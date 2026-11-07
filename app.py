@@ -435,7 +435,7 @@ if 'page_files' not in st.session_state:
 
 curr_page = st.session_state.current_page
 
-# شريط التحكم العلوي (بحث وتاريخ فقط)
+# شريط التحكم العلوي (بحث وتاريخ فقط بدون أي رفع برة)
 ctrl_cols = st.columns([2, 8])
 with ctrl_cols[0]:
     report_date = st.date_input("📅 تاريخ التقرير", value=date.today(), format="DD/MM/YYYY")
@@ -446,7 +446,7 @@ with ctrl_cols[1]:
 
 st.markdown(f"<hr style='margin: 15px 0 25px 0; border-color: {border_color};'>", unsafe_allow_html=True)
 
-# دالة معالجة بيانات أي صفحة
+# دالة معالجة بيانات أي صفحة بناءً على ملفاتها المرفوعة الخاصة بها
 def process_page_data(uploaded_files):
     if not uploaded_files:
         return None, None, None, None, None, 0, 0, 0, 0, 0, pd.DataFrame()
@@ -559,8 +559,8 @@ if page_uploaded is None:
         </div>
         """, unsafe_allow_html=True)
     
-    # 2. خانة رفع مستقلة وفاضية لكل صفحة تقرير لوحدها
-    st.markdown(f"<h3 style='text-align: center; color: {header_logo_color if curr_page != 'Overview' else text_color}; font-weight: 800;'>📁 ارفعي شيتات أو ملفات صفحة [{curr_page}]</h3>", unsafe_allow_html=True)
+    # 2. خانة رفع مستقلة وفاضية لكل صفحة تقرير لوحدها عند الدخول إليها
+    st.markdown(f"<h3 style='text-align: center; color: {text_color}; font-weight: 800; margin-top: 30px;'>📁 ارفعي ملفات أو شيتات صفحة [{curr_page}]</h3>", unsafe_allow_html=True)
     col_up1, col_up2, col_up3 = st.columns([1, 2, 1])
     with col_up2:
         files_in = st.file_uploader(f"رفع ملفات {curr_page}", type=["xlsx", "xls", "csv"], accept_multiple_files=True, label_visibility="collapsed", key=f"uploader_{curr_page}")
