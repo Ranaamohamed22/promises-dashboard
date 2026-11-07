@@ -126,6 +126,18 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
+# دالة عامة للبحث عن الأعمدة
+# ==========================================
+def find_col_in(target_df, candidates):
+    if target_df is None or target_df.empty:
+        return None
+    for c in candidates:
+        for col in target_df.columns:
+            if col.lower().strip() == c.lower().strip():
+                return col
+    return None
+
+# ==========================================
 # 0. الصف العلوي: القمر + Overview
 # ==========================================
 top_cols = st.columns([0.4, 1.3, 8], gap="small")
@@ -435,7 +447,7 @@ if 'page_files' not in st.session_state:
 
 curr_page = st.session_state.current_page
 
-# شريط التحكم العلوي: شريط البحث فقط من غير أي خانة رفع في الهيدر الرئيسي
+# شريط التحكم العلوي: شريط البحث فقط
 search_query = st.text_input("", placeholder="🔍 ابحثي هنا (برقم العميل، الاسم، أو أي بيان)...", label_visibility="collapsed")
 
 st.markdown(f"<hr style='margin: 15px 0 25px 0; border-color: {border_color}; clear: both;'>", unsafe_allow_html=True)
@@ -466,15 +478,6 @@ def process_page_data(uploaded_files):
     df_all = pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
     df_promises = pd.concat(promises_dfs, ignore_index=True) if promises_dfs else pd.DataFrame()
     df_act_raw = pd.concat(activity_dfs, ignore_index=True) if activity_dfs else df_all.copy()
-
-    def find_col_in(target_df, candidates):
-        if target_df.empty:
-            return None
-        for c in candidates:
-            for col in target_df.columns:
-                if col.lower().strip() == c.lower().strip():
-                    return col
-        return None
 
     created_col = find_col_in(df_act_raw, ['created on', 'created_on', 'createdon', 'تاريخ الإنشاء', 'وقت المعالجة', 'date', 'التاريخ'])
     if created_col:
@@ -544,7 +547,6 @@ def process_page_data(uploaded_files):
 page_uploaded = st.session_state.page_files[curr_page]
 
 if page_uploaded is None:
-    # 1. جملة الترحيب في الصفحة الرئيسية (Overview) فقط
     if curr_page == 'Overview':
         st.markdown(f"""
         <div style="background-color: {card_color}; border-radius: 15px; text-align: center; padding: 60px 20px; direction: rtl; border: 1px solid {border_color}; margin-top: 20px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
@@ -552,23 +554,25 @@ if page_uploaded is None:
             <p style="color: {sub_text_color}; font-size: 18px; font-weight: bold;">من شريط التنقل بالأعلى، اختاري أي تقرير لعرضه ورفع ملفاته الخاصة.</p>
         </div>
         """, unsafe_allow_html=True)
-    
-    # 2. خانة رفع مستقلة وفاضية لكل صفحة تقرير لوحدها عند الدخول إليها (تقبل XLSX فقط) مع الجملة المطلوبة
-    st.markdown(f"<p style='color: {text_color}; font-weight: 800; font-size: 18px; text-align: center; margin-top: 30px;'>ارفعي الملفات هنا ي رنا</p>", unsafe_allow_html=True)
-    col_up1, col_up2, col_up3 = st.columns([1, 2, 1])
-    with col_up2:
-        files_in = st.file_uploader(f"ارفعي الملفات هنا ي رنا", type=["xlsx"], accept_multiple_files=True, label_visibility="collapsed", key=f"uploader_{curr_page}")
-        if files_in:
-            st.session_state.page_files[curr_page] = files_in
-            st.rerun()
+    else:
+        # خانة الرفع في جهة اليمين تماماً مع الجملة المطلوبة وصيغة XLSX فقط
+        st.markdown(f"<p style='color: {text_color}; font-weight: 800; font-size: 18px; text-align: right; direction: rtl; margin-top: 20px;'>ارفعي الملفات هنا ي رنا</p>", unsafe_allow_html=True)
+        col_up1, col_up2 = st.columns([7, 3])
+        with col_up1:
+            files_in = st.file_uploader("ارفعي الملفات هنا ي رنا", type=["xlsx"], accept_multiple_files=True, label_visibility="collapsed", key=f"uploader_{curr_page}")
+            if files_in:
+                st.session_state.page_files[curr_page] = files_in
+                st.rerun()
 else:
     active_promises_df, broken_promises_df, neglect_df, activity_base_df, report_bytes, total_rows, total_unhandled, active_count, broken_count, neglect_count, total_activity_count = process_page_data(st.session_state.page_files[curr_page])
 
     with st.expander("📁 استبدال أو تغيير ملفات هذا التقرير"):
-        new_f = st.file_uploader(f"ملفات جديدة لـ {curr_page}", type=["xlsx"], key=f"re_uploader_{curr_page}")
-        if new_f:
-            st.session_state.page_files[curr_page] = [new_f]
-            st.rerun()
+        col_ex1, col_ex2 = st.columns([7, 3])
+        with col_ex1:
+            new_f = st.file_uploader("ملفات جديدة (XLSX فقط)", type=["xlsx"], accept_multiple_files=True, key=f"re_uploader_{curr_page}")
+            if new_f:
+                st.session_state.page_files[curr_page] = new_f
+                st.rerun()
 
     # ==========================================
     # صفحة الـ Overview الشاملة
@@ -579,32 +583,32 @@ else:
         
         st.markdown(f"""
         <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; margin-bottom: 30px;">
-            <div class="kpi-card" style="border-left-color: {border_color}; padding: 15px;">
+            <div class="kpi-card" style="border-right-color: {border_color}; padding: 15px;">
                 <div class="kpi-icon">📋</div>
                 <div class="kpi-title">إجمالي الحسابات</div>
                 <div class="kpi-value">{total_rows:,}</div>
             </div>
-            <div class="kpi-card" style="border-left-color: #586F8C; padding: 15px;">
+            <div class="kpi-card" style="border-right-color: #586F8C; padding: 15px;">
                 <div class="kpi-icon">⏳</div>
                 <div class="kpi-title">وعود قيد التنفيذ</div>
                 <div class="kpi-value">{total_unhandled:,}</div>
             </div>
-            <div class="kpi-card" style="border-left-color: #304D73; padding: 15px;">
+            <div class="kpi-card" style="border-right-color: #304D73; padding: 15px;">
                 <div class="kpi-icon">✅</div>
                 <div class="kpi-title">وعود قائمة</div>
                 <div class="kpi-value">{active_count:,}</div>
             </div>
-            <div class="kpi-card" style="border-left-color: #586F8C; padding: 15px;">
+            <div class="kpi-card" style="border-right-color: #586F8C; padding: 15px;">
                 <div class="kpi-icon">⚠️</div>
                 <div class="kpi-title">وعود مكسورة</div>
                 <div class="kpi-value">{broken_count:,}</div>
             </div>
-            <div class="kpi-card" style="border-left-color: #99AABF; padding: 15px;">
+            <div class="kpi-card" style="border-right-color: #99AABF; padding: 15px;">
                 <div class="kpi-icon">🚨</div>
                 <div class="kpi-title">حالات إهمال</div>
                 <div class="kpi-value">{neglect_count:,}</div>
             </div>
-            <div class="kpi-card" style="border-left-color: {border_color}; padding: 15px;">
+            <div class="kpi-card" style="border-right-color: {border_color}; padding: 15px;">
                 <div class="kpi-icon">📞</div>
                 <div class="kpi-title">إجمالي النشاط</div>
                 <div class="kpi-value">{total_activity_count:,}</div>
@@ -679,7 +683,7 @@ else:
     # ==========================================
     elif curr_page == 'Promises':
         st.markdown(f"""
-        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px;">
+        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; text-align: right; margin-bottom: 20px;">
             <h3 style="margin:0; color:#1F4373; font-weight:900;">🤝 إدارة ومتابعة الوعود (القائمة والمكسورة)</h3>
         </div>
         """, unsafe_allow_html=True)
@@ -703,7 +707,7 @@ else:
         
     elif curr_page == 'Neglect':
         st.markdown(f"""
-        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px;">
+        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; text-align: right; margin-bottom: 20px;">
             <h3 style="margin:0; color:#586F8C; font-weight:900;">🚨 تقرير الإهمال (تأخير أكثر من 3 أيام)</h3>
         </div>
         """, unsafe_allow_html=True)
@@ -715,11 +719,11 @@ else:
         st.dataframe(final_neglect_df, use_container_width=True, height=450)
 
     # ==========================================
-    # صفحة تقرير النشاط (مع اختيار المدى وزاوية اليمين RTL)
+    # صفحة تقرير النشاط (مع اختيار المدى: يومي، أسبوعي، شهري ومحاذاة RTL)
     # ==========================================
     elif curr_page == 'Activity':
         st.markdown(f"""
-        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px; text-align: right;">
+        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; text-align: right; margin-bottom: 20px;">
             <h3 style="margin:0; color:{text_color}; font-weight:900;">📈 تقرير النشاط وموديل التقييم (ناجحة / مغطاة)</h3>
         </div>
         """, unsafe_allow_html=True)
