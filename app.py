@@ -616,4 +616,14 @@ if uploaded_files:
         st.dataframe(act_df[display_cols], use_container_width=True, height=450)
 
         act_buf = io.BytesIO()
-        act_df[display
+        act_df[display_cols].to_excel(act_buf, index=False, sheet_name='تقرير النشاط والتقييم')
+        act_buf.seek(0)
+        st.download_button("📥 تحميل تقرير النشاط مفلتر.xlsx", data=act_buf, file_name=f"Activity_Success_Report_{today.date()}.xlsx")
+
+else:
+    st.markdown(f"""
+    <div style="background-color: {nav_btn_bg}; border-radius: 15px; text-align: center; padding: 100px 20px; direction: rtl; border: 1px solid {border_color}; margin-top: 50px;">
+        <h2 style="color: {text_color}; margin-bottom: 15px; font-weight:900;">أهلاً بيكي في منصة تقارير شركة إجادة لتحصيل الديون</h2>
+        <p style="color: {sub_text_color}; font-size: 18px; font-weight: bold;">من شريط التحكم بالأعلى، ارفعي شيت الإكسيل اليومي لعرض الداشبورد والتقارير.</p>
+    </div>
+    """, unsafe_allow_html=True)
