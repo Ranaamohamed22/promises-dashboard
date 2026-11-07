@@ -166,7 +166,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. شريط التنقل (دمج الوعود القائمة والمكسورة في زر واحد)
+# 2. شريط التنقل (الوعود المدمجة + الإهمال + النشاط)
 # ==========================================
 nav_cols = st.columns([1.5, 1.3, 1.3, 5], gap="small") 
 
@@ -522,7 +522,8 @@ if uploaded_files:
         neglect_base = neglect_base[n_due_date != today]
         n_last_date = pd.to_datetime(neglect_base['Follow up Last Date'], errors='coerce').dt.normalize()
         neglect_base['Neglect_Days'] = (today - n_last_date).dt.days
-        neglect_df = neglect_base[neglect_base['Neglect_Days'] > 3].copy()
+        neglect_mask = neglect_base['Neglect_Days'] > 3
+        neglect_df = neglect_base[neglect_mask].copy()
 
         total_unhandled = len(df_promises[base_condition])
 
@@ -781,7 +782,16 @@ if uploaded_files:
                         if val_str in ['1', '1.0', '1,0']: return 'ناجحة'
                         elif val_str in ['0', '0.0', '0,0']: return 'مغطاة'
                         else: return 'غير مصنف'
-                    act_df['Call_Status'] = act_df[target_status_col[0]].apply(classify_call)
+                    
+                    actual_col = target_status_col[0]
+                    if actual_col in act_df.columns:
+                        act_df['Call_Status'] = act_df[actual_col].apply(classify_call)
+                    else:
+                        found_c = find_col_in(act_df, ['التقييم', 'التقيمي', 'evaluation', 'eval', 'تقييم', 'status', 'الحالة'])
+                        if found_c:
+                            act_df['Call_Status'] = act_df[found_c].apply(classify_call)
+                        else:
+                            act_df['Call_Status'] = 'غير مصنف'
             else:
                 st.warning("⚠️ لم يتم العثور على عمود مشترك بين شيت النشاط الأساسي وموديل النشاط المرفوع.")
                 act_df['Call_Status'] = 'غير مصنف'
