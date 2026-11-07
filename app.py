@@ -20,6 +20,18 @@ if 'theme_choice' not in st.session_state:
     st.session_state.theme_choice = 'ثيم إجادة (Navy)'
 
 # ==========================================
+# دالة عامة للبحث عن الأعمدة (تم نقلها للأعلى لتجنب الـ NameError)
+# ==========================================
+def find_col_in(target_df, candidates):
+    if target_df is None or target_df.empty:
+        return None
+    for c in candidates:
+        for col in target_df.columns:
+            if col.lower().strip() == c.lower().strip():
+                return col
+    return None
+
+# ==========================================
 # إعدادات الثيم والألوان بالترتيب المطلوب
 # ==========================================
 ejada_navy_dark = "#1F4373"
@@ -124,18 +136,6 @@ st.markdown(f"""
     .kpi-icon {{ position: absolute; top: 20px; left: 20px; font-size: 24px; opacity: 0.9; }}
 </style>
 """, unsafe_allow_html=True)
-
-# ==========================================
-# دالة عامة للبحث عن الأعمدة
-# ==========================================
-def find_col_in(target_df, candidates):
-    if target_df is None or target_df.empty:
-        return None
-    for c in candidates:
-        for col in target_df.columns:
-            if col.lower().strip() == c.lower().strip():
-                return col
-    return None
 
 # ==========================================
 # 0. الصف العلوي: القمر + Overview
