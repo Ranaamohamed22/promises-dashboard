@@ -510,4 +510,110 @@ if uploaded_files:
                 start_t, end_t = time(16, 0), time(23, 0) if exclude_last_hour else time(23, 59, 59)
                 act_df = act_df[(act_times >= start_t) & (act_times <= end_t)]
 
-            if exclude_break
+            if exclude_break:
+                curr_times = act_df['Created_DateTime'].dt.time
+                act_df = act_df[~((curr_times >= time(12, 0)) & (curr_times <= time(12, 30)))]
+        else:
+            st.info("ℹ️ يتم عرض كافة سجلات النشاط (لم يتم العثور على عمود وقت Created On لتطبيق فلتر الساعات).")
+            act_df = activity_base_df.copy()
+
+        if mapping_file is not None:
+            map_df = pd.read_excel(mapping_file)
+            map_df.columns = map_df.columns.str.strip()
+            common_cols = [c for c in map_df.columns if c in act_df.columns]
+            if common_cols:
+                join_key = common_cols[0] 
+                target_status_col = [c for c in map_df.columns if c != join_key]
+                if target_status_col:
+                    act_df = act_df.merge(map_df[[join_key, target_status_col[0]]], on=join_key, how='left')
+                    def classify_call(val):
+                        val_str = str(val).strip()
+                        if val_str in ['1', '1.0', '1,0']: return 'ناجحة'
+                        elif val_str in ['0', '0.0', '0,0']: return 'مغطاة'
+                        else: return 'غير مصنف'
+                    act_df['Call_Status'] = act_df[target_status_col[0]].apply(classify_call)
+            else:
+                st.warning("⚠️ لم يتم العثور على عمود مشترك بين شيت النشاط الأساسي وموديل النشاط المرفوع.")
+                act_df['Call_Status'] = 'غير مصنف'
+        else:
+            target_col = find_col_in(act_df, ['التقييم', 'التقيمي', 'evaluation', 'eval', 'تقييم', 'status', 'الحالة', 'sub state', 'result', 'نتيجة المكالمة'])
+            target_col = target_col if target_col else act_df.columns[0]
+            available_vals = act_df[target_col].dropna().astype(str).unique().tolist()
+            selected_success_vals = st.multiselect(f"حددي القيم التي تعتبر (ناجحة = 1) من عمود [{target_col}]:", options=available_vals, default=[v for v in available_vals if str(v).strip() in ['1', '1.0', 'ناجح', 'وعد', 'سداد', 'تم']])
+            act_df['Call_Status'] = act_df[target_col].astype(str).apply(lambda x: 'ناجحة' if x in selected_success_vals else 'مغطاة')
+
+        if search_query:
+            act_df = act_df[act_df.astype(str).apply(lambda x: x.str.contains(search_query, case=False, na=False)).any(axis=1)]
+
+        total_activity = len(act_df)
+        success_count = len(act_df[act_df['Call_Status'] == 'ناجحة'])
+        covered_count = len(act_df[act_df['Call_Status'] == 'مغطاة'])
+        success_rate = (success_count / total_activity * 100) if total_activity > 0 else 0
+
+        if collector_col and collector_col in act_df.columns and total_activity > 0:
+            top_collector_series = act_df[collector_col].value_counts()
+            if not top_collector_series.empty:
+                top_name = top_collector_series.index[0]
+                top_calls = top_collector_series.values[0]
+                top_pct = (top_calls / total_activity * 100) if total_activity > 0 else 0
+                
+                st.markdown(f"""
+                <div style="background-color: {nav_btn_bg}; border-radius: 12px; padding: 20px 30px; border: 2px solid #F3A638; direction:rtl; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <h4 style="margin:0; color: #F3A638; font-weight:900;">🏆 بطل الشفت (الأكثر نشاطاً)</h4>
+                        <p style="margin: 5px 0 0 0; color: {text_color}; font-size: 18px;">المحصل: <b style="color:{snb_green}; font-size: 22px;">{top_name}</b></p>
+                    </div>
+                    <div style="text-align: left; background-color: {bg_color}; padding: 10px 20px; border-radius: 8px; border: 1px solid #F3A638;">
+                        <h3 style="margin:0; color: #F3A638; font-weight:900;">{top_calls:,} مكالمة</h3>
+                        <p style="margin: 0; color: #FFFFFF; font-size: 14px; font-weight: bold;">استحوذ على <span style="color:{snb_green};">{top_pct:.1f}%</span> من إجمالي شغل اليوم</p>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px;">
+            <div class="kpi-card" style="border-left-color: {border_color};">
+                <div class="kpi-icon">📞</div>
+                <div class="kpi-title">إجمالي المحاولات</div>
+                <div class="kpi-value">{total_activity:,}</div>
+                <div class="kpi-sub" style="color: {sub_text_color};">بعد إزالة التكرار</div>
+            </div>
+            <div class="kpi-card" style="border-left-color: {snb_green};">
+                <div class="kpi-icon">✅</div>
+                <div class="kpi-title">المكالمات الناجحة (1)</div>
+                <div class="kpi-value">{success_count:,}</div>
+                <div class="kpi-sub" style="color: {snb_green};">تقييم ناجح</div>
+            </div>
+            <div class="kpi-card" style="border-left-color: {border_color};">
+                <div class="kpi-icon">🎧</div>
+                <div class="kpi-title">المكالمات المغطاة (0)</div>
+                <div class="kpi-value">{covered_count:,}</div>
+                <div class="kpi-sub" style="color: {sub_text_color};">تقييم مغطاة</div>
+            </div>
+            <div class="kpi-card" style="border-left-color: #F3A638;">
+                <div class="kpi-icon">🎯</div>
+                <div class="kpi-title">نسبة النجاح الإجمالية</div>
+                <div class="kpi-value">{success_rate:.1f}%</div>
+                <div class="kpi-sub" style="color: #F3A638;">معدل الوصول للعملاء</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if collector_col and collector_col in act_df.columns:
+            pivot_summary = act_df.groupby([collector_col, 'Call_Status']).size().unstack(fill_value=0)
+            if 'ناجحة' not in pivot_summary.columns: pivot_summary['ناجحة'] = 0
+            if 'مغطاة' not in pivot_summary.columns: pivot_summary['مغطاة'] = 0
+            
+            pivot_summary['إجمالي المحاولات'] = pivot_summary['ناجحة'] + pivot_summary['مغطاة']
+            pivot_summary['نسبة النجاح %'] = (pivot_summary['ناجحة'] / pivot_summary['إجمالي المحاولات'] * 100).round(1).astype(str) + '%'
+            pivot_summary = pivot_summary.sort_values(by='إجمالي المحاولات', ascending=False).reset_index()
+
+            with st.expander("📊 تفصيل أداء المحصلين (ناجحة مقابل مغطاة)", expanded=True):
+                st.dataframe(pivot_summary, use_container_width=True)
+
+        extra_time_cols = [c for c in ['Date', 'Time', 'Call_Status'] if c in act_df.columns]
+        display_cols = extra_time_cols + [c for c in act_df.columns if c not in ['Created_DateTime', 'Date', 'Time', 'Call_Status']]
+        st.dataframe(act_df[display_cols], use_container_width=True, height=450)
+
+        act_buf = io.BytesIO()
+        act_df[display
