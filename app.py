@@ -178,26 +178,31 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. شريط التنقل
+# 2. شريط التنقل (مزود بزر البيت 🏠 للعودة للترحيب)
 # ==========================================
-nav_cols = st.columns([1.5, 1.3, 1.3, 5], gap="small") 
+nav_cols = st.columns([1, 1.5, 1.3, 1.3, 4.9], gap="small") 
 
 with nav_cols[0]:
+    if st.button("🏠 الرئيسية", type="primary" if st.session_state.current_page == 'Overview' else "secondary", use_container_width=True):
+        st.session_state.current_page = 'Overview'
+        st.rerun()
+
+with nav_cols[1]:
     if st.button("🤝 الوعود القائمة والمكسورة", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=True):
         st.session_state.current_page = 'Promises'
         st.rerun()
 
-with nav_cols[1]:
+with nav_cols[2]:
     if st.button("🚨 تقرير الإهمال", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=True):
         st.session_state.current_page = 'Neglect'
         st.rerun()
 
-with nav_cols[2]:
+with nav_cols[3]:
     if st.button("📈 النشاط", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=True):
         st.session_state.current_page = 'Activity'
         st.rerun()
 
-with nav_cols[3]:
+with nav_cols[4]:
     st.markdown("")
 
 st.markdown(f"<hr style='margin: 10px 0 15px 0; border-color: {border_color}; clear: both;'>", unsafe_allow_html=True)
@@ -447,9 +452,6 @@ if 'page_files' not in st.session_state:
 
 curr_page = st.session_state.current_page
 
-# شريط التحكم العلوي: شريط البحث فقط
-search_query = st.text_input("", placeholder="🔍 ابحثي هنا (برقم العميل، الاسم، أو أي بيان)...", label_visibility="collapsed")
-
 st.markdown(f"<hr style='margin: 15px 0 25px 0; border-color: {border_color}; clear: both;'>", unsafe_allow_html=True)
 
 # دالة معالجة بيانات أي صفحة
@@ -527,11 +529,6 @@ def process_page_data(uploaded_files):
 
         total_unhandled = len(df_promises[base_condition])
 
-        if search_query:
-            active_promises_df = active_promises_df[active_promises_df.astype(str).apply(lambda x: x.str.contains(search_query, case=False, na=False)).any(axis=1)]
-            broken_promises_df = broken_promises_df[broken_promises_df.astype(str).apply(lambda x: x.str.contains(search_query, case=False, na=False)).any(axis=1)]
-            neglect_df = neglect_df[neglect_df.astype(str).apply(lambda x: x.str.contains(search_query, case=False, na=False)).any(axis=1)]
-
     output_buffer = build_report_xlsx(active_promises_df, broken_promises_df, neglect_df)
     report_bytes = output_buffer.getvalue()
 
@@ -555,7 +552,6 @@ if page_uploaded is None:
         </div>
         """, unsafe_allow_html=True)
     else:
-        # خانة الرفع في جهة اليمين تماماً مع الجملة المطلوبة وصيغة XLSX فقط بدون خانة استبدال
         st.markdown(f"<p style='color: {text_color}; font-weight: 800; font-size: 18px; text-align: right; direction: rtl; margin-top: 20px;'>ارفعي الملفات هنا ي رنا</p>", unsafe_allow_html=True)
         col_up1, col_up2 = st.columns([7, 3])
         with col_up1:
@@ -565,8 +561,6 @@ if page_uploaded is None:
                 st.rerun()
 else:
     active_promises_df, broken_promises_df, neglect_df, activity_base_df, report_bytes, total_rows, total_unhandled, active_count, broken_count, neglect_count, total_activity_count = process_page_data(st.session_state.page_files[curr_page])
-
-    # تم إزالة خانة "استبدال أو تغيير ملفات هذا التقرير" بناءً على طلبك
 
     # ==========================================
     # صفحة الـ Overview الشاملة
@@ -713,7 +707,7 @@ else:
         st.dataframe(final_neglect_df, use_container_width=True, height=450)
 
     # ==========================================
-    # صفحة تقرير النشاط (العنوان في المنتصف تماماً)
+    # صفحة تقرير النشاط (العنوان في المنتصف + محصل باليمين وموديل النشاط باليسار)
     # ==========================================
     elif curr_page == 'Activity':
         st.markdown(f"""
@@ -722,11 +716,25 @@ else:
         </div>
         """, unsafe_allow_html=True)
 
-        with st.expander("📁 ارفعي موديل النشاط (شيت التقييم 1 و 0) - اختياري", expanded=True):
-            st.markdown(f"<p style='font-size: 13px; color: {sub_text_color}; direction: rtl; text-align: right;'>التقييم (1) يعني 'ناجحة'، والتقييم (0) يعني 'مغطاة'.</p>", unsafe_allow_html=True)
-            mapping_file = st.file_uploader("شيت موديل النشاط (اختياري)", type=["xlsx"], key="mapping_uploader")
+        # صف مستقل لكل صندوق في مربعه لوحده جهة اليمين واليسار
+        col_act_right, col_act_left = st.columns([1, 1], gap="medium")
 
-        # خانة اختيار المدى الزمني للنشاط (يومي، أسبوعي، شهري)
+        with col_act_right:
+            with st.container(border=True):
+                collector_col_name = find_col_in(activity_base_df, ['collecter', 'collector', 'المحصل', 'اسم المحصل'])
+                collector_options = ["الكل (جميع المحصلين)"]
+                if collector_col_name and collector_col_name in activity_base_df.columns:
+                    unique_colls = activity_base_df[collector_col_name].dropna().astype(str).unique().tolist()
+                    collector_options.extend(sorted(unique_colls))
+                
+                selected_collector = st.selectbox("👤 ابحثي عن اسم المحصل (Collector):", options=collector_options)
+
+        with col_act_left:
+            with st.container(border=True):
+                st.markdown(f"<p style='font-size: 13px; color: {sub_text_color}; direction: rtl; text-align: right; margin-bottom: 0;'>التقييم (1) يعني 'ناجحة'، والتقييم (0) يعني 'مغطاة'.</p>", unsafe_allow_html=True)
+                mapping_file = st.file_uploader("شيت موديل النشاط (اختياري)", type=["xlsx"], key="mapping_uploader")
+
+        # فلاتر المدى الزمني والشفت والبريك
         filter_act_col1, filter_act_col2, filter_act_col3, filter_act_col4 = st.columns([1.5, 2, 1.5, 1.5])
         with filter_act_col1:
             time_range_mode = st.selectbox("📅 مدى التقرير:", ["يومي", "أسبوعي", "شهري"])
@@ -737,9 +745,15 @@ else:
         with filter_act_col4:
             exclude_break = st.checkbox("☕ استبعاد البريك (12:00 - 12:30)", value=False)
 
-        created_col = find_col_in(activity_base_df, ['created on', 'created_on', 'createdon', 'تاريخ الإنشاء', 'وقت المعالجة', 'date', 'التاريخ'])
-        if created_col and 'Created_DateTime' in activity_base_df.columns and activity_base_df['Created_DateTime'].notna().any():
-            act_df = activity_base_df.dropna(subset=['Created_DateTime']).copy()
+        act_df = activity_base_df.copy()
+
+        # تصفية المحصل المختار
+        if collector_col_name and collector_col_name in act_df.columns and selected_collector != "الكل (جميع المحصلين)":
+            act_df = act_df[act_df[collector_col_name].astype(str).str.strip() == selected_collector]
+
+        created_col = find_col_in(act_df, ['created on', 'created_on', 'createdon', 'تاريخ الإنشاء', 'وقت المعالجة', 'date', 'التاريخ'])
+        if created_col and 'Created_DateTime' in act_df.columns and act_df['Created_DateTime'].notna().any():
+            act_df = act_df.dropna(subset=['Created_DateTime']).copy()
             
             # فلترة حسب المدى الزمني (يومي، أسبوعي، شهري)
             max_dt = act_df['Created_DateTime'].max()
@@ -795,9 +809,6 @@ else:
             available_vals = act_df[target_col].dropna().astype(str).unique().tolist()
             selected_success_vals = st.multiselect(f"حددي القيم التي تعتبر (ناجحة = 1) من عمود [{target_col}]:", options=available_vals, default=[v for v in available_vals if str(v).strip() in ['1', '1.0', 'ناجح', 'وعد', 'سداد', 'تم']])
             act_df['Call_Status'] = act_df[target_col].astype(str).apply(lambda x: 'ناجحة' if x in selected_success_vals else 'مغطاة')
-
-        if search_query:
-            act_df = act_df[act_df.astype(str).apply(lambda x: x.str.contains(search_query, case=False, na=False)).any(axis=1)]
 
         total_activity = len(act_df)
         success_count = len(act_df[act_df['Call_Status'] == 'ناجحة'])
