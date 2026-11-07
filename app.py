@@ -423,7 +423,7 @@ def build_report_xlsx(active_df, broken_df, neglect_df=None):
     return buf
 
 # ==========================================
-# إدارة الملفات لكل صفحة تقرير بشكل منفصل تماماً
+# إدارة الملفات لكل صفحة تقرير بشكل منفصل
 # ==========================================
 if 'page_files' not in st.session_state:
     st.session_state.page_files = {
@@ -554,7 +554,7 @@ def process_page_data(uploaded_files):
 page_uploaded = st.session_state.page_files[curr_page]
 
 if page_uploaded is None:
-    # 1. لو في الصفحة الرئيسية (Overview)، نعرض جملة الترحيب المخصصة لرنا
+    # 1. جملة الترحيب في الصفحة الرئيسية (Overview) فقط
     if curr_page == 'Overview':
         st.markdown(f"""
         <div style="background-color: {card_color}; border-radius: 15px; text-align: center; padding: 60px 20px; direction: rtl; border: 1px solid {border_color}; margin-top: 20px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
@@ -563,7 +563,7 @@ if page_uploaded is None:
         </div>
         """, unsafe_allow_html=True)
     else:
-        st.info(f"📁 يرجى رفع الملفات الخاصة بصفحة [{curr_page}] من خانة الرفع بالأعلى للبدء.")
+        st.info(f"📁 يرجى رفع الملفات الخاصة بصفحة [{curr_page}] باستخدام خانة الرفع بالأعلى للبدء.")
 else:
     active_promises_df, broken_promises_df, neglect_df, activity_base_df, report_bytes, total_rows, total_unhandled, active_count, broken_count, neglect_count, total_activity_count = process_page_data(st.session_state.page_files[curr_page])
 
