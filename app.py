@@ -58,24 +58,24 @@ if st.session_state.theme_choice == "ثيم إجادة (Navy)":
     input_bg = "#FFFFFF"
     input_text = "#1F4373"
 else:
-    bg_color = "#13131A"
-    card_color = "#1C1C24"
-    border_color = "#2D2D3B"
+    bg_color = "#FFFFFF"
+    card_color = "#F0F2F6"
+    border_color = "#D1D5DB"
     primary_color = ejada_navy_light
     primary_text = "#FFFFFF"
-    text_color = "#FFFFFF" 
-    sub_text_color = "#A0AEC0"
-    gauge_bg = "#2D2D3B"
-    nav_btn_bg = "#1A1A1D"
-    nav_btn_text = "#E0E0E0"
-    nav_btn_border = "#333333"
-    kpi_title_color = "#A0AEC0"
-    header_logo_color = "#FFFFFF"
-    input_bg = "#1A1A1D"
-    input_text = "#FFFFFF"
+    text_color = "#1F2937" 
+    sub_text_color = "#4B5563"
+    gauge_bg = "#E2E8F0"
+    nav_btn_bg = "#FFFFFF"
+    nav_btn_text = "#1F2937"
+    nav_btn_border = "#D1D5DB"
+    kpi_title_color = "#4B5563"
+    header_logo_color = "#1F4373"
+    input_bg = "#FFFFFF"
+    input_text = "#1F2937"
 
 # ==========================================
-# تصميم الـ UI الديناميكي (CSS) وتبييض كل الشرايط والمربعات تلقائياً
+# تصميم الـ UI الديناميكي (CSS)
 # ==========================================
 st.markdown(f"""
 <style>
@@ -124,11 +124,19 @@ st.markdown(f"""
         box-shadow: 0 2px 6px rgba(0,0,0,0.4) !important;
     }}
 
-    /* تحويل جميع حقول الإدخال، القوائم المنسدلة، وعناصر الـ Select و MultiSelect إلى أبيض في الثيم الأبيض */
-    .stTextInput input, div[data-baseweb="select"] > div, div[data-baseweb="base-input"] {{ background-color: {input_bg} !important; color: {input_text} !important; border: 1px solid {border_color} !important; border-radius: 8px !important; direction: rtl; text-align: right; }}
-    div[data-baseweb="tag"] {{ background-color: {ejada_navy_light} !important; color: #FFFFFF !important; }}
-    span[data-baseweb="tag"] span {{ color: #FFFFFF !important; }}
+    .stTextInput input, div[data-baseweb="select"] > div, div[data-baseweb="base-input"], div[data-baseweb="tag"] {{
+        background-color: {input_bg} !important;
+        color: {input_text} !important;
+        border: 1px solid {border_color} !important;
+        border-radius: 8px !important;
+        direction: rtl;
+        text-align: right;
+    }}
     
+    div[data-baseweb="select"] span, div[data-baseweb="select"] div, span[data-baseweb="tag"] span {{
+        color: {input_text} !important;
+    }}
+
     .stTextInput input::placeholder {{ color: {sub_text_color} !important; }}
     
     [data-testid="stFileUploader"] > section {{ background-color: {input_bg} !important; border: 1px dashed {border_color} !important; border-radius: 8px !important; }}
@@ -143,16 +151,16 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 0. الصف العلوي: القمر + Overview
+# 0. الصف العلوي: زر القمر (الثيم) + Overview
 # ==========================================
 top_cols = st.columns([0.5, 1.5, 6], gap="small")
 
 with top_cols[0]:
     if st.button(" ", key="theme_toggle"): 
-        if st.session_state.theme_choice == 'التصميم الأصلي (Dark)':
+        if st.session_state.theme_choice == 'التصميم الأبيض (Light)':
             st.session_state.theme_choice = 'ثيم إجادة (Navy)'
         else:
-            st.session_state.theme_choice = 'التصميم الأصلي (Dark)'
+            st.session_state.theme_choice = 'التصميم الأبيض (Light)'
         st.rerun()
 
 with top_cols[1]:
@@ -717,7 +725,7 @@ else:
         st.dataframe(final_neglect_df, use_container_width=True, height=450)
 
     # ==========================================
-    # صفحة تقرير النشاط (محاذاة كاملة لليمين وتبييض كل المربعات في الثيم الأبيض)
+    # صفحة تقرير النشاط (معتمد على Notes والمربعات البيضاء في الثيم الأبيض)
     # ==========================================
     elif curr_page == 'Activity':
         st.markdown(f"""
@@ -902,10 +910,4 @@ else:
         st.markdown("<div style='text-align: right; direction: rtl;'>", unsafe_allow_html=True)
         extra_time_cols = [c for c in ['Date', 'Time', 'Call_Status'] if c in act_df.columns]
         display_cols = extra_time_cols + [c for c in act_df.columns if c not in ['Created_DateTime', 'Date', 'Time', 'Call_Status']]
-        st.dataframe(act_df[display_cols], use_container_width=True, height=450)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        act_buf = io.BytesIO()
-        act_df[display_cols].to_excel(act_buf, index=False, sheet_name='تقرير النشاط والتقييم')
-        act_buf.seek(0)
-        st.download_button("📥 تحميل تقرير النشاط مفلتر.xlsx", data=act_buf, file_name=f"Activity_Success_Report.xlsx")
+        st.dataframe(
