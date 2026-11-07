@@ -436,4 +436,207 @@ if uploaded_files:
             <h5 style="margin:0 0 20px 0; color:{text_color}; font-weight:900;">Breakdown Overview</h5>
             <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid {border_color}; direction: rtl;">
                 <span style="width:30%; color:{text_color}; font-weight: bold; text-align: right;">الوعود القائمة اليوم</span>
-                <div style="width: 55%; background-color: {gauge_bg}; height: 8px; border-radius: 4px; overflow: hidden;"><div style="width:{gauge_val}
+                <div style="width: 55%; background-color: {gauge_bg}; height: 8px; border-radius: 4px; overflow: hidden;"><div style="width:{gauge_val}%; background-color:{snb_green}; height:100%;"></div></div>
+                <span style="color:{snb_green}; font-weight: bold; font-size: 14px;">{gauge_val}%</span>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid {border_color}; direction: rtl;">
+                <span style="width:30%; color:{text_color}; font-weight: bold; text-align: right;">الوعود المكسورة</span>
+                <div style="width: 55%; background-color: {gauge_bg}; height: 8px; border-radius: 4px; overflow: hidden;"><div style="width:{100-gauge_val if total_extracted > 0 else 0}%; background-color:#586F8C; height:100%;"></div></div>
+                <span style="color:#586F8C; font-weight: bold; font-size: 14px;">{100-gauge_val if total_extracted > 0 else 0}%</span>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; direction: rtl;">
+                <span style="width:30%; color:{text_color}; font-weight: bold; text-align: right;">حالات الإهمال</span>
+                <div style="width: 55%; background-color: {gauge_bg}; height: 8px; border-radius: 4px; overflow: hidden;"><div style="width:{int(neglect_count/total_rows*100) if total_rows > 0 else 0}%; background-color:#99AABF; height:100%;"></div></div>
+                <span style="color:#99AABF; font-weight: bold; font-size: 14px;">{int(neglect_count/total_rows*100) if total_rows > 0 else 0}%</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.download_button(label=f"📥 تحميل التقرير الكامل - {today.date()}.xlsx", data=output_buffer, file_name=f"Daily_Promises_Report_{today.date()}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+
+    # ==========================================
+    # باقي الصفحات 
+    # ==========================================
+    elif st.session_state.current_page == 'Active':
+        st.markdown(f"""
+        <div style="background-color: {nav_btn_bg}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px;">
+            <h3 style="margin:0; color:{snb_green}; font-weight:900;">✅ شيت الوعود القائمة ({active_count:,} حساب)</h3>
+        </div>
+        """, unsafe_allow_html=True)
+        st.dataframe(active_promises_df, use_container_width=True, height=450)
+        
+    elif st.session_state.current_page == 'Broken':
+        st.markdown(f"""
+        <div style="background-color: {nav_btn_bg}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px;">
+            <h3 style="margin:0; color:#586F8C; font-weight:900;">⚠️ شيت الوعود المكسورة ({broken_count:,} حساب)</h3>
+        </div>
+        """, unsafe_allow_html=True)
+        st.dataframe(broken_promises_df, use_container_width=True, height=450)
+        
+    elif st.session_state.current_page == 'Neglect':
+        st.markdown(f"""
+        <div style="background-color: {nav_btn_bg}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px;">
+            <h3 style="margin:0; color:#99AABF; font-weight:900;">🚨 تقرير الإهمال (تأخير أكثر من 3 أيام)</h3>
+        </div>
+        """, unsafe_allow_html=True)
+        default_sub_states = ['وعد بسداد مبلغ المعالجة', 'واعد بسداد مبلغ المعالجه', 'رافض السداد', 'الجوال مغلق', 'مماطل', 'تم سداد جزء وليس مبلغ المعالجه', 'لا يجيب', 'متقاعد الراتب علي بنك آخر', 'يرغب بجدوله المديونيه']
+        selected_sub_states = st.multiselect("فلاتر الـ Sub State المشمولة:", options=default_sub_states, default=default_sub_states)
+        sub_col = 'Sub State' if 'Sub State' in neglect_df.columns else 'sub state' if 'sub state' in neglect_df.columns else None
+        final_neglect_df = neglect_df[neglect_df[sub_col].isin(selected_sub_states)] if sub_col else neglect_df
+        st.markdown(f"<p style='text-align:right; direction:rtl; color:#FFFFFF; font-weight: bold;'>العدد الإجمالي: <b style='color:#99AABF; font-size:18px;'>{len(final_neglect_df):,}</b> حساب مهمل</p>", unsafe_allow_html=True)
+        st.dataframe(final_neglect_df, use_container_width=True, height=450)
+
+    # ==========================================
+    # صفحة تقرير النشاط (Activity Report) 
+    # ==========================================
+    elif st.session_state.current_page == 'Activity':
+        st.markdown(f"""
+        <div style="background-color: {nav_btn_bg}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px;">
+            <h3 style="margin:0; color:{text_color}; font-weight:900;">📈 تقرير النشاط وموديل التقييم (ناجحة / مغطاة)</h3>
+            <p style="margin: 5px 0 0 0; color: {sub_text_color}; font-size: 14px;">تم حذف التكرار تلقائياً بناءً على ({collector_col or 'collecter'}, {id_col or 'id numer'}, {notes_col or 'notes'}).</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        with st.expander("📁 ارفعي موديل النشاط (شيت التقييم 1 و 0) - اختياري", expanded=True):
+            st.markdown(f"<p style='font-size: 13px; color: {sub_text_color}; direction: rtl;'>التقييم (1) يعني 'ناجحة'، والتقييم (0) يعني 'مغطاة'.</p>", unsafe_allow_html=True)
+            mapping_file = st.file_uploader("شيت موديل النشاط (اختياري)", type=["xlsx"], key="mapping_uploader")
+
+        filter_act_col1, filter_act_col2, filter_act_col3 = st.columns([2, 1.5, 1.5])
+        with filter_act_col1:
+            shift_option = st.selectbox("⏰ اختاري فترة النشاط (الشفت):", ["كل اليوم بدون تحديد", "من 2:00 م إلى 12:00 منتصف الليل (14:00 - 00:00)", "من 12:00 ظهراً إلى 4:00 عصراً (12:00 - 16:00)", "من 4:00 عصراً إلى آخر اليوم (16:00 - 23:59)"])
+        with filter_act_col2:
+            exclude_last_hour = st.checkbox("⏳ استبعاد آخر ساعة من الفترة", value=False)
+        with filter_act_col3:
+            exclude_break = st.checkbox("☕ استبعاد البريك (12:00 - 12:30)", value=False)
+
+        if created_col and 'Created_DateTime' in activity_base_df.columns and activity_base_df['Created_DateTime'].notna().any():
+            act_df = activity_base_df.dropna(subset=['Created_DateTime']).copy()
+            act_times = act_df['Created_DateTime'].dt.time
+
+            if shift_option == "من 2:00 م إلى 12:00 منتصف الليل (14:00 - 00:00)":
+                start_t, end_t = time(14, 0), time(23, 0) if exclude_last_hour else time(23, 59, 59)
+                act_df = act_df[(act_times >= start_t) & (act_times <= end_t)]
+            elif shift_option == "من 12:00 ظهراً إلى 4:00 عصراً (12:00 - 16:00)":
+                start_t, end_t = time(12, 0), time(15, 0) if exclude_last_hour else time(16, 0)
+                act_df = act_df[(act_times >= start_t) & (act_times <= end_t)]
+            elif shift_option == "من 4:00 عصراً إلى آخر اليوم (16:00 - 23:59)":
+                start_t, end_t = time(16, 0), time(23, 0) if exclude_last_hour else time(23, 59, 59)
+                act_df = act_df[(act_times >= start_t) & (act_times <= end_t)]
+
+            if exclude_break:
+                curr_times = act_df['Created_DateTime'].dt.time
+                act_df = act_df[~((curr_times >= time(12, 0)) & (curr_times <= time(12, 30)))]
+        else:
+            st.info("ℹ️ يتم عرض كافة سجلات النشاط (لم يتم العثور على عمود وقت Created On لتطبيق فلتر الساعات).")
+            act_df = activity_base_df.copy()
+
+        if mapping_file is not None:
+            map_df = pd.read_excel(mapping_file)
+            map_df.columns = map_df.columns.str.strip()
+            common_cols = [c for c in map_df.columns if c in act_df.columns]
+            if common_cols:
+                join_key = common_cols[0] 
+                target_status_col = [c for c in map_df.columns if c != join_key]
+                if target_status_col:
+                    act_df = act_df.merge(map_df[[join_key, target_status_col[0]]], on=join_key, how='left')
+                    def classify_call(val):
+                        val_str = str(val).strip()
+                        if val_str in ['1', '1.0', '1,0']: return 'ناجحة'
+                        elif val_str in ['0', '0.0', '0,0']: return 'مغطاة'
+                        else: return 'غير مصنف'
+                    act_df['Call_Status'] = act_df[target_status_col[0]].apply(classify_call)
+            else:
+                st.warning("⚠️ لم يتم العثور على عمود مشترك بين شيت النشاط الأساسي وموديل النشاط المرفوع.")
+                act_df['Call_Status'] = 'غير مصنف'
+        else:
+            target_col = find_col_in(act_df, ['التقييم', 'التقيمي', 'evaluation', 'eval', 'تقييم', 'status', 'الحالة', 'sub state', 'result', 'نتيجة المكالمة'])
+            target_col = target_col if target_col else act_df.columns[0]
+            available_vals = act_df[target_col].dropna().astype(str).unique().tolist()
+            selected_success_vals = st.multiselect(f"حددي القيم التي تعتبر (ناجحة = 1) من عمود [{target_col}]:", options=available_vals, default=[v for v in available_vals if str(v).strip() in ['1', '1.0', 'ناجح', 'وعد', 'سداد', 'تم']])
+            act_df['Call_Status'] = act_df[target_col].astype(str).apply(lambda x: 'ناجحة' if x in selected_success_vals else 'مغطاة')
+
+        if search_query:
+            act_df = act_df[act_df.astype(str).apply(lambda x: x.str.contains(search_query, case=False, na=False)).any(axis=1)]
+
+        total_activity = len(act_df)
+        success_count = len(act_df[act_df['Call_Status'] == 'ناجحة'])
+        covered_count = len(act_df[act_df['Call_Status'] == 'مغطاة'])
+        success_rate = (success_count / total_activity * 100) if total_activity > 0 else 0
+
+        if collector_col and collector_col in act_df.columns and total_activity > 0:
+            top_collector_series = act_df[collector_col].value_counts()
+            if not top_collector_series.empty:
+                top_name = top_collector_series.index[0]
+                top_calls = top_collector_series.values[0]
+                top_pct = (top_calls / total_activity * 100) if total_activity > 0 else 0
+                
+                st.markdown(f"""
+                <div style="background-color: {nav_btn_bg}; border-radius: 12px; padding: 20px 30px; border: 2px solid #586F8C; direction:rtl; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <h4 style="margin:0; color: #586F8C; font-weight:900;">🏆 بطل الشفت (الأكثر نشاطاً)</h4>
+                        <p style="margin: 5px 0 0 0; color: {text_color}; font-size: 18px;">المحصل: <b style="color:{snb_green}; font-size: 22px;">{top_name}</b></p>
+                    </div>
+                    <div style="text-align: left; background-color: {bg_color}; padding: 10px 20px; border-radius: 8px; border: 1px solid #586F8C;">
+                        <h3 style="margin:0; color: #586F8C; font-weight:900;">{top_calls:,} مكالمة</h3>
+                        <p style="margin: 0; color: #FFFFFF; font-size: 14px; font-weight: bold;">استحوذ على <span style="color:{snb_green};">{top_pct:.1f}%</span> من إجمالي شغل اليوم</p>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px;">
+            <div class="kpi-card" style="border-left-color: {border_color};">
+                <div class="kpi-icon">📞</div>
+                <div class="kpi-title">إجمالي المحاولات</div>
+                <div class="kpi-value">{total_activity:,}</div>
+                <div class="kpi-sub" style="color: {sub_text_color};">بعد إزالة التكرار</div>
+            </div>
+            <div class="kpi-card" style="border-left-color: {snb_green};">
+                <div class="kpi-icon">✅</div>
+                <div class="kpi-title">المكالمات الناجحة (1)</div>
+                <div class="kpi-value">{success_count:,}</div>
+                <div class="kpi-sub" style="color: {snb_green};">تقييم ناجح</div>
+            </div>
+            <div class="kpi-card" style="border-left-color: {border_color};">
+                <div class="kpi-icon">🎧</div>
+                <div class="kpi-title">المكالمات المغطاة (0)</div>
+                <div class="kpi-value">{covered_count:,}</div>
+                <div class="kpi-sub" style="color: {sub_text_color};">تقييم مغطاة</div>
+            </div>
+            <div class="kpi-card" style="border-left-color: #586F8C;">
+                <div class="kpi-icon">🎯</div>
+                <div class="kpi-title">نسبة النجاح الإجمالية</div>
+                <div class="kpi-value">{success_rate:.1f}%</div>
+                <div class="kpi-sub" style="color: #586F8C;">معدل الوصول للعملاء</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if collector_col and collector_col in act_df.columns:
+            pivot_summary = act_df.groupby([collector_col, 'Call_Status']).size().unstack(fill_value=0)
+            if 'ناجحة' not in pivot_summary.columns: pivot_summary['ناجحة'] = 0
+            if 'مغطاة' not in pivot_summary.columns: pivot_summary['مغطاة'] = 0
+            
+            pivot_summary['إجمالي المحاولات'] = pivot_summary['ناجحة'] + pivot_summary['مغطاة']
+            pivot_summary['نسبة النجاح %'] = (pivot_summary['ناجحة'] / pivot_summary['إجمالي المحاولات'] * 100).round(1).astype(str) + '%'
+            pivot_summary = pivot_summary.sort_values(by='إجمالي المحاولات', ascending=False).reset_index()
+
+            with st.expander("📊 تفصيل أداء المحصلين (ناجحة مقابل مغطاة)", expanded=True):
+                st.dataframe(pivot_summary, use_container_width=True)
+
+        extra_time_cols = [c for c in ['Date', 'Time', 'Call_Status'] if c in act_df.columns]
+        display_cols = extra_time_cols + [c for c in act_df.columns if c not in ['Created_DateTime', 'Date', 'Time', 'Call_Status']]
+        st.dataframe(act_df[display_cols], use_container_width=True, height=450)
+
+        act_buf = io.BytesIO()
+        act_df[display_cols].to_excel(act_buf, index=False, sheet_name='تقرير النشاط والتقييم')
+        act_buf.seek(0)
+        st.download_button("📥 تحميل تقرير النشاط مفلتر.xlsx", data=act_buf, file_name=f"Activity_Success_Report_{today.date()}.xlsx")
+
+else:
+    st.markdown(f"""
+    <div style="background-color: {nav_btn_bg}; border-radius: 15px; text-align: center; padding: 100px 20px; direction: rtl; border: 1px solid {border_color}; margin-top: 50px;">
+        <h2 style="color: {text_color}; margin-bottom: 15px; font-weight:900;">أهلاً بيكي يا رنا في منصة تقارير شركة إجادة لتحصيل الديون</h2>
+        <p style="color: {sub_text_color}; font-size: 18px; font-weight: bold;">من شريط التحكم بالأعلى، ارفعي شيت الإكسيل اليومي لعرض الداشبورد والتقارير.</p>
+    </div>
+    """, unsafe_allow_html=True)
