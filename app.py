@@ -55,6 +55,8 @@ if st.session_state.theme_choice == "ثيم إجادة (Navy)":
     nav_btn_border = ejada_border_light
     kpi_title_color = "#586F8C"
     header_logo_color = "#FFFFFF"
+    input_bg = "#FFFFFF"
+    input_text = "#1F4373"
 else:
     bg_color = "#13131A"
     card_color = "#1C1C24"
@@ -69,6 +71,8 @@ else:
     nav_btn_border = "#333333"
     kpi_title_color = "#A0AEC0"
     header_logo_color = "#FFFFFF"
+    input_bg = "#FFFFFF"
+    input_text = "#13131A"
 
 # ==========================================
 # تصميم الـ UI الديناميكي (CSS) ودعم الـ RTL
@@ -80,7 +84,7 @@ st.markdown(f"""
     
     .stApp {{ background-color: {bg_color} !important; }}
 
-    .block-container {{ padding-top: 3.8rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; }}
+    .block-container {{ padding-top: 3.8rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; direction: rtl; text-align: right; }}
     
     div[data-testid="stButton"] > button[kind="secondary"] {{
         background-color: {nav_btn_bg} !important;
@@ -93,8 +97,6 @@ st.markdown(f"""
         box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
     }}
     div[data-testid="stButton"] > button[kind="secondary"] p {{ color: {nav_btn_text} !important; font-weight: 800 !important; }}
-    div[data-testid="stButton"] > button[kind="secondary"]:hover, 
-    div[data-testid="stButton"] > button[kind="secondary"]:focus {{ border-color: {ejada_grey_blue} !important; color: {ejada_navy_light} !important; }}
     
     div[data-testid="stButton"] > button[kind="primary"] {{
         background-color: {snb_green} !important; 
@@ -107,7 +109,6 @@ st.markdown(f"""
         box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
     }}
     div[data-testid="stButton"] > button[kind="primary"] p {{ color: #FFFFFF !important; font-weight: 800 !important; }}
-    div[data-testid="stButton"] > button[kind="primary"]:focus {{ box-shadow: none !important; }}
 
     div.st-key-theme_toggle div[data-testid="stButton"] > button {{
         background: linear-gradient(90deg, {ejada_navy_dark} 50%, {ejada_grey_blue} 50%) !important;
@@ -122,12 +123,12 @@ st.markdown(f"""
         color: transparent !important; 
         box-shadow: 0 2px 6px rgba(0,0,0,0.4) !important;
     }}
-    div.st-key-theme_toggle div[data-testid="stButton"] > button:hover {{ transform: scale(1.1) !important; }}
 
-    .stTextInput input {{ background-color: {nav_btn_bg} !important; color: {text_color} !important; border: 1px solid {border_color} !important; border-radius: 8px !important; direction: rtl; }}
+    .stTextInput input, div[data-baseweb="select"] > div {{ background-color: {input_bg} !important; color: {input_text} !important; border: 1px solid {border_color} !important; border-radius: 8px !important; direction: rtl; text-align: right; }}
     .stTextInput input::placeholder {{ color: {sub_text_color} !important; }}
-    [data-testid="stFileUploader"] > section {{ background-color: {nav_btn_bg} !important; border: 1px dashed {border_color} !important; border-radius: 8px !important; }}
-    [data-testid="stFileUploader"] section * {{ color: {text_color} !important; }}
+    
+    [data-testid="stFileUploader"] > section {{ background-color: {input_bg} !important; border: 1px dashed {border_color} !important; border-radius: 8px !important; }}
+    [data-testid="stFileUploader"] section * {{ color: {input_text} !important; }}
 
     .kpi-card {{ background-color: {card_color}; border-radius: 12px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); border: 1px solid {border_color}; border-right-width: 6px; border-right-style: solid; text-align: right; direction: rtl; position: relative; }}
     .kpi-title {{ color: {kpi_title_color}; font-size: 13px; text-transform: uppercase; font-weight: 800; margin-bottom: 10px; }}
@@ -159,7 +160,7 @@ with top_cols[1]:
 # 1. الهيدر الرئيسي (إجادة + SNB)
 # ==========================================
 st.markdown(f"""
-<div style="position: relative; width: 100%; min-height: 120px; margin-top: -60px; margin-bottom: 25px; pointer-events: none;">
+<div style="position: relative; width: 100%; min-height: 120px; margin-top: -60px; margin-bottom: 25px; pointer-events: none; direction: ltr;">
     <div style="text-align: center; line-height: 1.1;">
         <div style="color: {header_logo_color}; font-size: 45px; font-weight: 900; font-family: Tahoma, sans-serif;">إجـــادة</div>
         <div style="color: {header_logo_color}; font-size: 20px; letter-spacing: 10px; font-weight: 900; margin-top: -8px; margin-right:-10px;">EJADA</div>
@@ -178,7 +179,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. شريط التنقل (مزود بزر البيت 🏠 للعودة للترحيب)
+# 2. شريط التنقل
 # ==========================================
 nav_cols = st.columns([1, 1.5, 1.3, 1.3, 4.9], gap="small") 
 
@@ -707,7 +708,7 @@ else:
         st.dataframe(final_neglect_df, use_container_width=True, height=450)
 
     # ==========================================
-    # صفحة تقرير النشاط (العنوان في المنتصف + محصل باليمين وموديل النشاط باليسار)
+    # صفحة تقرير النشاط (معتمد على Notes والتعامل مع الملاحظات الجديدة)
     # ==========================================
     elif curr_page == 'Activity':
         st.markdown(f"""
@@ -716,7 +717,6 @@ else:
         </div>
         """, unsafe_allow_html=True)
 
-        # صف مستقل لكل صندوق في مربعه لوحده جهة اليمين واليسار
         col_act_right, col_act_left = st.columns([1, 1], gap="medium")
 
         with col_act_right:
@@ -747,15 +747,12 @@ else:
 
         act_df = activity_base_df.copy()
 
-        # تصفية المحصل المختار
         if collector_col_name and collector_col_name in act_df.columns and selected_collector != "الكل (جميع المحصلين)":
             act_df = act_df[act_df[collector_col_name].astype(str).str.strip() == selected_collector]
 
         created_col = find_col_in(act_df, ['created on', 'created_on', 'createdon', 'تاريخ الإنشاء', 'وقت المعالجة', 'date', 'التاريخ'])
         if created_col and 'Created_DateTime' in act_df.columns and act_df['Created_DateTime'].notna().any():
             act_df = act_df.dropna(subset=['Created_DateTime']).copy()
-            
-            # فلترة حسب المدى الزمني (يومي، أسبوعي، شهري)
             max_dt = act_df['Created_DateTime'].max()
             if time_range_mode == "يومي":
                 act_df = act_df[act_df['Created_DateTime'].dt.date == max_dt.date()]
@@ -779,43 +776,65 @@ else:
             if exclude_break:
                 curr_times = act_df['Created_DateTime'].dt.time
                 act_df = act_df[~((curr_times >= time(12, 0)) & (curr_times <= time(12, 30)))]
-        else:
-            act_df = activity_base_df.copy()
 
-        if mapping_file is not None:
+        # ربط التقييم بعمود Notes والتعامل مع الملاحظات الجديدة غير الموجودة في الموديل
+        notes_col_name = find_col_in(act_df, ['notes', 'note', 'الملاحظات', 'ملاحظات', 'feedback'])
+        
+        if mapping_file is not None and notes_col_name:
             map_df = pd.read_excel(mapping_file)
             map_df.columns = map_df.columns.str.strip()
-            common_cols = [c for c in map_df.columns if c in act_df.columns]
-            if common_cols:
-                join_key = common_cols[0] 
-                target_status_col = [c for c in map_df.columns if c != join_key]
-                if target_status_col:
-                    act_df = act_df.merge(map_df[[join_key, target_status_col[0]]], on=join_key, how='left')
-                    def classify_call(val):
-                        val_str = str(val).strip()
-                        if val_str in ['1', '1.0', '1,0']: return 'ناجحة'
-                        elif val_str in ['0', '0.0', '0,0']: return 'مغطاة'
-                        else: return 'غير مصنف'
-                    actual_col = target_status_col[0]
-                    if actual_col in act_df.columns:
-                        act_df['Call_Status'] = act_df[actual_col].apply(classify_call)
+            
+            # البحث عن عمود الملاحظات وعمود التقييم في شيت الموديل
+            map_notes_col = find_col_in(map_df, ['notes', 'note', 'الملاحظات', 'ملاحظات', 'feedback'])
+            map_eval_col = [c for c in map_df.columns if c != map_notes_col][0] if len(map_df.columns) > 1 else map_df.columns[0]
+            
+            if map_notes_col:
+                # تحويل الموديل إلى قاموس للمقارنة
+                mapping_dict = dict(zip(map_df[map_notes_col].astype(str).str.strip(), map_df[map_eval_col]))
+                
+                # فحص الملاحظات الموجودة في الشيت وغير موجودة في الموديل
+                all_sheet_notes = act_df[notes_col_name].dropna().astype(str).str.strip().unique()
+                unmapped_notes = [n for n in all_sheet_notes if n not in mapping_dict]
+                
+                if unmapped_notes:
+                    st.warning(f"⚠️ وجدنا ملاحظات جديدة ({len(unmapped_notes)} ملاحظة) غير موجودة في موديل التقييم المرفوع:")
+                    
+                    if 'custom_note_evals' not in st.session_state:
+                        st.session_state.custom_note_evals = {}
+                        
+                    for un_note in unmapped_notes:
+                        eval_choice = st.radio(f"كيف تحسبين الملاحظة الآتية: **({un_note})**؟", options=["ناجحة (1)", "مغطاة (0)"], key=f"eval_radio_{un_note}")
+                        st.session_state.custom_note_evals[un_note] = 1 if "ناجحة" in eval_choice else 0
+                        
+                def classify_with_model(val):
+                    v_str = str(val).strip()
+                    if v_str in mapping_dict:
+                        val_eval = str(mapping_dict[v_str]).strip()
+                        return 'ناجحة' if val_eval in ['1', '1.0', '1,0', 'true'] else 'مغطاة'
+                    elif v_str in st.session_state.get('custom_note_evals', {}):
+                        return 'ناجحة' if st.session_state.custom_note_evals[v_str] == 1 else 'مغطاة'
                     else:
-                        act_df['Call_Status'] = 'غير مصنف'
+                        return 'غير مصنف'
+                        
+                act_df['Call_Status'] = act_df[notes_col_name].apply(classify_with_model)
             else:
                 act_df['Call_Status'] = 'غير مصنف'
         else:
-            target_col = find_col_in(act_df, ['التقييم', 'التقيمي', 'evaluation', 'eval', 'تقييم', 'status', 'الحالة', 'sub state', 'result', 'نتيجة المكالمة'])
-            target_col = target_col if target_col else act_df.columns[0]
-            available_vals = act_df[target_col].dropna().astype(str).unique().tolist()
-            selected_success_vals = st.multiselect(f"حددي القيم التي تعتبر (ناجحة = 1) من عمود [{target_col}]:", options=available_vals, default=[v for v in available_vals if str(v).strip() in ['1', '1.0', 'ناجح', 'وعد', 'سداد', 'تم']])
-            act_df['Call_Status'] = act_df[target_col].astype(str).apply(lambda x: 'ناجحة' if x in selected_success_vals else 'مغطاة')
+            # لو مفيش موديل مرفوع، نعتمد الافتراضي من عمود الملاحظات أو أي عمود تقييم
+            target_col = notes_col_name if notes_col_name else find_col_in(act_df, ['التقييم', 'status', 'الحالة', 'sub state', 'result'])
+            if target_col:
+                available_vals = act_df[target_col].dropna().astype(str).unique().tolist()
+                selected_success_vals = st.multiselect(f"حددي القيم التي تعتبر (ناجحة = 1) من عمود [{target_col}]:", options=available_vals, default=[v for v in available_vals if str(v).strip() in ['1', '1.0', 'ناجح', 'وعد', 'سداد', 'تم']])
+                act_df['Call_Status'] = act_df[target_col].astype(str).apply(lambda x: 'ناجحة' if x in selected_success_vals else 'مغطاة')
+            else:
+                act_df['Call_Status'] = 'غير مصنف'
 
         total_activity = len(act_df)
         success_count = len(act_df[act_df['Call_Status'] == 'ناجحة'])
         covered_count = len(act_df[act_df['Call_Status'] == 'مغطاة'])
         success_rate = (success_count / total_activity * 100) if total_activity > 0 else 0
 
-        collector_col = find_col_in(act_df, ['collecter', 'collector', 'المحصل', 'اسم المحصل'])
+        collector_col = collector_col_name
         if collector_col and collector_col in act_df.columns and total_activity > 0:
             top_collector_series = act_df[collector_col].value_counts()
             if not top_collector_series.empty:
