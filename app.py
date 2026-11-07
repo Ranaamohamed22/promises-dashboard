@@ -435,23 +435,27 @@ if 'page_files' not in st.session_state:
 
 curr_page = st.session_state.current_page
 
-# شريط التحكم العلوي (بحث وتاريخ فقط بدون أي رفع برة)
-ctrl_cols = st.columns([2, 8])
+# شريط التحكم العلوي: خانة رفع الملفات مكان تاريخ التقرير مع الجملة المطلوبة + شريط البحث
+ctrl_cols = st.columns([5, 5])
 with ctrl_cols[0]:
-    report_date = st.date_input("📅 تاريخ التقرير", value=date.today(), format="DD/MM/YYYY")
+    st.markdown(f"<p style='color: {text_color}; font-weight: 800; margin-bottom: 2px; direction: rtl;'>ارفعي الملفات هنا ي رنا</p>", unsafe_allow_html=True)
+    uploaded_files_top = st.file_uploader("ارفعي الملفات هنا ي رنا", type=["xlsx", "xls", "csv"], accept_multiple_files=True, label_visibility="collapsed", key=f"top_uploader_{curr_page}")
+    if uploaded_files_top:
+        st.session_state.page_files[curr_page] = uploaded_files_top
+        st.rerun()
 with ctrl_cols[1]:
-    st.markdown("<div style='padding-top: 28px;'>", unsafe_allow_html=True)
+    st.markdown("<div style='padding-top: 25px;'>", unsafe_allow_html=True)
     search_query = st.text_input("", placeholder="🔍 ابحثي هنا (برقم العميل، الاسم، أو أي بيان)...", label_visibility="collapsed")
     st.markdown("</div>", unsafe_allow_html=True)
 
-st.markdown(f"<hr style='margin: 15px 0 25px 0; border-color: {border_color};'>", unsafe_allow_html=True)
+st.markdown(f"<hr style='margin: 15px 0 25px 0; border-color: {border_color}; clear: both;'>", unsafe_allow_html=True)
 
-# دالة معالجة بيانات أي صفحة بناءً على ملفاتها المرفوعة الخاصة بها
+# دالة معالجة بيانات أي صفحة
 def process_page_data(uploaded_files):
     if not uploaded_files:
         return None, None, None, None, None, 0, 0, 0, 0, 0, pd.DataFrame()
     
-    today = pd.Timestamp(report_date).normalize()
+    today = pd.Timestamp(date.today()).normalize()
     promises_dfs = []
     activity_dfs = []
     all_dfs = []
@@ -558,30 +562,17 @@ if page_uploaded is None:
             <p style="color: {sub_text_color}; font-size: 18px; font-weight: bold;">من شريط التنقل بالأعلى، اختاري أي تقرير لعرضه ورفع ملفاته الخاصة.</p>
         </div>
         """, unsafe_allow_html=True)
-    
-    # 2. خانة رفع مستقلة وفاضية لكل صفحة تقرير لوحدها عند الدخول إليها
-    st.markdown(f"<h3 style='text-align: center; color: {text_color}; font-weight: 800; margin-top: 30px;'>📁 ارفعي ملفات أو شيتات صفحة [{curr_page}]</h3>", unsafe_allow_html=True)
-    col_up1, col_up2, col_up3 = st.columns([1, 2, 1])
-    with col_up2:
-        files_in = st.file_uploader(f"رفع ملفات {curr_page}", type=["xlsx", "xls", "csv"], accept_multiple_files=True, label_visibility="collapsed", key=f"uploader_{curr_page}")
-        if files_in:
-            st.session_state.page_files[curr_page] = files_in
-            st.rerun()
+    else:
+        st.info(f"📁 يرجى رفع الملفات الخاصة بصفحة [{curr_page}] من خانة الرفع بالأعلى للبدء.")
 else:
     active_promises_df, broken_promises_df, neglect_df, activity_base_df, report_bytes, total_rows, total_unhandled, active_count, broken_count, neglect_count, total_activity_count = process_page_data(st.session_state.page_files[curr_page])
-
-    with st.expander("📁 استبدال أو تغيير ملفات هذا التقرير"):
-        new_f = st.file_uploader(f"ملفات جديدة لـ {curr_page}", type=["xlsx", "xls", "csv"], accept_multiple_files=True, key=f"re_uploader_{curr_page}")
-        if new_f:
-            st.session_state.page_files[curr_page] = new_f
-            st.rerun()
 
     # ==========================================
     # صفحة الـ Overview الشاملة
     # ==========================================
     if curr_page == 'Overview':
         st.markdown(f"<h2 style='text-align:center; margin:0; color:{ejada_navy_light}; font-weight:900;'>📊 لوحة القيادة الشاملة (Executive Overview)</h2>", unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align:center; color:#FFFFFF; font-weight: bold; margin-bottom: 30px;'>ملخص أداء محفظة الديون ونشاط المحصلين - {today.date()}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align:center; color:#FFFFFF; font-weight: bold; margin-bottom: 30px;'>ملخص أداء محفظة الديون ونشاط المحصلين</p>", unsafe_allow_html=True)
         
         st.markdown(f"""
         <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; margin-bottom: 30px;">
@@ -678,7 +669,7 @@ else:
                     st.info("لا توجد بيانات نشاط كافية لعرض رسم بياني.")
                 
         st.markdown("<br>", unsafe_allow_html=True)
-        st.download_button(label=f"📥 تحميل التقرير الكامل - {today.date()}.xlsx", data=report_bytes, file_name=f"Daily_Promises_Report_{today.date()}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+        st.download_button(label=f"📥 تحميل التقرير الكامل.xlsx", data=report_bytes, file_name=f"Daily_Promises_Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
     # ==========================================
     # صفحة الوعود القائمة والمكسورة (مدمجة)
@@ -705,7 +696,7 @@ else:
             st.dataframe(broken_promises_df, use_container_width=True, height=400)
             
         st.markdown("<br>", unsafe_allow_html=True)
-        st.download_button("📥 تحميل التقرير الشامل (الإكسيل بالملخصات).xlsx", data=report_bytes, file_name=f"Daily_Promises_Report_{today.date()}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="dl_promises_all")
+        st.download_button("📥 تحميل التقرير الشامل (الإكسيل بالملخصات).xlsx", data=report_bytes, file_name=f"Daily_Promises_Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="dl_promises_all")
         
     elif curr_page == 'Neglect':
         st.markdown(f"""
@@ -780,85 +771,4 @@ else:
             else:
                 act_df['Call_Status'] = 'غير مصنف'
         else:
-            target_col = find_col_in(act_df, ['التقييم', 'التقيمي', 'evaluation', 'eval', 'تقييم', 'status', 'الحالة', 'sub state', 'result', 'نتيجة المكالمة'])
-            target_col = target_col if target_col else act_df.columns[0]
-            available_vals = act_df[target_col].dropna().astype(str).unique().tolist()
-            selected_success_vals = st.multiselect(f"حددي القيم التي تعتبر (ناجحة = 1) من عمود [{target_col}]:", options=available_vals, default=[v for v in available_vals if str(v).strip() in ['1', '1.0', 'ناجح', 'وعد', 'سداد', 'تم']])
-            act_df['Call_Status'] = act_df[target_col].astype(str).apply(lambda x: 'ناجحة' if x in selected_success_vals else 'مغطاة')
-
-        if search_query:
-            act_df = act_df[act_df.astype(str).apply(lambda x: x.str.contains(search_query, case=False, na=False)).any(axis=1)]
-
-        total_activity = len(act_df)
-        success_count = len(act_df[act_df['Call_Status'] == 'ناجحة'])
-        covered_count = len(act_df[act_df['Call_Status'] == 'مغطاة'])
-        success_rate = (success_count / total_activity * 100) if total_activity > 0 else 0
-
-        collector_col = find_col_in(act_df, ['collecter', 'collector', 'المحصل', 'اسم المحصل'])
-        if collector_col and collector_col in act_df.columns and total_activity > 0:
-            top_collector_series = act_df[collector_col].value_counts()
-            if not top_collector_series.empty:
-                top_name = top_collector_series.index[0]
-                top_calls = top_collector_series.values[0]
-                top_pct = (top_calls / total_activity * 100) if total_activity > 0 else 0
-                st.markdown(f"""
-                <div style="background-color: {card_color}; border-radius: 12px; padding: 20px 30px; border: 2px solid #586F8C; direction:rtl; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
-                    <div>
-                        <h4 style="margin:0; color: #586F8C; font-weight:900;">🏆 بطل الشفت (الأكثر نشاطاً)</h4>
-                        <p style="margin: 5px 0 0 0; color: {text_color}; font-size: 18px;">المحصل: <b style="color:#1F4373; font-size: 22px;">{top_name}</b></p>
-                    </div>
-                    <div style="text-align: left; background-color: {bg_color}; padding: 10px 20px; border-radius: 8px; border: 1px solid #586F8C;">
-                        <h3 style="margin:0; color: #586F8C; font-weight:900;">{top_calls:,} مكالمة</h3>
-                        <p style="margin: 0; color: #FFFFFF; font-size: 14px; font-weight: bold;">استحوذ على <span style="color:#99AABF;">{top_pct:.1f}%</span> من إجمالي شغل اليوم</p>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-        st.markdown(f"""
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px;">
-            <div class="kpi-card" style="border-left-color: {border_color};">
-                <div class="kpi-icon">📞</div>
-                <div class="kpi-title">إجمالي المحاولات</div>
-                <div class="kpi-value">{total_activity:,}</div>
-                <div class="kpi-sub" style="color: {sub_text_color};">بعد إزالة التكرار</div>
-            </div>
-            <div class="kpi-card" style="border-left-color: #1F4373;">
-                <div class="kpi-icon">✅</div>
-                <div class="kpi-title">المكالمات الناجحة (1)</div>
-                <div class="kpi-value">{success_count:,}</div>
-                <div class="kpi-sub" style="color: #1F4373;">تقييم ناجح</div>
-            </div>
-            <div class="kpi-card" style="border-left-color: {border_color};">
-                <div class="kpi-icon">🎧</div>
-                <div class="kpi-title">المكالمات المغطاة (0)</div>
-                <div class="kpi-value">{covered_count:,}</div>
-                <div class="kpi-sub" style="color: {sub_text_color};">تقييم مغطاة</div>
-            </div>
-            <div class="kpi-card" style="border-left-color: #586F8C;">
-                <div class="kpi-icon">🎯</div>
-                <div class="kpi-title">نسبة النجاح الإجمالية</div>
-                <div class="kpi-value">{success_rate:.1f}%</div>
-                <div class="kpi-sub" style="color: #586F8C;">معدل الوصول للعملاء</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        if collector_col and collector_col in act_df.columns:
-            pivot_summary = act_df.groupby([collector_col, 'Call_Status']).size().unstack(fill_value=0)
-            if 'ناجحة' not in pivot_summary.columns: pivot_summary['ناجحة'] = 0
-            if 'مغطاة' not in pivot_summary.columns: pivot_summary['مغطاة'] = 0
-            pivot_summary['إجمالي المحاولات'] = pivot_summary['ناجحة'] + pivot_summary['مغطاة']
-            pivot_summary['نسبة النجاح %'] = (pivot_summary['ناجحة'] / pivot_summary['إجمالي المحاولات'] * 100).round(1).astype(str) + '%'
-            pivot_summary = pivot_summary.sort_values(by='إجمالي المحاولات', ascending=False).reset_index()
-
-            with st.expander("📊 تفصيل أداء المحصلين (ناجحة مقابل مغطاة)", expanded=True):
-                st.dataframe(pivot_summary, use_container_width=True)
-
-        extra_time_cols = [c for c in ['Date', 'Time', 'Call_Status'] if c in act_df.columns]
-        display_cols = extra_time_cols + [c for c in act_df.columns if c not in ['Created_DateTime', 'Date', 'Time', 'Call_Status']]
-        st.dataframe(act_df[display_cols], use_container_width=True, height=450)
-
-        act_buf = io.BytesIO()
-        act_df[display_cols].to_excel(act_buf, index=False, sheet_name='تقرير النشاط والتقييم')
-        act_buf.seek(0)
-        st.download_button("📥 تحميل تقرير النشاط مفلتر.xlsx", data=act_buf, file_name=f"Activity_Success_Report_{today.date()}.xlsx")
+            target_col = find_col_in(act_df, ['التقييم', 'التقيمي', 'evaluation', 'eval', 'تقييم', 'status', '
