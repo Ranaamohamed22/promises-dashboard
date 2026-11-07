@@ -20,6 +20,27 @@ if 'theme_choice' not in st.session_state:
     st.session_state.theme_choice = 'ثيم إجادة (Navy)'
 
 # ==========================================
+# دالات استجابة سريعة للزرار (Overview & Theme)
+# ==========================================
+def toggle_theme():
+    if st.session_state.theme_choice == 'التصميم الأبيض (Light)':
+        st.session_state.theme_choice = 'ثيم إجادة (Navy)'
+    else:
+        st.session_state.theme_choice = 'التصميم الأبيض (Light)'
+
+def go_to_overview():
+    st.session_state.current_page = 'Overview'
+
+def go_to_promises():
+    st.session_state.current_page = 'Promises'
+
+def go_to_neglect():
+    st.session_state.current_page = 'Neglect'
+
+def go_to_activity():
+    st.session_state.current_page = 'Activity'
+
+# ==========================================
 # دالة عامة للبحث عن الأعمدة
 # ==========================================
 def find_col_in(target_df, candidates):
@@ -151,22 +172,15 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 0. الصف العلوي: زر القمر (تبديل الثيم) + Overview
+# 0. الصف العلوي: زر القمر (تبديل الثيم الفوري) + Overview
 # ==========================================
 top_cols = st.columns([0.5, 1.5, 6], gap="small")
 
 with top_cols[0]:
-    if st.button(" ", key="theme_toggle"): 
-        if st.session_state.theme_choice == 'التصميم الأبيض (Light)':
-            st.session_state.theme_choice = 'ثيم إجادة (Navy)'
-        else:
-            st.session_state.theme_choice = 'التصميم الأبيض (Light)'
-        st.rerun()
+    st.button(" ", key="theme_toggle", on_click=toggle_theme)
 
 with top_cols[1]:
-    if st.button("📊 Overview", type="primary" if st.session_state.current_page == 'Overview' else "secondary", use_container_width=True):
-        st.session_state.current_page = 'Overview'
-        st.rerun()
+    st.button("📊 Overview", type="primary" if st.session_state.current_page == 'Overview' else "secondary", use_container_width=True, on_click=go_to_overview)
 
 # ==========================================
 # 1. الهيدر الرئيسي (إجادة في المنتصف + البنك الأهلي SNB ناحية اليسار تماماً)
@@ -196,24 +210,16 @@ st.markdown(f"""
 nav_cols = st.columns([1, 1.5, 1.3, 1.3, 4.9], gap="small") 
 
 with nav_cols[0]:
-    if st.button("🏠 الرئيسية", type="primary" if st.session_state.current_page == 'Overview' else "secondary", use_container_width=True):
-        st.session_state.current_page = 'Overview'
-        st.rerun()
+    st.button("🏠 الرئيسية", type="primary" if st.session_state.current_page == 'Overview' else "secondary", use_container_width=True, on_click=go_to_overview)
 
 with nav_cols[1]:
-    if st.button("🤝 الوعود القائمة والمكسورة", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=True):
-        st.session_state.current_page = 'Promises'
-        st.rerun()
+    st.button("🤝 الوعود القائمة والمكسورة", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=True, on_click=go_to_promises)
 
 with nav_cols[2]:
-    if st.button("🚨 تقرير الإهمال", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=True):
-        st.session_state.current_page = 'Neglect'
-        st.rerun()
+    st.button("🚨 تقرير الإهمال", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=True, on_click=go_to_neglect)
 
 with nav_cols[3]:
-    if st.button("📈 النشاط", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=True):
-        st.session_state.current_page = 'Activity'
-        st.rerun()
+    st.button("📈 النشاط", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=True, on_click=go_to_activity)
 
 with nav_cols[4]:
     st.markdown("")
