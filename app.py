@@ -23,7 +23,7 @@ ejada_navy_dark = "#1F4373"
 ejada_navy_light = "#304D73"
 ejada_grey_blue = "#586F8C"
 ejada_border_light = "#99AABF"
-off_white_bg = "#F8F9FA"  # خلفية الـ Off-white للشارتات والكروت
+off_white_bg = "#F8F9FA"  
 snb_green = "#2CA549"  
 
 if st.session_state.theme_choice == "ثيم إجادة (Navy)":
@@ -40,7 +40,6 @@ if st.session_state.theme_choice == "ثيم إجادة (Navy)":
     nav_btn_border = ejada_border_light
     kpi_title_color = "#586F8C"
     header_logo_color = "#FFFFFF"
-    chart_bg = "#F8F9FA"  # خلفية مخصصة للرسومات البيانية
 else:
     bg_color = "#13131A"
     card_color = "#1C1C24"
@@ -55,7 +54,6 @@ else:
     nav_btn_border = "#333333"
     kpi_title_color = "#A0AEC0"
     header_logo_color = "#FFFFFF"
-    chart_bg = "#1C1C24"
 
 # ==========================================
 # تصميم الـ UI الديناميكي (CSS)
@@ -122,7 +120,6 @@ st.markdown(f"""
     .kpi-sub {{ color: {sub_text_color}; font-size: 12px; font-weight: 600; }}
     .kpi-icon {{ position: absolute; top: 20px; right: 20px; font-size: 24px; opacity: 0.9; }}
 
-    /* ستايل كارت الشارت المستقل بإطار خاص وخلفية Off-white */
     .chart-box {{
         background-color: {off_white_bg};
         border: 2px solid {ejada_border_light};
@@ -308,7 +305,7 @@ if uploaded_files:
         if search_query:
             active_promises_df = active_promises_df[active_promises_df.astype(str).apply(lambda x: x.str.contains(search_query, case=False, na=False)).any(axis=1)]
             broken_promises_df = broken_promises_df[broken_promises_df.astype(str).apply(lambda x: x.str.contains(search_query, case=False, na=False)).any(axis=1)]
-            neglect_df = neglect_df[neglect_df.astype(str).apply(lambda x: x.str.contains(search_query, case=False, na=False)).any(axis=1)]
+            neglect_df = neglect_df[neglect_df[neglect_df.astype(str).apply(lambda x: x.str.contains(search_query, case=False, na=False)).any(axis=1)]
 
     output_buffer = io.BytesIO()
     with pd.ExcelWriter(output_buffer, engine='openpyxl') as writer:
@@ -367,7 +364,7 @@ if uploaded_files:
 
         chart_col1, chart_col2, chart_col3 = st.columns(3)
 
-        # 1. Donut Chart داخل كارت مستقل بخلفية Off-white وعنوان في المنتصف
+        # 1. Donut Chart
         with chart_col1:
             st.markdown('<div class="chart-box">', unsafe_allow_html=True)
             fig_donut = go.Figure(go.Pie(
@@ -389,7 +386,7 @@ if uploaded_files:
             st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # 2. Gauge Chart داخل كارت مستقل بخلفية Off-white وعنوان في المنتصف
+        # 2. Gauge Chart (مصحح الخطأ عبر استخدام title_text مباشرة)
         with chart_col2:
             st.markdown('<div class="chart-box">', unsafe_allow_html=True)
             total_extracted = active_count + broken_count
@@ -398,7 +395,7 @@ if uploaded_files:
                 mode="gauge+number",
                 value=gauge_val,
                 number={'suffix': "%", 'font': {'color': ejada_navy_dark, 'size': 34, 'weight': 'bold'}},
-                title=dict(text="نسبة الوعود القائمة من الإجمالي", x=0.5, xanchor='center', font=dict(color=ejada_navy_dark, size=15, weight='bold')),
+                title_text="نسبة الوعود القائمة من الإجمالي",
                 gauge={
                     'axis': {'range': [0, 100], 'visible': False},
                     'bar': {'color': "#304D73"},
@@ -410,11 +407,17 @@ if uploaded_files:
                     ]
                 }
             ))
-            fig_gauge.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color=ejada_navy_dark, margin=dict(l=20, r=20, t=50, b=20))
+            fig_gauge.update_layout(
+                title_font=dict(color=ejada_navy_dark, size=15, weight='bold'),
+                title_x=0.5,
+                paper_bgcolor='rgba(0,0,0,0)', 
+                font_color=ejada_navy_dark, 
+                margin=dict(l=20, r=20, t=50, b=20)
+            )
             st.plotly_chart(fig_gauge, use_container_width=True, config={'displayModeBar': False})
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # 3. Bar Chart داخل كارت مستقل بخلفية Off-white وعنوان في المنتصف
+        # 3. Bar Chart
         with chart_col3:
             st.markdown('<div class="chart-box">', unsafe_allow_html=True)
             if collector_col and collector_col in activity_base_df.columns and total_activity_count > 0:
