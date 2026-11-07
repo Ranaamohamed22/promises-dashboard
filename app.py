@@ -910,4 +910,10 @@ else:
         st.markdown("<div style='text-align: right; direction: rtl;'>", unsafe_allow_html=True)
         extra_time_cols = [c for c in ['Date', 'Time', 'Call_Status'] if c in act_df.columns]
         display_cols = extra_time_cols + [c for c in act_df.columns if c not in ['Created_DateTime', 'Date', 'Time', 'Call_Status']]
-        st.dataframe(
+        st.dataframe(act_df[display_cols], use_container_width=True, height=450)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        act_buf = io.BytesIO()
+        act_df[display_cols].to_excel(act_buf, index=False, sheet_name='تقرير النشاط والتقييم')
+        act_buf.seek(0)
+        st.download_button("📥 تحميل تقرير النشاط مفلتر.xlsx", data=act_buf, file_name=f"Activity_Success_Report.xlsx")
