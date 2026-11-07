@@ -17,33 +17,30 @@ if 'theme_choice' not in st.session_state:
     st.session_state.theme_choice = 'ثيم إجادة (Navy)'
 
 # ==========================================
-# إعدادات الثيم والألوان بالترتيب المطلوب (بدون أخضر)
+# إعدادات الثيم والألوان بالترتيب المطلوبة
 # ==========================================
 ejada_navy_dark = "#1F4373"
 ejada_navy_light = "#304D73"
 ejada_grey_blue = "#586F8C"
 ejada_border_light = "#99AABF"
-ejada_bg_light = "#F2F2F2"
-snb_green = "#2CA549"  # يُستخدم فقط لشعار SNB والأزرار النشطة الأساسية
+off_white_bg = "#F8F9FA"  # خلفية الـ Off-white للشارتات والكروت
+snb_green = "#2CA549"  
 
 if st.session_state.theme_choice == "ثيم إجادة (Navy)":
     bg_color = ejada_navy_dark 
-    card_color = "#FFFFFF" 
-    border_color = ejada_grey_blue
+    card_color = off_white_bg 
+    border_color = ejada_border_light
     primary_color = ejada_navy_light 
     primary_text = "#FFFFFF"
     text_color = ejada_navy_dark
     sub_text_color = ejada_grey_blue
-    gauge_bg = "#304D73"
+    gauge_bg = "#E2E8F0"
     nav_btn_bg = "#FFFFFF"
     nav_btn_text = ejada_navy_dark
     nav_btn_border = ejada_border_light
-    nav_btn_hover_border = ejada_grey_blue
     kpi_title_color = "#586F8C"
     header_logo_color = "#FFFFFF"
-    bar_chart_text = "#FFFFFF"
-    # ترتيب الألوان الجديد للشارتات بناءً على طلبك (بدون أخضر)
-    chart_colors = ["#1F4373", "#304D73", "#586F8C", "#99AABF", "#F2F2F2"]
+    chart_bg = "#F8F9FA"  # خلفية مخصصة للرسومات البيانية
 else:
     bg_color = "#13131A"
     card_color = "#1C1C24"
@@ -56,11 +53,9 @@ else:
     nav_btn_bg = "#1A1A1D"
     nav_btn_text = "#E0E0E0"
     nav_btn_border = "#333333"
-    nav_btn_hover_border = ejada_grey_blue
     kpi_title_color = "#A0AEC0"
     header_logo_color = "#FFFFFF"
-    bar_chart_text = "#FFFFFF"
-    chart_colors = ["#1F4373", "#304D73", "#586F8C", "#99AABF", "#F2F2F2"]
+    chart_bg = "#1C1C24"
 
 # ==========================================
 # تصميم الـ UI الديناميكي (CSS)
@@ -121,11 +116,21 @@ st.markdown(f"""
     [data-testid="stFileUploader"] > section {{ background-color: {nav_btn_bg} !important; border: 1px dashed {border_color} !important; border-radius: 8px !important; }}
     [data-testid="stFileUploader"] section * {{ color: {text_color} !important; }}
 
-    .kpi-card {{ background-color: {nav_btn_bg}; border-radius: 12px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); border: 1px solid {border_color}; border-left-width: 6px; border-left-style: solid; text-align: left; direction: ltr; position: relative; }}
+    .kpi-card {{ background-color: {card_color}; border-radius: 12px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); border: 1px solid {border_color}; border-left-width: 6px; border-left-style: solid; text-align: left; direction: ltr; position: relative; }}
     .kpi-title {{ color: {kpi_title_color}; font-size: 13px; text-transform: uppercase; font-weight: 800; margin-bottom: 10px; }}
     .kpi-value {{ color: {text_color}; font-size: 30px; font-weight: 900; margin-bottom: 5px; }}
     .kpi-sub {{ color: {sub_text_color}; font-size: 12px; font-weight: 600; }}
     .kpi-icon {{ position: absolute; top: 20px; right: 20px; font-size: 24px; opacity: 0.9; }}
+
+    /* ستايل كارت الشارت المستقل بإطار خاص وخلفية Off-white */
+    .chart-box {{
+        background-color: {off_white_bg};
+        border: 2px solid {ejada_border_light};
+        border-radius: 12px;
+        padding: 15px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        margin-bottom: 20px;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -362,8 +367,9 @@ if uploaded_files:
 
         chart_col1, chart_col2, chart_col3 = st.columns(3)
 
-        # 1. Donut Chart بالترتيب الجديد للألوان (بدون أخضر)
+        # 1. Donut Chart داخل كارت مستقل بخلفية Off-white وعنوان في المنتصف
         with chart_col1:
+            st.markdown('<div class="chart-box">', unsafe_allow_html=True)
             fig_donut = go.Figure(go.Pie(
                 labels=['الوعود القائمة', 'الوعود المكسورة', 'حالات الإهمال'],
                 values=[active_count, broken_count, neglect_count],
@@ -373,65 +379,69 @@ if uploaded_files:
                 textfont_color="#FFFFFF"
             ))
             fig_donut.update_layout(
-                title_text="توزيع الوعود وحالات الإهمال", 
-                title_x=0.5,
+                title=dict(text="توزيع الوعود وحالات الإهمال", x=0.5, xanchor='center', font=dict(color=ejada_navy_dark, size=15, weight='bold')),
                 paper_bgcolor='rgba(0,0,0,0)', 
-                font_color="#FFFFFF", 
+                plot_bgcolor='rgba(0,0,0,0)',
+                font_color=ejada_navy_dark, 
                 margin=dict(t=50, b=10, l=10, r=10),
                 showlegend=False
             )
             st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
+            st.markdown('</div>', unsafe_allow_html=True)
 
-        # 2. Gauge Chart بألوان درجات إجادة
+        # 2. Gauge Chart داخل كارت مستقل بخلفية Off-white وعنوان في المنتصف
         with chart_col2:
+            st.markdown('<div class="chart-box">', unsafe_allow_html=True)
             total_extracted = active_count + broken_count
             gauge_val = int((active_count / total_extracted * 100)) if total_extracted > 0 else 0
             fig_gauge = go.Figure(go.Indicator(
                 mode="gauge+number",
                 value=gauge_val,
-                number={'suffix': "%", 'font': {'color': "#FFFFFF", 'size': 36, 'weight': 'bold'}},
-                title={'text': "نسبة الوعود القائمة من الإجمالي", 'font': {'color': "#FFFFFF", 'size': 14}},
+                number={'suffix': "%", 'font': {'color': ejada_navy_dark, 'size': 34, 'weight': 'bold'}},
+                title=dict(text="نسبة الوعود القائمة من الإجمالي", x=0.5, xanchor='center', font=dict(color=ejada_navy_dark, size=15, weight='bold')),
                 gauge={
                     'axis': {'range': [0, 100], 'visible': False},
                     'bar': {'color': "#304D73"},
-                    'bgcolor': "#1F4373",
+                    'bgcolor': "#E2E8F0",
                     'borderwidth': 0,
                     'steps': [
-                        {'range': [0, 50], 'color': '#586F8C'},
-                        {'range': [50, 100], 'color': '#99AABF'}
+                        {'range': [0, 50], 'color': '#99AABF'},
+                        {'range': [50, 100], 'color': '#586F8C'}
                     ]
                 }
             ))
-            fig_gauge.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color="#FFFFFF", margin=dict(l=20, r=20, t=50, b=20))
+            fig_gauge.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color=ejada_navy_dark, margin=dict(l=20, r=20, t=50, b=20))
             st.plotly_chart(fig_gauge, use_container_width=True, config={'displayModeBar': False})
+            st.markdown('</div>', unsafe_allow_html=True)
 
-        # 3. Bar Chart بالترتيب الدقيق للألوان (بدون أخضر)
+        # 3. Bar Chart داخل كارت مستقل بخلفية Off-white وعنوان في المنتصف
         with chart_col3:
+            st.markdown('<div class="chart-box">', unsafe_allow_html=True)
             if collector_col and collector_col in activity_base_df.columns and total_activity_count > 0:
                 top_colls = activity_base_df[collector_col].value_counts().head(5)
                 fig_bar = go.Figure(go.Bar(
                     x=top_colls.index,
                     y=top_colls.values,
-                    marker_color=["#1F4373", "#304D73", "#586F8C", "#99AABF", "#F2F2F2"],
+                    marker_color=["#1F4373", "#304D73", "#586F8C", "#99AABF", "#1F4373"],
                     text=top_colls.values,
                     textposition='auto',
                     textfont=dict(color="#FFFFFF", weight='bold')
                 ))
                 fig_bar.update_layout(
-                    title_text="أكثر 5 محصلين نشاطاً", 
-                    title_x=0.5,
+                    title=dict(text="أكثر 5 محصلين نشاطاً", x=0.5, xanchor='center', font=dict(color=ejada_navy_dark, size=15, weight='bold')),
                     paper_bgcolor='rgba(0,0,0,0)', 
                     plot_bgcolor='rgba(0,0,0,0)', 
-                    font_color="#FFFFFF", 
+                    font_color=ejada_navy_dark, 
                     margin=dict(t=50, b=10, l=10, r=10)
                 )
                 fig_bar.update_yaxes(showgrid=False, visible=False)
                 st.plotly_chart(fig_bar, use_container_width=True, config={'displayModeBar': False})
             else:
                 st.info("لا توجد بيانات نشاط كافية لعرض رسم بياني.")
+            st.markdown('</div>', unsafe_allow_html=True)
                 
         st.markdown(f"""
-        <div style="background-color: {nav_btn_bg}; border-radius: 12px; padding: 25px; border: 1px solid {border_color}; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
+        <div style="background-color: {card_color}; border-radius: 12px; padding: 25px; border: 1px solid {border_color}; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
             <h5 style="margin:0 0 20px 0; color:{text_color}; font-weight:900;">Breakdown Overview</h5>
             <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid {border_color}; direction: rtl;">
                 <span style="width:30%; color:{text_color}; font-weight: bold; text-align: right;">الوعود القائمة اليوم</span>
@@ -458,7 +468,7 @@ if uploaded_files:
     # ==========================================
     elif st.session_state.current_page == 'Active':
         st.markdown(f"""
-        <div style="background-color: {nav_btn_bg}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px;">
+        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px;">
             <h3 style="margin:0; color:#1F4373; font-weight:900;">✅ شيت الوعود القائمة ({active_count:,} حساب)</h3>
         </div>
         """, unsafe_allow_html=True)
@@ -466,7 +476,7 @@ if uploaded_files:
         
     elif st.session_state.current_page == 'Broken':
         st.markdown(f"""
-        <div style="background-color: {nav_btn_bg}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px;">
+        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px;">
             <h3 style="margin:0; color:#304D73; font-weight:900;">⚠️ شيت الوعود المكسورة ({broken_count:,} حساب)</h3>
         </div>
         """, unsafe_allow_html=True)
@@ -474,7 +484,7 @@ if uploaded_files:
         
     elif st.session_state.current_page == 'Neglect':
         st.markdown(f"""
-        <div style="background-color: {nav_btn_bg}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px;">
+        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px;">
             <h3 style="margin:0; color:#586F8C; font-weight:900;">🚨 تقرير الإهمال (تأخير أكثر من 3 أيام)</h3>
         </div>
         """, unsafe_allow_html=True)
@@ -490,7 +500,7 @@ if uploaded_files:
     # ==========================================
     elif st.session_state.current_page == 'Activity':
         st.markdown(f"""
-        <div style="background-color: {nav_btn_bg}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px;">
+        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px;">
             <h3 style="margin:0; color:{text_color}; font-weight:900;">📈 تقرير النشاط وموديل التقييم (ناجحة / مغطاة)</h3>
             <p style="margin: 5px 0 0 0; color: {sub_text_color}; font-size: 14px;">تم حذف التكرار تلقائياً بناءً على ({collector_col or 'collecter'}, {id_col or 'id numer'}, {notes_col or 'notes'}).</p>
         </div>
@@ -570,7 +580,7 @@ if uploaded_files:
                 top_pct = (top_calls / total_activity * 100) if total_activity > 0 else 0
                 
                 st.markdown(f"""
-                <div style="background-color: {nav_btn_bg}; border-radius: 12px; padding: 20px 30px; border: 2px solid #586F8C; direction:rtl; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="background-color: {card_color}; border-radius: 12px; padding: 20px 30px; border: 2px solid #586F8C; direction:rtl; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
                     <div>
                         <h4 style="margin:0; color: #586F8C; font-weight:900;">🏆 بطل الشفت (الأكثر نشاطاً)</h4>
                         <p style="margin: 5px 0 0 0; color: {text_color}; font-size: 18px;">المحصل: <b style="color:#1F4373; font-size: 22px;">{top_name}</b></p>
@@ -634,7 +644,7 @@ if uploaded_files:
 
 else:
     st.markdown(f"""
-    <div style="background-color: {nav_btn_bg}; border-radius: 15px; text-align: center; padding: 100px 20px; direction: rtl; border: 1px solid {border_color}; margin-top: 50px;">
+    <div style="background-color: {card_color}; border-radius: 15px; text-align: center; padding: 100px 20px; direction: rtl; border: 1px solid {border_color}; margin-top: 50px;">
         <h2 style="color: {text_color}; margin-bottom: 15px; font-weight:900;">أهلاً بيكي يا رنا في منصة تقارير شركة إجادة لتحصيل الديون</h2>
         <p style="color: {sub_text_color}; font-size: 18px; font-weight: bold;">من شريط التحكم بالأعلى، ارفعي شيت الإكسيل اليومي لعرض الداشبورد والتقارير.</p>
     </div>
