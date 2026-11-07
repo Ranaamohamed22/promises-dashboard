@@ -188,7 +188,24 @@ with nav_cols[2]:
 with nav_cols[3]:
     st.markdown("")
 
-st.markdown(f"<hr style='margin: 10px 0 10px 0; border-color: {border_color}; clear: both;'>", unsafe_allow_html=True)
+st.markdown(f"<hr style='margin: 10px 0 15px 0; border-color: {border_color}; clear: both;'>", unsafe_allow_html=True)
+
+# ==========================================
+# 3. شريط التحكم الجديد (رفع الملفات بجوار البحث والتاريخ في كل الصفحات)
+# ==========================================
+ctrl_cols = st.columns([3.5, 1.5, 5])
+with ctrl_cols[0]:
+    uploaded_files = st.file_uploader("📁 ارفعي ملفات الإكسيل (متعددة)", type=["xlsx", "xls", "csv"], accept_multiple_files=True)
+with ctrl_cols[1]:
+    st.markdown("<div style='padding-top: 2px;'>", unsafe_allow_html=True)
+    report_date = st.date_input("📅 تاريخ التقرير", value=date.today(), format="DD/MM/YYYY")
+    st.markdown("</div>", unsafe_allow_html=True)
+with ctrl_cols[2]:
+    st.markdown("<div style='padding-top: 28px;'>", unsafe_allow_html=True)
+    search_query = st.text_input("", placeholder="🔍 ابحثي هنا (برقم العميل، الاسم، أو أي بيان)...", label_visibility="collapsed")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+st.markdown(f"<hr style='margin: 15px 0 25px 0; border-color: {border_color};'>", unsafe_allow_html=True)
 
 # ==========================================
 # دوال تقرير الوعود والإكسيل
@@ -421,21 +438,6 @@ def build_report_xlsx(active_df, broken_df, neglect_df=None):
     wb.save(buf)
     buf.seek(0)
     return buf
-
-# ==========================================
-# 3. شريط التحكم (رفع الملفات المتعددة والبحث)
-# ==========================================
-filter_cols = st.columns([3, 1.6, 5.4])
-with filter_cols[0]:
-    uploaded_files = st.file_uploader("", type=["xlsx", "xls", "csv"], accept_multiple_files=True, label_visibility="collapsed")
-with filter_cols[1]:
-    report_date = st.date_input("📅 تاريخ التقرير", value=date.today(), format="DD/MM/YYYY")
-with filter_cols[2]:
-    st.markdown("<div style='padding-top: 30px;'>", unsafe_allow_html=True)
-    search_query = st.text_input("", placeholder="🔍 ابحثي هنا (برقم العميل، الاسم، أو أي بيان)...", label_visibility="collapsed")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-st.markdown(f"<hr style='margin: 10px 0 25px 0; border-color: {border_color};'>", unsafe_allow_html=True)
 
 # ==========================================
 # 4. معالجة البيانات المجمعة
