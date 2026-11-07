@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 import io
 import base64
 import os
@@ -59,7 +59,7 @@ else:
     header_logo_color = "#FFFFFF"
 
 # ==========================================
-# تصميم الـ UI الديناميكي (CSS)
+# تصميم الـ UI الديناميكي (CSS) ودعم الـ RTL
 # ==========================================
 st.markdown(f"""
 <style>
@@ -112,16 +112,16 @@ st.markdown(f"""
     }}
     div.st-key-theme_toggle div[data-testid="stButton"] > button:hover {{ transform: scale(1.1) !important; }}
 
-    .stTextInput input {{ background-color: {nav_btn_bg} !important; color: {text_color} !important; border: 1px solid {border_color} !important; border-radius: 8px !important; }}
+    .stTextInput input {{ background-color: {nav_btn_bg} !important; color: {text_color} !important; border: 1px solid {border_color} !important; border-radius: 8px !important; direction: rtl; }}
     .stTextInput input::placeholder {{ color: {sub_text_color} !important; }}
     [data-testid="stFileUploader"] > section {{ background-color: {nav_btn_bg} !important; border: 1px dashed {border_color} !important; border-radius: 8px !important; }}
     [data-testid="stFileUploader"] section * {{ color: {text_color} !important; }}
 
-    .kpi-card {{ background-color: {card_color}; border-radius: 12px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); border: 1px solid {border_color}; border-left-width: 6px; border-left-style: solid; text-align: left; direction: ltr; position: relative; }}
+    .kpi-card {{ background-color: {card_color}; border-radius: 12px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); border: 1px solid {border_color}; border-right-width: 6px; border-right-style: solid; text-align: right; direction: rtl; position: relative; }}
     .kpi-title {{ color: {kpi_title_color}; font-size: 13px; text-transform: uppercase; font-weight: 800; margin-bottom: 10px; }}
     .kpi-value {{ color: {text_color}; font-size: 30px; font-weight: 900; margin-bottom: 5px; }}
     .kpi-sub {{ color: {sub_text_color}; font-size: 12px; font-weight: 600; }}
-    .kpi-icon {{ position: absolute; top: 20px; right: 20px; font-size: 24px; opacity: 0.9; }}
+    .kpi-icon {{ position: absolute; top: 20px; left: 20px; font-size: 24px; opacity: 0.9; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -565,9 +565,9 @@ else:
     active_promises_df, broken_promises_df, neglect_df, activity_base_df, report_bytes, total_rows, total_unhandled, active_count, broken_count, neglect_count, total_activity_count = process_page_data(st.session_state.page_files[curr_page])
 
     with st.expander("📁 استبدال أو تغيير ملفات هذا التقرير"):
-        new_f = st.file_uploader(f"ملفات جديدة لـ {curr_page}", type=["xlsx"], accept_multiple_files=True, key=f"re_uploader_{curr_page}")
+        new_f = st.file_uploader(f"ملفات جديدة لـ {curr_page}", type=["xlsx"], key=f"re_uploader_{curr_page}")
         if new_f:
-            st.session_state.page_files[curr_page] = new_f
+            st.session_state.page_files[curr_page] = [new_f]
             st.rerun()
 
     # ==========================================
@@ -714,28 +714,46 @@ else:
         st.markdown(f"<p style='text-align:right; direction:rtl; color:#FFFFFF; font-weight: bold;'>العدد الإجمالي: <b style='color:#586F8C; font-size:18px;'>{len(final_neglect_df):,}</b> حساب مهمل</p>", unsafe_allow_html=True)
         st.dataframe(final_neglect_df, use_container_width=True, height=450)
 
+    # ==========================================
+    # صفحة تقرير النشاط (مع اختيار المدى وزاوية اليمين RTL)
+    # ==========================================
     elif curr_page == 'Activity':
         st.markdown(f"""
-        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px;">
+        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px; text-align: right;">
             <h3 style="margin:0; color:{text_color}; font-weight:900;">📈 تقرير النشاط وموديل التقييم (ناجحة / مغطاة)</h3>
         </div>
         """, unsafe_allow_html=True)
 
         with st.expander("📁 ارفعي موديل النشاط (شيت التقييم 1 و 0) - اختياري", expanded=True):
-            st.markdown(f"<p style='font-size: 13px; color: {sub_text_color}; direction: rtl;'>التقييم (1) يعني 'ناجحة'، والتقييم (0) يعني 'مغطاة'.</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size: 13px; color: {sub_text_color}; direction: rtl; text-align: right;'>التقييم (1) يعني 'ناجحة'، والتقييم (0) يعني 'مغطاة'.</p>", unsafe_allow_html=True)
             mapping_file = st.file_uploader("شيت موديل النشاط (اختياري)", type=["xlsx"], key="mapping_uploader")
 
-        filter_act_col1, filter_act_col2, filter_act_col3 = st.columns([2, 1.5, 1.5])
+        # خانة اختيار المدى الزمني للنشاط (يومي، أسبوعي، شهري)
+        filter_act_col1, filter_act_col2, filter_act_col3, filter_act_col4 = st.columns([1.5, 2, 1.5, 1.5])
         with filter_act_col1:
-            shift_option = st.selectbox("⏰ اختاري فترة النشاط (الشفت):", ["كل اليوم بدون تحديد", "من 2:00 م إلى 12:00 منتصف الليل (14:00 - 00:00)", "من 12:00 ظهراً إلى 4:00 عصراً (12:00 - 16:00)", "من 4:00 عصراً إلى آخر اليوم (16:00 - 23:59)"])
+            time_range_mode = st.selectbox("📅 مدى التقرير:", ["يومي", "أسبوعي", "شهري"])
         with filter_act_col2:
-            exclude_last_hour = st.checkbox("⏳ استبعاد آخر ساعة من الفترة", value=False)
+            shift_option = st.selectbox("⏰ فترة النشاط (الشفت):", ["كل اليوم بدون تحديد", "من 2:00 م إلى 12:00 منتصف الليل (14:00 - 00:00)", "من 12:00 ظهراً إلى 4:00 عصراً (12:00 - 16:00)", "من 4:00 عصراً إلى آخر اليوم (16:00 - 23:59)"])
         with filter_act_col3:
+            exclude_last_hour = st.checkbox("⏳ استبعاد آخر ساعة", value=False)
+        with filter_act_col4:
             exclude_break = st.checkbox("☕ استبعاد البريك (12:00 - 12:30)", value=False)
 
         created_col = find_col_in(activity_base_df, ['created on', 'created_on', 'createdon', 'تاريخ الإنشاء', 'وقت المعالجة', 'date', 'التاريخ'])
         if created_col and 'Created_DateTime' in activity_base_df.columns and activity_base_df['Created_DateTime'].notna().any():
             act_df = activity_base_df.dropna(subset=['Created_DateTime']).copy()
+            
+            # فلترة حسب المدى الزمني (يومي، أسبوعي، شهري)
+            max_dt = act_df['Created_DateTime'].max()
+            if time_range_mode == "يومي":
+                act_df = act_df[act_df['Created_DateTime'].dt.date == max_dt.date()]
+            elif time_range_mode == "أسبوعي":
+                start_week = max_dt - timedelta(days=7)
+                act_df = act_df[act_df['Created_DateTime'] >= start_week]
+            elif time_range_mode == "شهري":
+                start_month = max_dt - timedelta(days=30)
+                act_df = act_df[act_df['Created_DateTime'] >= start_month]
+
             act_times = act_df['Created_DateTime'].dt.time
             if shift_option == "من 2:00 م إلى 12:00 منتصف الليل (14:00 - 00:00)":
                 start_t, end_t = time(14, 0), time(23, 0) if exclude_last_hour else time(23, 59, 59)
@@ -796,39 +814,39 @@ else:
                 top_calls = top_collector_series.values[0]
                 top_pct = (top_calls / total_activity * 100) if total_activity > 0 else 0
                 st.markdown(f"""
-                <div style="background-color: {card_color}; border-radius: 12px; padding: 20px 30px; border: 2px solid #586F8C; direction:rtl; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="background-color: {card_color}; border-radius: 12px; padding: 20px 30px; border: 2px solid #586F8C; direction:rtl; text-align: right; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
                     <div>
                         <h4 style="margin:0; color: #586F8C; font-weight:900;">🏆 بطل الشفت (الأكثر نشاطاً)</h4>
                         <p style="margin: 5px 0 0 0; color: {text_color}; font-size: 18px;">المحصل: <b style="color:#1F4373; font-size: 22px;">{top_name}</b></p>
                     </div>
                     <div style="text-align: left; background-color: {bg_color}; padding: 10px 20px; border-radius: 8px; border: 1px solid #586F8C;">
                         <h3 style="margin:0; color: #586F8C; font-weight:900;">{top_calls:,} مكالمة</h3>
-                        <p style="margin: 0; color: #FFFFFF; font-size: 14px; font-weight: bold;">استحوذ على <span style="color:#99AABF;">{top_pct:.1f}%</span> من إجمالي شغل اليوم</p>
+                        <p style="margin: 0; color: #FFFFFF; font-size: 14px; font-weight: bold;">استحوذ على <span style="color:#99AABF;">{top_pct:.1f}%</span> من إجمالي شغل الفترة</p>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
         st.markdown(f"""
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px;">
-            <div class="kpi-card" style="border-left-color: {border_color};">
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; direction: rtl;">
+            <div class="kpi-card" style="border-right-color: {border_color};">
                 <div class="kpi-icon">📞</div>
                 <div class="kpi-title">إجمالي المحاولات</div>
                 <div class="kpi-value">{total_activity:,}</div>
                 <div class="kpi-sub" style="color: {sub_text_color};">بعد إزالة التكرار</div>
             </div>
-            <div class="kpi-card" style="border-left-color: #1F4373;">
+            <div class="kpi-card" style="border-right-color: #1F4373;">
                 <div class="kpi-icon">✅</div>
                 <div class="kpi-title">المكالمات الناجحة (1)</div>
                 <div class="kpi-value">{success_count:,}</div>
                 <div class="kpi-sub" style="color: #1F4373;">تقييم ناجح</div>
             </div>
-            <div class="kpi-card" style="border-left-color: {border_color};">
+            <div class="kpi-card" style="border-right-color: {border_color};">
                 <div class="kpi-icon">🎧</div>
                 <div class="kpi-title">المكالمات المغطاة (0)</div>
                 <div class="kpi-value">{covered_count:,}</div>
                 <div class="kpi-sub" style="color: {sub_text_color};">تقييم مغطاة</div>
             </div>
-            <div class="kpi-card" style="border-left-color: #586F8C;">
+            <div class="kpi-card" style="border-right-color: #586F8C;">
                 <div class="kpi-icon">🎯</div>
                 <div class="kpi-title">نسبة النجاح الإجمالية</div>
                 <div class="kpi-value">{success_rate:.1f}%</div>
@@ -848,9 +866,11 @@ else:
             with st.expander("📊 تفصيل أداء المحصلين (ناجحة مقابل مغطاة)", expanded=True):
                 st.dataframe(pivot_summary, use_container_width=True)
 
+        st.markdown("<div style='text-align: right; direction: rtl;'>", unsafe_allow_html=True)
         extra_time_cols = [c for c in ['Date', 'Time', 'Call_Status'] if c in act_df.columns]
         display_cols = extra_time_cols + [c for c in act_df.columns if c not in ['Created_DateTime', 'Date', 'Time', 'Call_Status']]
         st.dataframe(act_df[display_cols], use_container_width=True, height=450)
+        st.markdown("</div>", unsafe_allow_html=True)
 
         act_buf = io.BytesIO()
         act_df[display_cols].to_excel(act_buf, index=False, sheet_name='تقرير النشاط والتقييم')
