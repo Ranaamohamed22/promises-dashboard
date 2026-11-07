@@ -131,18 +131,31 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 1. عنوان إجادة (في المنتصف وأعلى الصفحة)
+# 1. عنوان إجادة (في المنتصف وأعلى الصفحة) + البنك الأهلي السعودي (أقصى اليمين فوق)
 # ==========================================
 st.markdown(f"""
-<div style="text-align: center; margin-top: -35px; margin-bottom: 20px; line-height: 1.1;">
-    <div style="color: {header_logo_color}; font-size: 45px; font-weight: 900; font-family: Tahoma, sans-serif;">إجـــادة</div>
-    <div style="color: {header_logo_color}; font-size: 20px; letter-spacing: 10px; font-weight: 900; margin-top: -8px; margin-right:-10px;">EJADA</div>
-    <div style="color: {header_logo_color}; font-size: 18px; font-weight: bold; margin-top: 5px;">لتحصيل الديون</div>
+<div style="position: relative; width: 100%; margin-top: -35px; margin-bottom: 25px;">
+    <!-- عنوان إجادة في المنتصف تماماً -->
+    <div style="text-align: center; line-height: 1.1;">
+        <div style="color: {header_logo_color}; font-size: 45px; font-weight: 900; font-family: Tahoma, sans-serif;">إجـــادة</div>
+        <div style="color: {header_logo_color}; font-size: 20px; letter-spacing: 10px; font-weight: 900; margin-top: -8px; margin-right:-10px;">EJADA</div>
+        <div style="color: {header_logo_color}; font-size: 18px; font-weight: bold; margin-top: 5px;">لتحصيل الديون</div>
+    </div>
+    <!-- شعار البنك الأهلي السعودي في أقصى اليمين فوق وتحته (30-60-NPL) -->
+    <div style="position: absolute; top: 5px; right: 0; text-align: right; line-height: 1.3; direction: ltr;">
+        <div style="white-space: nowrap;">
+            <span style="color: {snb_green}; font-weight: 900; font-size: 26px; letter-spacing: 1px; vertical-align: middle;">SNB</span>
+            <span style="color: {snb_green}; font-size: 22px; font-weight: bold; font-family: Tahoma, sans-serif; margin-left: 8px; vertical-align: middle;">البنك الأهلي السعودي</span>
+        </div>
+        <div style="color: {snb_green}; font-size: 18px; font-weight: 900; text-align: center; letter-spacing: 1.5px; margin-top: 2px;">
+            (30-60-NPL)
+        </div>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. شريط التنقل (دمج المساحة في العمود الأخير لضمان سطر واحد في أقصى اليمين)
+# 2. شريط التنقل
 # ==========================================
 nav_cols = st.columns([0.4, 1.3, 1.3, 1.3, 1.3, 1.3, 3.5], gap="small") 
 
@@ -180,13 +193,7 @@ with nav_cols[5]:
         st.rerun()
 
 with nav_cols[6]:
-    # سطر واحد إجباري (nowrap) ومحاذى لأقصى اليمين تماماً
-    st.markdown(f"""
-    <div style="width: 100%; text-align: right; margin-top: 6px; white-space: nowrap; direction: ltr;">
-        <span style="color: {snb_green}; font-weight: 900; font-size: 26px; letter-spacing: 1px; vertical-align: middle;">SNB</span>
-        <span style="color: {snb_green}; font-size: 20px; font-weight: bold; font-family: Tahoma, sans-serif; margin-left: 8px; vertical-align: middle;">البنك الأهلي السعودي</span>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("")
 
 st.markdown(f"<hr style='margin: 10px 0 10px 0; border-color: {border_color}; clear: both;'>", unsafe_allow_html=True)
 
@@ -263,7 +270,7 @@ if uploaded_files:
     else:
         activity_base_df = df_act_raw.copy()
 
-    # --- تجهيز بيانات الوعود والإهمال (تعمل تلقائياً لو ملف الوعود مرفوع، وتضع 0 لو مرفوع ملف نشاط فقط) ---
+    # --- تجهيز بيانات الوعود والإهمال ---
     active_promises_df = pd.DataFrame()
     broken_promises_df = pd.DataFrame()
     neglect_df = pd.DataFrame()
