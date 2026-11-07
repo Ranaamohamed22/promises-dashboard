@@ -423,7 +423,7 @@ def build_report_xlsx(active_df, broken_df, neglect_df=None):
     return buf
 
 # ==========================================
-# إدارة الملفات لكل صفحة تقرير بشكل منفصل
+# إدارة الملفات لكل صفحة تقرير بشكل منفصل تماماً
 # ==========================================
 if 'page_files' not in st.session_state:
     st.session_state.page_files = {
@@ -435,18 +435,8 @@ if 'page_files' not in st.session_state:
 
 curr_page = st.session_state.current_page
 
-# شريط التحكم العلوي: خانة رفع الملفات مكان تاريخ التقرير مع الجملة المطلوبة + شريط البحث
-ctrl_cols = st.columns([5, 5])
-with ctrl_cols[0]:
-    st.markdown(f"<p style='color: {text_color}; font-weight: 800; margin-bottom: 2px; direction: rtl;'>ارفعي الملفات هنا ي رنا</p>", unsafe_allow_html=True)
-    uploaded_files_top = st.file_uploader("ارفعي الملفات هنا ي رنا", type=["xlsx", "xls", "csv"], accept_multiple_files=True, label_visibility="collapsed", key=f"top_uploader_{curr_page}")
-    if uploaded_files_top:
-        st.session_state.page_files[curr_page] = uploaded_files_top
-        st.rerun()
-with ctrl_cols[1]:
-    st.markdown("<div style='padding-top: 25px;'>", unsafe_allow_html=True)
-    search_query = st.text_input("", placeholder="🔍 ابحثي هنا (برقم العميل، الاسم، أو أي بيان)...", label_visibility="collapsed")
-    st.markdown("</div>", unsafe_allow_html=True)
+# شريط التحكم العلوي: شريط البحث فقط من غير أي خانة رفع في الهيدر الرئيسي
+search_query = st.text_input("", placeholder="🔍 ابحثي هنا (برقم العميل، الاسم، أو أي بيان)...", label_visibility="collapsed")
 
 st.markdown(f"<hr style='margin: 15px 0 25px 0; border-color: {border_color}; clear: both;'>", unsafe_allow_html=True)
 
@@ -562,10 +552,23 @@ if page_uploaded is None:
             <p style="color: {sub_text_color}; font-size: 18px; font-weight: bold;">من شريط التنقل بالأعلى، اختاري أي تقرير لعرضه ورفع ملفاته الخاصة.</p>
         </div>
         """, unsafe_allow_html=True)
-    else:
-        st.info(f"📁 يرجى رفع الملفات الخاصة بصفحة [{curr_page}] باستخدام خانة الرفع بالأعلى للبدء.")
+    
+    # 2. خانة رفع مستقلة وفاضية لكل صفحة تقرير لوحدها عند الدخول إليها (تقبل XLSX فقط) مع الجملة المطلوبة
+    st.markdown(f"<p style='color: {text_color}; font-weight: 800; font-size: 18px; text-align: center; margin-top: 30px;'>ارفعي الملفات هنا ي رنا</p>", unsafe_allow_html=True)
+    col_up1, col_up2, col_up3 = st.columns([1, 2, 1])
+    with col_up2:
+        files_in = st.file_uploader(f"ارفعي الملفات هنا ي رنا", type=["xlsx"], accept_multiple_files=True, label_visibility="collapsed", key=f"uploader_{curr_page}")
+        if files_in:
+            st.session_state.page_files[curr_page] = files_in
+            st.rerun()
 else:
     active_promises_df, broken_promises_df, neglect_df, activity_base_df, report_bytes, total_rows, total_unhandled, active_count, broken_count, neglect_count, total_activity_count = process_page_data(st.session_state.page_files[curr_page])
+
+    with st.expander("📁 استبدال أو تغيير ملفات هذا التقرير"):
+        new_f = st.file_uploader(f"ملفات جديدة لـ {curr_page}", type=["xlsx"], accept_multiple_files=True, key=f"re_uploader_{curr_page}")
+        if new_f:
+            st.session_state.page_files[curr_page] = new_f
+            st.rerun()
 
     # ==========================================
     # صفحة الـ Overview الشاملة
