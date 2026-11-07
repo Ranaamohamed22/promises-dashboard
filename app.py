@@ -23,12 +23,12 @@ ejada_navy_dark = "#1F4373"
 ejada_navy_light = "#304D73"
 ejada_grey_blue = "#586F8C"
 ejada_border_light = "#99AABF"
-off_white_bg = "#F8F9FA"  
+white_bg = "#FFFFFF"  
 snb_green = "#2CA549"  
 
 if st.session_state.theme_choice == "ثيم إجادة (Navy)":
     bg_color = ejada_navy_dark 
-    card_color = off_white_bg 
+    card_color = white_bg 
     border_color = ejada_border_light
     primary_color = ejada_navy_light 
     primary_text = "#FFFFFF"
@@ -119,15 +119,6 @@ st.markdown(f"""
     .kpi-value {{ color: {text_color}; font-size: 30px; font-weight: 900; margin-bottom: 5px; }}
     .kpi-sub {{ color: {sub_text_color}; font-size: 12px; font-weight: 600; }}
     .kpi-icon {{ position: absolute; top: 20px; right: 20px; font-size: 24px; opacity: 0.9; }}
-
-    .chart-box {{
-        background-color: {off_white_bg};
-        border: 2px solid {ejada_border_light};
-        border-radius: 12px;
-        padding: 15px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        margin-bottom: 20px;
-    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -364,84 +355,81 @@ if uploaded_files:
 
         chart_col1, chart_col2, chart_col3 = st.columns(3)
 
-        # 1. Donut Chart
+        # 1. Donut Chart داخل st.container بخلفية بيضاء صريحة
         with chart_col1:
-            st.markdown('<div class="chart-box">', unsafe_allow_html=True)
-            fig_donut = go.Figure(go.Pie(
-                labels=['الوعود القائمة', 'الوعود المكسورة', 'حالات الإهمال'],
-                values=[active_count, broken_count, neglect_count],
-                hole=0.6,
-                marker_colors=["#1F4373", "#304D73", "#586F8C"],
-                textinfo='percent+label',
-                textfont_color="#FFFFFF"
-            ))
-            fig_donut.update_layout(
-                title=dict(text="توزيع الوعود وحالات الإهمال", x=0.5, xanchor='center', font=dict(color=ejada_navy_dark, size=15, weight='bold')),
-                paper_bgcolor='rgba(0,0,0,0)', 
-                plot_bgcolor='rgba(0,0,0,0)',
-                font_color=ejada_navy_dark, 
-                margin=dict(t=50, b=10, l=10, r=10),
-                showlegend=False
-            )
-            st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        # 2. Gauge Chart (مصحح بالكامل بدون أخطاء)
-        with chart_col2:
-            st.markdown('<div class="chart-box">', unsafe_allow_html=True)
-            total_extracted = active_count + broken_count
-            gauge_val = int((active_count / total_extracted * 100)) if total_extracted > 0 else 0
-            fig_gauge = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=gauge_val,
-                number={'suffix': "%", 'font': {'color': ejada_navy_dark, 'size': 34, 'weight': 'bold'}},
-                title_text="نسبة الوعود القائمة من الإجمالي",
-                gauge={
-                    'axis': {'range': [0, 100], 'visible': False},
-                    'bar': {'color': "#304D73"},
-                    'bgcolor': "#E2E8F0",
-                    'borderwidth': 0,
-                    'steps': [
-                        {'range': [0, 50], 'color': '#99AABF'},
-                        {'range': [50, 100], 'color': '#586F8C'}
-                    ]
-                }
-            ))
-            fig_gauge.update_layout(
-                title_font=dict(color=ejada_navy_dark, size=15, weight='bold'),
-                title_x=0.5,
-                paper_bgcolor='rgba(0,0,0,0)', 
-                font_color=ejada_navy_dark, 
-                margin=dict(l=20, r=20, t=50, b=20)
-            )
-            st.plotly_chart(fig_gauge, use_container_width=True, config={'displayModeBar': False})
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        # 3. Bar Chart
-        with chart_col3:
-            st.markdown('<div class="chart-box">', unsafe_allow_html=True)
-            if collector_col and collector_col in activity_base_df.columns and total_activity_count > 0:
-                top_colls = activity_base_df[collector_col].value_counts().head(5)
-                fig_bar = go.Figure(go.Bar(
-                    x=top_colls.index,
-                    y=top_colls.values,
-                    marker_color=["#1F4373", "#304D73", "#586F8C", "#99AABF", "#1F4373"],
-                    text=top_colls.values,
-                    textposition='auto',
-                    textfont=dict(color="#FFFFFF", weight='bold')
+            with st.container(border=True):
+                fig_donut = go.Figure(go.Pie(
+                    labels=['الوعود القائمة', 'الوعود المكسورة', 'حالات الإهمال'],
+                    values=[active_count, broken_count, neglect_count],
+                    hole=0.6,
+                    marker_colors=["#1F4373", "#304D73", "#586F8C"],
+                    textinfo='percent+label',
+                    textfont_color="#FFFFFF"
                 ))
-                fig_bar.update_layout(
-                    title=dict(text="أكثر 5 محصلين نشاطاً", x=0.5, xanchor='center', font=dict(color=ejada_navy_dark, size=15, weight='bold')),
-                    paper_bgcolor='rgba(0,0,0,0)', 
-                    plot_bgcolor='rgba(0,0,0,0)', 
+                fig_donut.update_layout(
+                    title=dict(text="توزيع الوعود وحالات الإهمال", x=0.5, xanchor='center', font=dict(color=ejada_navy_dark, size=15, weight='bold')),
+                    paper_bgcolor='white', 
+                    plot_bgcolor='white',
                     font_color=ejada_navy_dark, 
-                    margin=dict(t=50, b=10, l=10, r=10)
+                    margin=dict(t=50, b=10, l=10, r=10),
+                    showlegend=False
                 )
-                fig_bar.update_yaxes(showgrid=False, visible=False)
-                st.plotly_chart(fig_bar, use_container_width=True, config={'displayModeBar': False})
-            else:
-                st.info("لا توجد بيانات نشاط كافية لعرض رسم بياني.")
-            st.markdown('</div>', unsafe_allow_html=True)
+                st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
+
+        # 2. Gauge Chart داخل st.container بخلفية بيضاء صريحة
+        with chart_col2:
+            with st.container(border=True):
+                total_extracted = active_count + broken_count
+                gauge_val = int((active_count / total_extracted * 100)) if total_extracted > 0 else 0
+                fig_gauge = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=gauge_val,
+                    number={'suffix': "%", 'font': {'color': ejada_navy_dark, 'size': 34, 'weight': 'bold'}},
+                    title_text="نسبة الوعود القائمة من الإجمالي",
+                    gauge={
+                        'axis': {'range': [0, 100], 'visible': False},
+                        'bar': {'color': "#304D73"},
+                        'bgcolor': "#E2E8F0",
+                        'borderwidth': 0,
+                        'steps': [
+                            {'range': [0, 50], 'color': '#99AABF'},
+                            {'range': [50, 100], 'color': '#586F8C'}
+                        ]
+                    }
+                ))
+                fig_gauge.update_layout(
+                    title_font=dict(color=ejada_navy_dark, size=15, weight='bold'),
+                    title_x=0.5,
+                    paper_bgcolor='white', 
+                    font_color=ejada_navy_dark, 
+                    margin=dict(l=20, r=20, t=50, b=20)
+                )
+                st.plotly_chart(fig_gauge, use_container_width=True, config={'displayModeBar': False})
+
+        # 3. Bar Chart داخل st.container بخلفية بيضاء صريحة
+        with chart_col3:
+            with st.container(border=True):
+                if collector_col and collector_col in activity_base_df.columns and total_activity_count > 0:
+                    top_colls = activity_base_df[collector_col].value_counts().head(5)
+                    fig_bar = go.Figure(go.Bar(
+                        x=top_colls.index,
+                        y=top_colls.values,
+                        marker_color=["#1F4373", "#304D73", "#586F8C", "#99AABF", "#1F4373"],
+                        text=top_colls.values,
+                        textposition='auto',
+                        textfont=dict(color="#FFFFFF", weight='bold')
+                    ))
+                    fig_bar.update_layout(
+                        title=dict(text="أكثر 5 محصلين نشاطاً", x=0.5, xanchor='center', font=dict(color=ejada_navy_dark, size=15, weight='bold')),
+                        paper_bgcolor='white', 
+                        plot_bgcolor='white', 
+                        font_color=ejada_navy_dark, 
+                        margin=dict(t=50, b=10, l=10, r=10)
+                    )
+                    fig_bar.update_yaxes(showgrid=False, visible=False)
+                    st.plotly_chart(fig_bar, use_container_width=True, config={'displayModeBar': False})
+                else:
+                    st.info("لا توجد بيانات نشاط كافية لعرض رسم بياني.")
                 
         st.markdown(f"""
         <div style="background-color: {card_color}; border-radius: 12px; padding: 25px; border: 1px solid {border_color}; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
