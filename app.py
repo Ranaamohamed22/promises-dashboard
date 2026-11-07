@@ -5,6 +5,9 @@ from datetime import date, datetime, time
 import io
 import base64
 import os
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
 # ==========================================
 # إعدادات الصفحة الأساسية
@@ -193,13 +196,264 @@ with nav_cols[4]:
 st.markdown(f"<hr style='margin: 10px 0 10px 0; border-color: {border_color}; clear: both;'>", unsafe_allow_html=True)
 
 # ==========================================
+# دوال تقرير الوعود (نفس شكل الشيت + نفس الـ Pivot Table)
+# ==========================================
+PIVOT_TEAM = 'Sales Team'
+PIVOT_COLL = 'Salesperson'
+PIVOT_NOTE = 'ملاحظات-التمويل'
+PIVOT_ACC = 'Account Number'
+PIVOT_AMT = 'Net Amount'
+SUM_FMT = '_(* #,##0_);_(* \\(#,##0\\);_(* "-"??_);_(@_)'
+
+
+def build_pivot(df, order='desc'):
+    """order='desc' ترتيب Z→A (زي شيت المكسورة) | order='first' ترتيب ظهور الصفوف في الشيت (زي شيت القائمة)
+    Pivot: الصفوف = المشرف ثم المحصل | الأعمدة = ملاحظات-التمويل | القيم = عدد الحسابات + مجموع متبقي المديونية"""
+    need = [PIVOT_TEAM, PIVOT_COLL, PIVOT_NOTE, PIVOT_ACC, PIVOT_AMT]
+    if df is None or df.empty or any(c not in df.columns for c in need):
+        return {'notes': ['NPL'], 'teams': [], 'grand': {'by_note': {'NPL': (0, 0.0)}, 'cnt': 0, 'amt': 0.0}}
+
+    d = df[need].copy()
+    d['_c'] = d[PIVOT_ACC].notna().astype(int)
+    d[PIVOT_AMT] = pd.to_numeric(d[PIVOT_AMT], errors='coerce').fillna(0.0)
+    d[PIVOT_TEAM] = d[PIVOT_TEAM].fillna('(فارغ)').astype(str)
+    d[PIVOT_COLL] = d[PIVOT_COLL].fillna('(فارغ)').astype(str)
+    d[PIVOT_NOTE] = d[PIVOT_NOTE].fillna('(فارغ)').astype(str).str.strip()
+
+    # الترتيب في الشيت الأصلي تنازلي (Z→A): NPL ثم Dpd60
+    def _ordered(values):
+        vals = list(pd.unique(values))
+        return sorted(vals, reverse=True) if order == 'desc' else vals
+
+    notes = _ordered(d[PIVOT_NOTE])
+    g = d.groupby([PIVOT_TEAM, PIVOT_COLL, PIVOT_NOTE]).agg(cnt=('_c', 'sum'), amt=(PIVOT_AMT, 'sum'))
+
+    teams = []
+    grand_by_note = {n: [0, 0.0] for n in notes}
+    for team in _ordered(d[PIVOT_TEAM]):
+        rows = []
+        for coll in _ordered(d.loc[d[PIVOT_TEAM] == team, PIVOT_COLL]):
+            by_note, t_cnt, t_amt = {}, 0, 0.0
+            for n in notes:
+                if (team, coll, n) in g.index:
+                    c, a = int(g.loc[(team, coll, n), 'cnt']), float(g.loc[(team, coll, n), 'amt'])
+                else:
+                    c, a = 0, 0.0
+                by_note[n] = (c, a)
+                t_cnt += c
+                t_amt += a
+                grand_by_note[n][0] += c
+                grand_by_note[n][1] += a
+            rows.append({'coll': coll, 'by_note': by_note, 'cnt': t_cnt, 'amt': t_amt})
+        teams.append({'team': team, 'rows': rows})
+
+    grand = {
+        'by_note': {n: (v[0], v[1]) for n, v in grand_by_note.items()},
+        'cnt': sum(v[0] for v in grand_by_note.values()),
+        'amt': sum(v[1] for v in grand_by_note.values()),
+    }
+    return {'notes': notes, 'teams': teams, 'grand': grand}
+
+
+def pivot_to_frame(p):
+    """تحويل الـ Pivot لجدول للعرض على الشاشة"""
+    cols = ['اسم المشرف', 'اسم المحصل']
+    for n in p['notes']:
+        cols += [f'{n} | عدد الحسابات', f'{n} | متبقي المديونية']
+    cols += ['Total عدد الحسابات', 'Total متبقي المديونية']
+    out = []
+    for t in p['teams']:
+        for i, r in enumerate(t['rows']):
+            row = [t['team'] if i == 0 else '', r['coll']]
+            for n in p['notes']:
+                row += [r['by_note'][n][0], round(r['by_note'][n][1], 2)]
+            row += [r['cnt'], round(r['amt'], 2)]
+            out.append(row)
+    g = p['grand']
+    row = ['الاجمالي', '']
+    for n in p['notes']:
+        row += [g['by_note'][n][0], round(g['by_note'][n][1], 2)]
+    row += [g['cnt'], round(g['amt'], 2)]
+    out.append(row)
+    return pd.DataFrame(out, columns=cols)
+
+
+def _prepare_for_output(df):
+    """نفس أنواع الأعمدة في الشيت الأصلي: المبالغ أرقام، والتواريخ الأساسية تواريخ، والباقي نصوص"""
+    d = df.copy()
+    for c in ['Amount', 'Net Amount', 'Payment']:
+        if c in d.columns:
+            d[c] = pd.to_numeric(d[c], errors='coerce')
+    for c in ['Debit Date', 'Assign Date', 'Follow up Due Date', 'Follow up Last Date', 'Expected Closing']:
+        if c in d.columns:
+            d[c] = pd.to_datetime(d[c], errors='coerce')
+    return d
+
+
+def _write_df_sheet(ws, df):
+    if df is None or len(df.columns) == 0:
+        return
+    df = _prepare_for_output(df)
+    bold = Font(bold=True)
+    for j, c in enumerate(df.columns, 1):
+        ws.cell(row=1, column=j, value=c).font = bold
+        ws.column_dimensions[get_column_letter(j)].width = min(40, max(12, len(str(c)) + 4))
+    for i, row in enumerate(df.itertuples(index=False), 2):
+        for j, v in enumerate(row, 1):
+            if v is None or (not isinstance(v, (list, tuple)) and pd.isna(v)):
+                continue
+            if isinstance(v, pd.Timestamp):
+                v = v.to_pydatetime()
+            elif hasattr(v, 'item') and not isinstance(v, (str, bytes)):
+                v = v.item()
+            cell = ws.cell(row=i, column=j, value=v)
+            if isinstance(v, datetime):
+                cell.number_format = 'yyyy-mm-dd'
+            elif isinstance(v, float):
+                cell.number_format = '#,##0.00'
+
+
+def _write_pivot_sheet(ws, p, title):
+    """نفس تنسيق شيت الملخص: عنوان - رؤوس - مشرف/محصل - إجمالي"""
+    notes = p['notes']
+    n = len(notes)
+    last_col = 2 + 2 * n + 2
+    ws.sheet_view.rightToLeft = True
+
+    dark = PatternFill('solid', fgColor='244062')
+    light = PatternFill('solid', fgColor='C5D9F1')
+    white_b = Font(name='Calibri', bold=True, color='FFFFFF', size=11)
+    thin, thick = Side(style='thin'), Side(style='thick')
+    center = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+    def hdr(r, c, v=None, size=11):
+        cell = ws.cell(row=r, column=c, value=v)
+        cell.font = Font(name='Calibri', bold=True, color='FFFFFF', size=size)
+        cell.fill = dark
+        cell.alignment = center
+        cell.border = Border(left=thin, right=thin, top=thin, bottom=thin)
+        return cell
+
+    # عنوان التقرير
+    for r in (1, 2):
+        for c in range(1, last_col + 1):
+            hdr(r, c, None)
+    ws.cell(row=1, column=1, value=title).font = Font(name='Calibri', bold=True, color='FFFFFF', size=18)
+    ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=last_col)
+
+    # الصفوف 3-5
+    for c in range(1, last_col + 1):
+        hdr(3, c)
+        hdr(4, c)
+        hdr(5, c)
+    ws.cell(row=3, column=3, value=PIVOT_NOTE)
+    ws.cell(row=3, column=4, value='Values')
+    for i, note in enumerate(notes):
+        c0 = 3 + 2 * i
+        ws.cell(row=4, column=c0, value=note).font = Font(name='Calibri', bold=True, color='FFFFFF', size=14)
+        ws.merge_cells(start_row=4, start_column=c0, end_row=4, end_column=c0 + 1)
+        ws.cell(row=5, column=c0, value='عدد الحسابات')
+        ws.cell(row=5, column=c0 + 1, value='متبقي المديونية')
+    tc = 3 + 2 * n
+    ws.cell(row=4, column=tc, value='Total عدد الحسابات')
+    ws.merge_cells(start_row=4, start_column=tc, end_row=5, end_column=tc)
+    ws.cell(row=4, column=tc + 1, value='Total متبقي المديونية')
+    ws.merge_cells(start_row=4, start_column=tc + 1, end_row=5, end_column=tc + 1)
+    ws.cell(row=5, column=1, value='اسم المشرف ')
+    ws.cell(row=5, column=2, value='اسم المحصل ')
+
+    def body(r, c, v, fmt=None, bold=False):
+        cell = ws.cell(row=r, column=c, value=v)
+        cell.font = Font(name='Calibri', bold=bold, size=11)
+        cell.alignment = center
+        cell.border = Border(left=thin, right=thin, top=thin, bottom=thin)
+        if fmt:
+            cell.number_format = fmt
+        return cell
+
+    r = 6
+    for t in p['teams']:
+        start = r
+        for row in t['rows']:
+            body(r, 2, row['coll'])
+            for i, note in enumerate(notes):
+                body(r, 3 + 2 * i, row['by_note'][note][0])
+                body(r, 4 + 2 * i, row['by_note'][note][1], SUM_FMT)
+            body(r, tc, row['cnt'])
+            body(r, tc + 1, row['amt'], SUM_FMT)
+            r += 1
+        a = body(start, 1, t['team'])
+        a.fill = light
+        a.border = Border(left=thick, right=thin, top=thin, bottom=thin)
+        for rr in range(start + 1, r):
+            cell = ws.cell(row=rr, column=1)
+            cell.fill = light
+            cell.border = Border(left=thick, right=thin, top=thin, bottom=thin)
+        if r - 1 > start:
+            ws.merge_cells(start_row=start, start_column=1, end_row=r - 1, end_column=1)
+
+    # صف الإجمالي
+    g = p['grand']
+    for c in range(1, last_col + 1):
+        cell = ws.cell(row=r, column=c)
+        cell.font = white_b
+        cell.fill = dark
+        cell.alignment = center
+        cell.border = Border(left=thick if c == 1 else thin, right=thin, top=thin, bottom=thick)
+    ws.cell(row=r, column=1, value='الاجمالي')
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=2)
+    for i, note in enumerate(notes):
+        ws.cell(row=r, column=3 + 2 * i, value=g['by_note'][note][0])
+        x = ws.cell(row=r, column=4 + 2 * i, value=g['by_note'][note][1])
+        x.number_format = SUM_FMT
+    ws.cell(row=r, column=tc, value=g['cnt'])
+    x = ws.cell(row=r, column=tc + 1, value=g['amt'])
+    x.number_format = SUM_FMT
+
+    ws.column_dimensions['A'].width = 35.7
+    ws.column_dimensions['B'].width = 30.7
+    for c in range(3, 3 + 2 * n):
+        ws.column_dimensions[get_column_letter(c)].width = 18.9
+    ws.column_dimensions[get_column_letter(tc)].width = 16.7
+    ws.column_dimensions[get_column_letter(tc + 1)].width = 17.6
+
+
+def build_report_xlsx(active_df, broken_df, neglect_df=None):
+    """نفس ملف التقرير: 4 شيتات (قائمة + ملخصها + مكسورة + ملخصها) وبعدهم تقرير الإهمال لو موجود"""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'تقرير الوعود القائمة'
+    _write_df_sheet(ws, active_df)
+
+    ws = wb.create_sheet('ملخص تقرير الوعود القائمة')
+    _write_pivot_sheet(ws, build_pivot(active_df, order='first'), 'تقرير الوعود القائمة البنك الاهلي السعودي SNB (NPL&60Dpd)')
+
+    ws = wb.create_sheet('تقرير الوعود المكسورة')
+    _write_df_sheet(ws, broken_df)
+
+    ws = wb.create_sheet('ملخص تقرير الوعود المكسورة')
+    _write_pivot_sheet(ws, build_pivot(broken_df, order='desc'), 'تقرير الوعود المكسورة البنك الاهلي SNB (NPL&60Dpd)')
+
+    if neglect_df is not None and len(neglect_df.columns) > 0:
+        ws = wb.create_sheet('تقرير الإهمال')
+        _write_df_sheet(ws, neglect_df)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+# ==========================================
 # 3. شريط التحكم (رفع الملفات المتعددة والبحث)
 # ==========================================
-filter_cols = st.columns([3, 1, 6])
+filter_cols = st.columns([3, 1.6, 5.4])
 with filter_cols[0]:
     uploaded_files = st.file_uploader("", type=["xlsx", "xls", "csv"], accept_multiple_files=True, label_visibility="collapsed")
+with filter_cols[1]:
+    report_date = st.date_input("📅 تاريخ التقرير", value=date.today(), format="DD/MM/YYYY")
 with filter_cols[2]:
-    st.markdown("<div style='padding-top: 15px;'>", unsafe_allow_html=True)
+    st.markdown("<div style='padding-top: 30px;'>", unsafe_allow_html=True)
     search_query = st.text_input("", placeholder="🔍 ابحثي هنا (برقم العميل، الاسم، أو أي بيان)...", label_visibility="collapsed")
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -209,7 +463,7 @@ st.markdown(f"<hr style='margin: 10px 0 25px 0; border-color: {border_color};'>"
 # 4. معالجة البيانات المجمعة
 # ==========================================
 if uploaded_files:
-    today = pd.Timestamp(date.today()).normalize()
+    today = pd.Timestamp(report_date).normalize()
     
     promises_dfs = []
     activity_dfs = []
@@ -217,7 +471,7 @@ if uploaded_files:
 
     for f in uploaded_files:
         try:
-            temp_df = pd.read_csv(f) if f.name.endswith('.csv') else pd.read_excel(f)
+            temp_df = pd.read_csv(f, dtype=str) if f.name.endswith('.csv') else pd.read_excel(f, dtype=str)
             temp_df.columns = temp_df.columns.astype(str).str.strip()
             all_dfs.append(temp_df)
             
@@ -278,8 +532,10 @@ if uploaded_files:
         
         active_promises_df = df_promises[base_condition & (due_date == today) & (last_date != today)].copy()
         broken_promises_df = df_promises[base_condition & (due_date < today)].copy()
-        broken_promises_df['Date_Diff'] = (last_date[broken_promises_df.index] - due_date[broken_promises_df.index]).dt.days
-        broken_promises_df = broken_promises_df[broken_promises_df['Date_Diff'] < 0]
+        _diff = (last_date[broken_promises_df.index] - due_date[broken_promises_df.index]).dt.days
+        broken_promises_df = broken_promises_df[_diff < 0]
+        # عمود "الفرق " بعد Follow up Last Date زي الشيت الأصلي
+        broken_promises_df.insert(broken_promises_df.columns.get_loc('Follow up Last Date') + 1, 'الفرق ', _diff[_diff < 0].astype(int))
 
         neglect_base = df_promises[
             (df_promises['حالة المعالجة - التمويل'].astype(str).str.strip() == 'غير معالج') & 
@@ -298,12 +554,9 @@ if uploaded_files:
             broken_promises_df = broken_promises_df[broken_promises_df.astype(str).apply(lambda x: x.str.contains(search_query, case=False, na=False)).any(axis=1)]
             neglect_df = neglect_df[neglect_df.astype(str).apply(lambda x: x.str.contains(search_query, case=False, na=False)).any(axis=1)]
 
-    output_buffer = io.BytesIO()
-    with pd.ExcelWriter(output_buffer, engine='openpyxl') as writer:
-        active_promises_df.to_excel(writer, sheet_name='الوعود القائمة', index=False)
-        broken_promises_df.to_excel(writer, sheet_name='الوعود المكسورة', index=False)
-        neglect_df.to_excel(writer, sheet_name='تقرير الإهمال', index=False)
-    output_buffer.seek(0)
+    # ملف التقرير: 4 شيتات (قائمة + ملخص + مكسورة + ملخص) + تقرير الإهمال
+    output_buffer = build_report_xlsx(active_promises_df, broken_promises_df, neglect_df)
+    report_bytes = output_buffer.getvalue()
 
     total_rows = len(df_promises) if not df_promises.empty else len(df_all)
     active_count = len(active_promises_df)
@@ -452,7 +705,7 @@ if uploaded_files:
         </div>
         """, unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
-        st.download_button(label=f"📥 تحميل التقرير الكامل - {today.date()}.xlsx", data=output_buffer, file_name=f"Daily_Promises_Report_{today.date()}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+        st.download_button(label=f"📥 تحميل التقرير الكامل - {today.date()}.xlsx", data=report_bytes, file_name=f"Daily_Promises_Report_{today.date()}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
     # ==========================================
     # باقي الصفحات 
@@ -463,7 +716,10 @@ if uploaded_files:
             <h3 style="margin:0; color:#1F4373; font-weight:900;">✅ شيت الوعود القائمة ({active_count:,} حساب)</h3>
         </div>
         """, unsafe_allow_html=True)
+        st.markdown(f"<h4 style='text-align:right; direction:rtl; color:#FFFFFF; font-weight:900;'>📊 ملخص تقرير الوعود القائمة (Pivot)</h4>", unsafe_allow_html=True)
+        st.dataframe(pivot_to_frame(build_pivot(active_promises_df, order='first')), use_container_width=True, hide_index=True)
         st.dataframe(active_promises_df, use_container_width=True, height=450)
+        st.download_button("📥 تحميل تقرير الوعود (القائمة + المكسورة + الملخصات).xlsx", data=report_bytes, file_name=f"Daily_Promises_Report_{today.date()}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="dl_active")
         
     elif st.session_state.current_page == 'Broken':
         st.markdown(f"""
@@ -471,7 +727,10 @@ if uploaded_files:
             <h3 style="margin:0; color:#304D73; font-weight:900;">⚠️ شيت الوعود المكسورة ({broken_count:,} حساب)</h3>
         </div>
         """, unsafe_allow_html=True)
+        st.markdown(f"<h4 style='text-align:right; direction:rtl; color:#FFFFFF; font-weight:900;'>📊 ملخص تقرير الوعود المكسورة (Pivot)</h4>", unsafe_allow_html=True)
+        st.dataframe(pivot_to_frame(build_pivot(broken_promises_df)), use_container_width=True, hide_index=True)
         st.dataframe(broken_promises_df, use_container_width=True, height=450)
+        st.download_button("📥 تحميل تقرير الوعود (القائمة + المكسورة + الملخصات).xlsx", data=report_bytes, file_name=f"Daily_Promises_Report_{today.date()}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="dl_broken")
         
     elif st.session_state.current_page == 'Neglect':
         st.markdown(f"""
