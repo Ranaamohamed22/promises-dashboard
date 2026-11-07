@@ -20,7 +20,7 @@ if 'theme_choice' not in st.session_state:
     st.session_state.theme_choice = 'ثيم إجادة (Navy)'
 
 # ==========================================
-# دالة عامة للبحث عن الأعمدة (تم نقلها للأعلى لتجنب الـ NameError)
+# دالة عامة للبحث عن الأعمدة
 # ==========================================
 def find_col_in(target_df, candidates):
     if target_df is None or target_df.empty:
@@ -555,7 +555,7 @@ if page_uploaded is None:
         </div>
         """, unsafe_allow_html=True)
     else:
-        # خانة الرفع في جهة اليمين تماماً مع الجملة المطلوبة وصيغة XLSX فقط
+        # خانة الرفع في جهة اليمين تماماً مع الجملة المطلوبة وصيغة XLSX فقط بدون خانة استبدال
         st.markdown(f"<p style='color: {text_color}; font-weight: 800; font-size: 18px; text-align: right; direction: rtl; margin-top: 20px;'>ارفعي الملفات هنا ي رنا</p>", unsafe_allow_html=True)
         col_up1, col_up2 = st.columns([7, 3])
         with col_up1:
@@ -566,13 +566,7 @@ if page_uploaded is None:
 else:
     active_promises_df, broken_promises_df, neglect_df, activity_base_df, report_bytes, total_rows, total_unhandled, active_count, broken_count, neglect_count, total_activity_count = process_page_data(st.session_state.page_files[curr_page])
 
-    with st.expander("📁 استبدال أو تغيير ملفات هذا التقرير"):
-        col_ex1, col_ex2 = st.columns([7, 3])
-        with col_ex1:
-            new_f = st.file_uploader("ملفات جديدة (XLSX فقط)", type=["xlsx"], accept_multiple_files=True, key=f"re_uploader_{curr_page}")
-            if new_f:
-                st.session_state.page_files[curr_page] = new_f
-                st.rerun()
+    # تم إزالة خانة "استبدال أو تغيير ملفات هذا التقرير" بناءً على طلبك
 
     # ==========================================
     # صفحة الـ Overview الشاملة
@@ -719,11 +713,11 @@ else:
         st.dataframe(final_neglect_df, use_container_width=True, height=450)
 
     # ==========================================
-    # صفحة تقرير النشاط (مع اختيار المدى: يومي، أسبوعي، شهري ومحاذاة RTL)
+    # صفحة تقرير النشاط (العنوان في المنتصف تماماً)
     # ==========================================
     elif curr_page == 'Activity':
         st.markdown(f"""
-        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; text-align: right; margin-bottom: 20px;">
+        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; text-align: center; margin-bottom: 20px;">
             <h3 style="margin:0; color:{text_color}; font-weight:900;">📈 تقرير النشاط وموديل التقييم (ناجحة / مغطاة)</h3>
         </div>
         """, unsafe_allow_html=True)
