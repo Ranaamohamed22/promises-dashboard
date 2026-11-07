@@ -423,7 +423,7 @@ def build_report_xlsx(active_df, broken_df, neglect_df=None):
     return buf
 
 # ==========================================
-# إدارة الملفات لكل صفحة / تقرير منفصل
+# إدارة الملفات لكل صفحة تقرير بشكل منفصل تماماً
 # ==========================================
 if 'page_files' not in st.session_state:
     st.session_state.page_files = {
@@ -435,7 +435,7 @@ if 'page_files' not in st.session_state:
 
 curr_page = st.session_state.current_page
 
-# شريط التحكم العلوي (بحث وتاريخ فقط بدون رفع برة)
+# شريط التحكم العلوي (بحث وتاريخ فقط)
 ctrl_cols = st.columns([2, 8])
 with ctrl_cols[0]:
     report_date = st.date_input("📅 تاريخ التقرير", value=date.today(), format="DD/MM/YYYY")
@@ -446,7 +446,7 @@ with ctrl_cols[1]:
 
 st.markdown(f"<hr style='margin: 15px 0 25px 0; border-color: {border_color};'>", unsafe_allow_html=True)
 
-# دالة مساعدة لمعالجة بيانات أي صفحة بناءً على ملفاتها المرفوعة الخاصة بها
+# دالة معالجة بيانات أي صفحة
 def process_page_data(uploaded_files):
     if not uploaded_files:
         return None, None, None, None, None, 0, 0, 0, 0, 0, pd.DataFrame()
@@ -546,28 +546,31 @@ def process_page_data(uploaded_files):
 
     return active_promises_df, broken_promises_df, neglect_df, activity_base_df, report_bytes, total_rows, total_unhandled, active_count, broken_count, neglect_count, total_activity_count
 
-# التحقق من الملفات الخاصة بالصفحة الحالية
+# التحقق من الملفات الخاصة بالصفحة الحالية فقط
 page_uploaded = st.session_state.page_files[curr_page]
 
 if page_uploaded is None:
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    col_up1, col_up2, col_up3 = st.columns([1, 2, 1])
-    with col_up2:
+    # 1. لو في الصفحة الرئيسية (Overview)، نعرض جملة الترحيب المخصصة لرنا
+    if curr_page == 'Overview':
         st.markdown(f"""
-        <div style="background-color: {card_color}; padding: 30px; border-radius: 15px; border: 2px dashed {border_color}; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
-            <h3 style="color: {text_color}; font-weight: 900; margin-bottom: 10px;">📁 ارفعي ملفات هذا التقرير</h3>
-            <p style="color: {sub_text_color}; font-size: 14px; font-weight: bold; margin-bottom: 20px;">يرجى رفع الشيت الخاص بهذه الصفحة لعرض البيانات والرسومات البيانية</p>
+        <div style="background-color: {card_color}; border-radius: 15px; text-align: center; padding: 60px 20px; direction: rtl; border: 1px solid {border_color}; margin-top: 20px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            <h2 style="color: {text_color}; margin-bottom: 15px; font-weight:900;">أهلاً بيكي يا رنا في منصة تقارير شركة إجادة لتحصيل الديون</h2>
+            <p style="color: {sub_text_color}; font-size: 18px; font-weight: bold;">من شريط التنقل بالأعلى، اختاري أي تقرير لعرضه ورفع ملفاته الخاصة.</p>
         </div>
         """, unsafe_allow_html=True)
-        files_in = st.file_uploader(f"رفع ملفات صفحة {curr_page}", type=["xlsx", "xls", "csv"], accept_multiple_files=True, label_visibility="collapsed", key=f"uploader_{curr_page}")
+    
+    # 2. خانة رفع مستقلة وفاضية لكل صفحة تقرير لوحدها
+    st.markdown(f"<h3 style='text-align: center; color: {header_logo_color if curr_page != 'Overview' else text_color}; font-weight: 800;'>📁 ارفعي شيتات أو ملفات صفحة [{curr_page}]</h3>", unsafe_allow_html=True)
+    col_up1, col_up2, col_up3 = st.columns([1, 2, 1])
+    with col_up2:
+        files_in = st.file_uploader(f"رفع ملفات {curr_page}", type=["xlsx", "xls", "csv"], accept_multiple_files=True, label_visibility="collapsed", key=f"uploader_{curr_page}")
         if files_in:
             st.session_state.page_files[curr_page] = files_in
             st.rerun()
 else:
     active_promises_df, broken_promises_df, neglect_df, activity_base_df, report_bytes, total_rows, total_unhandled, active_count, broken_count, neglect_count, total_activity_count = process_page_data(st.session_state.page_files[curr_page])
 
-    # زر لتغيير الملفات المرفوعة في هذه الصفحة لو حابة
-    with st.expander("📁 تغيير أو استبدال الملفات المرفوعة لهذا التقرير"):
+    with st.expander("📁 استبدال أو تغيير ملفات هذا التقرير"):
         new_f = st.file_uploader(f"ملفات جديدة لـ {curr_page}", type=["xlsx", "xls", "csv"], accept_multiple_files=True, key=f"re_uploader_{curr_page}")
         if new_f:
             st.session_state.page_files[curr_page] = new_f
