@@ -131,7 +131,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 1. عنوان إجادة (في المنتصف وأعلى الصفحة) + البنك الأهلي السعودي (أقصى اليمين فوق)
+# 1. عنوان إجادة (في المنتصف وأعلى الصفحة) + البنك الأهلي السعودي (أقصى اليمين تماماً بدون هوامش)
 # ==========================================
 st.markdown(f"""
 <div style="position: relative; width: 100%; margin-top: -35px; margin-bottom: 25px;">
@@ -141,13 +141,13 @@ st.markdown(f"""
         <div style="color: {header_logo_color}; font-size: 20px; letter-spacing: 10px; font-weight: 900; margin-top: -8px; margin-right:-10px;">EJADA</div>
         <div style="color: {header_logo_color}; font-size: 18px; font-weight: bold; margin-top: 5px;">لتحصيل الديون</div>
     </div>
-    <!-- شعار البنك الأهلي السعودي في أقصى اليمين فوق وتحته (30-60-NPL) -->
-    <div style="position: absolute; top: 5px; right: 0; text-align: right; line-height: 1.3; direction: ltr;">
+    <!-- شعار البنك الأهلي السعودي ملاصق لأقصى اليمين تماماً -->
+    <div style="position: absolute; top: 0; right: -10px; text-align: right; line-height: 1.2; direction: ltr;">
         <div style="white-space: nowrap;">
             <span style="color: {snb_green}; font-weight: 900; font-size: 26px; letter-spacing: 1px; vertical-align: middle;">SNB</span>
             <span style="color: {snb_green}; font-size: 22px; font-weight: bold; font-family: Tahoma, sans-serif; margin-left: 8px; vertical-align: middle;">البنك الأهلي السعودي</span>
         </div>
-        <div style="color: {snb_green}; font-size: 18px; font-weight: 900; text-align: center; letter-spacing: 1.5px; margin-top: 2px;">
+        <div style="color: {snb_green}; font-size: 17px; font-weight: 900; text-align: center; letter-spacing: 1.5px; margin-top: 2px;">
             (30-60-NPL)
         </div>
     </div>
@@ -226,11 +226,9 @@ if uploaded_files:
             temp_df.columns = temp_df.columns.astype(str).str.strip()
             all_dfs.append(temp_df)
             
-            # لو الملف فيه أعمدة الوعود والإهمال يضاف لجدول الوعود
             if 'Follow up Due Date' in temp_df.columns and 'Follow up Last Date' in temp_df.columns:
                 promises_dfs.append(temp_df)
             
-            # لو الملف فيه عمود وقت/تاريخ الإنشاء أو هو ملف نشاط يضاف لجدول النشاط
             has_created = any(c.lower().strip() in ['created on', 'created_on', 'createdon', 'تاريخ الإنشاء', 'وقت المعالجة', 'date', 'التاريخ'] for c in temp_df.columns)
             if has_created or not ('Follow up Due Date' in temp_df.columns):
                 activity_dfs.append(temp_df)
@@ -250,7 +248,6 @@ if uploaded_files:
                     return col
         return None
 
-    # --- تجهيز بيانات النشاط ---
     created_col = find_col_in(df_act_raw, ['created on', 'created_on', 'createdon', 'تاريخ الإنشاء', 'وقت المعالجة', 'date', 'التاريخ'])
     if created_col:
         df_act_raw['Created_DateTime'] = pd.to_datetime(df_act_raw[created_col], errors='coerce')
@@ -270,7 +267,6 @@ if uploaded_files:
     else:
         activity_base_df = df_act_raw.copy()
 
-    # --- تجهيز بيانات الوعود والإهمال ---
     active_promises_df = pd.DataFrame()
     broken_promises_df = pd.DataFrame()
     neglect_df = pd.DataFrame()
@@ -630,7 +626,7 @@ if uploaded_files:
 else:
     st.markdown(f"""
     <div style="background-color: {nav_btn_bg}; border-radius: 15px; text-align: center; padding: 100px 20px; direction: rtl; border: 1px solid {border_color}; margin-top: 50px;">
-        <h2 style="color: {text_color}; margin-bottom: 15px; font-weight:900;">أهلاً بيكي في منصة تقارير شركة إجادة لتحصيل الديون</h2>
+        <h2 style="color: {text_color}; margin-bottom: 15px; font-weight:900;">أهلاً بيكي يا رنا في منصة تقارير شركة إجادة لتحصيل الديون</h2>
         <p style="color: {sub_text_color}; font-size: 18px; font-weight: bold;">من شريط التحكم بالأعلى، ارفعي شيت الإكسيل اليومي لعرض الداشبورد والتقارير.</p>
     </div>
     """, unsafe_allow_html=True)
