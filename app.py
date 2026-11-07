@@ -17,7 +17,7 @@ if 'theme_choice' not in st.session_state:
     st.session_state.theme_choice = 'ثيم إجادة (Navy)'
 
 # ==========================================
-# إعدادات الثيم والألوان بالترتيب المطلوبة
+# إعدادات الثيم والألوان بالترتيب المطلوب
 # ==========================================
 ejada_navy_dark = "#1F4373"
 ejada_navy_light = "#304D73"
@@ -305,7 +305,7 @@ if uploaded_files:
         if search_query:
             active_promises_df = active_promises_df[active_promises_df.astype(str).apply(lambda x: x.str.contains(search_query, case=False, na=False)).any(axis=1)]
             broken_promises_df = broken_promises_df[broken_promises_df.astype(str).apply(lambda x: x.str.contains(search_query, case=False, na=False)).any(axis=1)]
-            neglect_df = neglect_df[neglect_df[neglect_df.astype(str).apply(lambda x: x.str.contains(search_query, case=False, na=False)).any(axis=1)]
+            neglect_df = neglect_df[neglect_df.astype(str).apply(lambda x: x.str.contains(search_query, case=False, na=False)).any(axis=1)]
 
     output_buffer = io.BytesIO()
     with pd.ExcelWriter(output_buffer, engine='openpyxl') as writer:
@@ -386,7 +386,7 @@ if uploaded_files:
             st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # 2. Gauge Chart (مصحح الخطأ عبر استخدام title_text مباشرة)
+        # 2. Gauge Chart (مصحح بالكامل بدون أخطاء)
         with chart_col2:
             st.markdown('<div class="chart-box">', unsafe_allow_html=True)
             total_extracted = active_count + broken_count
