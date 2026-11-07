@@ -71,7 +71,7 @@ st.markdown(f"""
     .stApp {{ background-color: {bg_color} !important; }}
 
     /* تقليل هوامش الصفحة عشان الشعارات والأقمر يلزقوا في الأطراف */
-    .block-container {{ padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; }}
+    .block-container {{ padding-top: 3.8rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; }}
     
     /* الزراير العادية */
     div[data-testid="stButton"] > button[kind="secondary"] {{
@@ -134,19 +134,36 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 1. لوجو إجادة + كلمة DASHBOARD (أقصى اليسار) + البنك الأهلي السعودي (أقصى اليمين)
+# 0. الصف العلوي: القمر + Overview في أقصى اليسار
+# ==========================================
+top_cols = st.columns([0.4, 1.3, 8], gap="small")
+
+with top_cols[0]:
+    if st.button(" ", key="theme_toggle"): 
+        if st.session_state.theme_choice == 'التصميم الأصلي (Dark)':
+            st.session_state.theme_choice = 'ثيم إجادة (Navy)'
+        else:
+            st.session_state.theme_choice = 'التصميم الأصلي (Dark)'
+        st.rerun()
+
+with top_cols[1]:
+    if st.button("📊 Overview", type="primary" if st.session_state.current_page == 'Overview' else "secondary", use_container_width=True):
+        st.session_state.current_page = 'Overview'
+        st.rerun()
+
+# ==========================================
+# 1. عنوان إجادة (في المنتصف) + البنك الأهلي السعودي (أقصى اليمين)
 # ==========================================
 st.markdown(f"""
-<div style="position: relative; width: 100%; min-height: 120px; margin-top: -35px; margin-bottom: 25px;">
-    <!-- لوجو إجادة + كلمة DASHBOARD في أقصى اليسار -->
-    <div style="position: absolute; top: 0; left: 0; text-align: center; line-height: 1.1; direction: ltr;">
+<div style="position: relative; width: 100%; min-height: 120px; margin-top: -60px; margin-bottom: 25px; pointer-events: none;">
+    <!-- عنوان إجادة في المنتصف تماماً -->
+    <div style="text-align: center; line-height: 1.1;">
         <div style="color: {header_logo_color}; font-size: 45px; font-weight: 900; font-family: Tahoma, sans-serif;">إجـــادة</div>
         <div style="color: {header_logo_color}; font-size: 20px; letter-spacing: 10px; font-weight: 900; margin-top: -8px; margin-right:-10px;">EJADA</div>
         <div style="color: {header_logo_color}; font-size: 18px; font-weight: bold; margin-top: 5px;">لتحصيل الديون</div>
-        <div style="color: {snb_green}; font-size: 16px; font-weight: 900; letter-spacing: 6px; margin-top: 6px;">DASHBOARD</div>
     </div>
-    <!-- شعار البنك الأهلي السعودي في أقصى اليمين -->
-    <div style="position: absolute; top: 0; right: -20px; text-align: right; line-height: 1.2; direction: ltr;">
+    <!-- شعار البنك الأهلي السعودي في أقصى اليمين (داخل الفريم) -->
+    <div style="position: absolute; top: 0; right: 0; text-align: right; line-height: 1.2; direction: ltr;">
         <div style="white-space: nowrap;">
             <span style="color: {snb_green}; font-weight: 900; font-size: 26px; letter-spacing: 1px; vertical-align: middle;">SNB</span>
             <span style="color: {snb_green}; font-size: 22px; font-weight: bold; font-family: Tahoma, sans-serif; margin-left: 8px; vertical-align: middle;">البنك الأهلي السعودي</span>
@@ -161,42 +178,29 @@ st.markdown(f"""
 # ==========================================
 # 2. شريط التنقل
 # ==========================================
-nav_cols = st.columns([0.4, 1.3, 1.3, 1.3, 1.3, 1.3, 3.5], gap="small") 
+nav_cols = st.columns([1.3, 1.3, 1.3, 1.3, 5], gap="small") 
 
 with nav_cols[0]:
-    if st.button(" ", key="theme_toggle"): 
-        if st.session_state.theme_choice == 'التصميم الأصلي (Dark)':
-            st.session_state.theme_choice = 'ثيم إجادة (Navy)'
-        else:
-            st.session_state.theme_choice = 'التصميم الأصلي (Dark)'
-        st.rerun()
-
-with nav_cols[1]:
-    if st.button("📊 Overview", type="primary" if st.session_state.current_page == 'Overview' else "secondary", use_container_width=True):
-        st.session_state.current_page = 'Overview'
-        st.rerun()
-
-with nav_cols[2]:
     if st.button("✅ الوعود القائمة", type="primary" if st.session_state.current_page == 'Active' else "secondary", use_container_width=True):
         st.session_state.current_page = 'Active'
         st.rerun()
 
-with nav_cols[3]:
+with nav_cols[1]:
     if st.button("⚠️ الوعود المكسورة", type="primary" if st.session_state.current_page == 'Broken' else "secondary", use_container_width=True):
         st.session_state.current_page = 'Broken'
         st.rerun()
 
-with nav_cols[4]:
+with nav_cols[2]:
     if st.button("🚨 تقرير الإهمال", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=True):
         st.session_state.current_page = 'Neglect'
         st.rerun()
 
-with nav_cols[5]:
+with nav_cols[3]:
     if st.button("📈 النشاط", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=True):
         st.session_state.current_page = 'Activity'
         st.rerun()
 
-with nav_cols[6]:
+with nav_cols[4]:
     st.markdown("")
 
 st.markdown(f"<hr style='margin: 10px 0 10px 0; border-color: {border_color}; clear: both;'>", unsafe_allow_html=True)
