@@ -771,4 +771,57 @@ else:
             else:
                 act_df['Call_Status'] = 'غير مصنف'
         else:
-            target_col = find_col_in(act_df, ['التقييم', 'التقيمي', 'evaluation', 'eval', 'تقييم', 'status', '
+            target_col = find_col_in(act_df, ['التقييم', 'التقيمي', 'evaluation', 'eval', 'تقييم', 'status', 'الحالة', 'sub state', 'result', 'نتيجة المكالمة'])
+            target_col = target_col if target_col else act_df.columns[0]
+            available_vals = act_df[target_col].dropna().astype(str).unique().tolist()
+            selected_success_vals = st.multiselect(f"حددي القيم التي تعتبر (ناجحة = 1) من عمود [{target_col}]:", options=available_vals, default=[v for v in available_vals if str(v).strip() in ['1', '1.0', 'ناجح', 'وعد', 'سداد', 'تم']])
+            act_df['Call_Status'] = act_df[target_col].astype(str).apply(lambda x: 'ناجحة' if x in selected_success_vals else 'مغطاة')
+
+        if search_query:
+            act_df = act_df[act_df.astype(str).apply(lambda x: x.str.contains(search_query, case=False, na=False)).any(axis=1)]
+
+        total_activity = len(act_df)
+        success_count = len(act_df[act_df['Call_Status'] == 'ناجحة'])
+        covered_count = len(act_df[act_df['Call_Status'] == 'مغطاة'])
+        success_rate = (success_count / total_activity * 100) if total_activity > 0 else 0
+
+        collector_col = find_col_in(act_df, ['collecter', 'collector', 'المحصل', 'اسم المحصل'])
+        if collector_col and collector_col in act_df.columns and total_activity > 0:
+            top_collector_series = act_df[collector_col].value_counts()
+            if not top_collector_series.empty:
+                top_name = top_collector_series.index[0]
+                top_calls = top_collector_series.values[0]
+                top_pct = (top_calls / total_activity * 100) if total_activity > 0 else 0
+                st.markdown(f"""
+                <div style="background-color: {card_color}; border-radius: 12px; padding: 20px 30px; border: 2px solid #586F8C; direction:rtl; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <h4 style="margin:0; color: #586F8C; font-weight:900;">🏆 بطل الشفت (الأكثر نشاطاً)</h4>
+                        <p style="margin: 5px 0 0 0; color: {text_color}; font-size: 18px;">المحصل: <b style="color:#1F4373; font-size: 22px;">{top_name}</b></p>
+                    </div>
+                    <div style="text-align: left; background-color: {bg_color}; padding: 10px 20px; border-radius: 8px; border: 1px solid #586F8C;">
+                        <h3 style="margin:0; color: #586F8C; font-weight:900;">{top_calls:,} مكالمة</h3>
+                        <p style="margin: 0; color: #FFFFFF; font-size: 14px; font-weight: bold;">استحوذ على <span style="color:#99AABF;">{top_pct:.1f}%</span> من إجمالي شغل اليوم</p>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px;">
+            <div class="kpi-card" style="border-left-color: {border_color};">
+                <div class="kpi-icon">📞</div>
+                <div class="kpi-title">إجمالي المحاولات</div>
+                <div class="kpi-value">{total_activity:,}</div>
+                <div class="kpi-sub" style="color: {sub_text_color};">بعد إزالة التكرار</div>
+            </div>
+            <div class="kpi-card" style="border-left-color: #1F4373;">
+                <div class="kpi-icon">✅</div>
+                <div class="kpi-title">المكالمات الناجحة (1)</div>
+                <div class="kpi-value">{success_count:,}</div>
+                <div class="kpi-sub" style="color: #1F4373;">تقييم ناجح</div>
+            </div>
+            <div class="kpi-card" style="border-left-color: {border_color};">
+                <div class="kpi-icon">🎧</div>
+                <div class="kpi-title">المكالمات المغطاة (0)</div>
+                <div class="kpi-value">{covered_count:,}</div>
+                <div class="kpi-sub" style="color: {sub_text_color};">تقييم مغطاة</div>
+            </div>
