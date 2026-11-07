@@ -69,6 +69,9 @@ st.markdown(f"""
     [data-testid="stSidebar"] {{display: none !important;}}
     
     .stApp {{ background-color: {bg_color} !important; }}
+
+    /* تقليل هوامش الصفحة عشان الشعارات والأقمر يلزقوا في الأطراف */
+    .block-container {{ padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; }}
     
     /* الزراير العادية */
     div[data-testid="stButton"] > button[kind="secondary"] {{
@@ -131,18 +134,19 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 1. عنوان إجادة (في المنتصف وأعلى الصفحة) + البنك الأهلي السعودي (أقصى اليمين تماماً بدون هوامش)
+# 1. لوجو إجادة + كلمة DASHBOARD (أقصى اليسار) + البنك الأهلي السعودي (أقصى اليمين)
 # ==========================================
 st.markdown(f"""
-<div style="position: relative; width: 100%; margin-top: -35px; margin-bottom: 25px;">
-    <!-- عنوان إجادة في المنتصف تماماً -->
-    <div style="text-align: center; line-height: 1.1;">
+<div style="position: relative; width: 100%; min-height: 120px; margin-top: -35px; margin-bottom: 25px;">
+    <!-- لوجو إجادة + كلمة DASHBOARD في أقصى اليسار -->
+    <div style="position: absolute; top: 0; left: 0; text-align: center; line-height: 1.1; direction: ltr;">
         <div style="color: {header_logo_color}; font-size: 45px; font-weight: 900; font-family: Tahoma, sans-serif;">إجـــادة</div>
         <div style="color: {header_logo_color}; font-size: 20px; letter-spacing: 10px; font-weight: 900; margin-top: -8px; margin-right:-10px;">EJADA</div>
         <div style="color: {header_logo_color}; font-size: 18px; font-weight: bold; margin-top: 5px;">لتحصيل الديون</div>
+        <div style="color: {snb_green}; font-size: 16px; font-weight: 900; letter-spacing: 6px; margin-top: 6px;">DASHBOARD</div>
     </div>
-    <!-- شعار البنك الأهلي السعودي ملاصق لأقصى اليمين تماماً -->
-    <div style="position: absolute; top: 0; right: -10px; text-align: right; line-height: 1.2; direction: ltr;">
+    <!-- شعار البنك الأهلي السعودي في أقصى اليمين -->
+    <div style="position: absolute; top: 0; right: -20px; text-align: right; line-height: 1.2; direction: ltr;">
         <div style="white-space: nowrap;">
             <span style="color: {snb_green}; font-weight: 900; font-size: 26px; letter-spacing: 1px; vertical-align: middle;">SNB</span>
             <span style="color: {snb_green}; font-size: 22px; font-weight: bold; font-family: Tahoma, sans-serif; margin-left: 8px; vertical-align: middle;">البنك الأهلي السعودي</span>
