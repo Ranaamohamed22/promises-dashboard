@@ -71,11 +71,11 @@ else:
     nav_btn_border = "#333333"
     kpi_title_color = "#A0AEC0"
     header_logo_color = "#FFFFFF"
-    input_bg = "#FFFFFF"
-    input_text = "#13131A"
+    input_bg = "#1A1A1D"
+    input_text = "#FFFFFF"
 
 # ==========================================
-# تصميم الـ UI الديناميكي (CSS) ودعم الـ RTL
+# تصميم الـ UI الديناميكي (CSS) وتبييض كل الشرايط والمربعات تلقائياً
 # ==========================================
 st.markdown(f"""
 <style>
@@ -124,7 +124,11 @@ st.markdown(f"""
         box-shadow: 0 2px 6px rgba(0,0,0,0.4) !important;
     }}
 
-    .stTextInput input, div[data-baseweb="select"] > div {{ background-color: {input_bg} !important; color: {input_text} !important; border: 1px solid {border_color} !important; border-radius: 8px !important; direction: rtl; text-align: right; }}
+    /* تحويل جميع حقول الإدخال، القوائم المنسدلة، وعناصر الـ Select و MultiSelect إلى أبيض في الثيم الأبيض */
+    .stTextInput input, div[data-baseweb="select"] > div, div[data-baseweb="base-input"] {{ background-color: {input_bg} !important; color: {input_text} !important; border: 1px solid {border_color} !important; border-radius: 8px !important; direction: rtl; text-align: right; }}
+    div[data-baseweb="tag"] {{ background-color: {ejada_navy_light} !important; color: #FFFFFF !important; }}
+    span[data-baseweb="tag"] span {{ color: #FFFFFF !important; }}
+    
     .stTextInput input::placeholder {{ color: {sub_text_color} !important; }}
     
     [data-testid="stFileUploader"] > section {{ background-color: {input_bg} !important; border: 1px dashed {border_color} !important; border-radius: 8px !important; }}
@@ -141,7 +145,7 @@ st.markdown(f"""
 # ==========================================
 # 0. الصف العلوي: القمر + Overview
 # ==========================================
-top_cols = st.columns([0.4, 1.3, 8], gap="small")
+top_cols = st.columns([0.5, 1.5, 6], gap="small")
 
 with top_cols[0]:
     if st.button(" ", key="theme_toggle"): 
@@ -157,21 +161,21 @@ with top_cols[1]:
         st.rerun()
 
 # ==========================================
-# 1. الهيدر الرئيسي (إجادة + SNB)
+# 1. الهيدر الرئيسي (إجادة في المنتصف + البنك الأهلي SNB ناحية اليسار تماماً)
 # ==========================================
 st.markdown(f"""
-<div style="position: relative; width: 100%; min-height: 120px; margin-top: -60px; margin-bottom: 25px; pointer-events: none; direction: ltr;">
+<div style="position: relative; width: 100%; min-height: 110px; margin-top: -50px; margin-bottom: 25px;">
     <div style="text-align: center; line-height: 1.1;">
         <div style="color: {header_logo_color}; font-size: 45px; font-weight: 900; font-family: Tahoma, sans-serif;">إجـــادة</div>
         <div style="color: {header_logo_color}; font-size: 20px; letter-spacing: 10px; font-weight: 900; margin-top: -8px; margin-right:-10px;">EJADA</div>
         <div style="color: {header_logo_color}; font-size: 18px; font-weight: bold; margin-top: 5px;">لتحصيل الديون</div>
     </div>
-    <div style="position: absolute; top: 0; right: -15px; text-align: right; line-height: 1.2; direction: ltr;">
+    <div style="position: absolute; top: 5px; left: 10px; text-align: left; line-height: 1.2; direction: ltr;">
         <div style="white-space: nowrap;">
-            <span style="color: {snb_green}; font-weight: 900; font-size: 26px; letter-spacing: 1px; vertical-align: middle;">SNB</span>
-            <span style="color: {snb_green}; font-size: 22px; font-weight: bold; font-family: Tahoma, sans-serif; margin-left: 8px; vertical-align: middle;">البنك الأهلي السعودي</span>
+            <span style="color: {snb_green}; font-weight: 900; font-size: 24px; letter-spacing: 1px; vertical-align: middle;">SNB</span>
+            <span style="color: {snb_green}; font-size: 19px; font-weight: bold; font-family: Tahoma, sans-serif; margin-left: 6px; vertical-align: middle;">البنك الأهلي السعودي</span>
         </div>
-        <div style="color: {snb_green}; font-size: 17px; font-weight: 900; text-align: center; letter-spacing: 1.5px; margin-top: 2px;">
+        <div style="color: {snb_green}; font-size: 15px; font-weight: 900; text-align: center; letter-spacing: 1.5px; margin-top: 2px;">
             (30-60-NPL)
         </div>
     </div>
@@ -640,8 +644,11 @@ else:
                     }
                 ))
                 fig_gauge.update_layout(
-                    title_font=dict(color=ejada_navy_dark, size=15, weight='bold'), title_x=0.5,
-                    paper_bgcolor='white', font_color=ejada_navy_dark, margin=dict(l=20, r=20, t=50, b=20)
+                    title_font=dict(color=ejada_navy_dark, size=15, weight='bold'),
+                    title_x=0.5,
+                    paper_bgcolor='white', 
+                    font_color=ejada_navy_dark, 
+                    margin=dict(l=20, r=20, t=50, b=20)
                 )
                 st.plotly_chart(fig_gauge, use_container_width=True, config={'displayModeBar': False})
 
@@ -653,7 +660,9 @@ else:
                     fig_bar = go.Figure(go.Bar(
                         x=top_colls.index, y=top_colls.values,
                         marker_color=["#1F4373", "#304D73", "#586F8C", "#99AABF", "#1F4373"],
-                        text=top_colls.values, textposition='auto', textfont=dict(color="#FFFFFF", weight='bold')
+                        text=top_colls.values,
+                        textposition='auto',
+                        textfont=dict(color="#FFFFFF", weight='bold')
                     ))
                     fig_bar.update_layout(
                         title=dict(text="أكثر 5 محصلين نشاطاً", x=0.5, xanchor='center', font=dict(color=ejada_navy_dark, size=15, weight='bold')),
@@ -708,7 +717,7 @@ else:
         st.dataframe(final_neglect_df, use_container_width=True, height=450)
 
     # ==========================================
-    # صفحة تقرير النشاط (معتمد على Notes والتعامل مع الملاحظات الجديدة)
+    # صفحة تقرير النشاط (محاذاة كاملة لليمين وتبييض كل المربعات في الثيم الأبيض)
     # ==========================================
     elif curr_page == 'Activity':
         st.markdown(f"""
@@ -777,22 +786,19 @@ else:
                 curr_times = act_df['Created_DateTime'].dt.time
                 act_df = act_df[~((curr_times >= time(12, 0)) & (curr_times <= time(12, 30)))]
 
-        # ربط التقييم بعمود Notes والتعامل مع الملاحظات الجديدة غير الموجودة في الموديل
+        # ربط التقييم بعمود Notes والتعامل مع الملاحظات الجديدة
         notes_col_name = find_col_in(act_df, ['notes', 'note', 'الملاحظات', 'ملاحظات', 'feedback'])
         
         if mapping_file is not None and notes_col_name:
             map_df = pd.read_excel(mapping_file)
             map_df.columns = map_df.columns.str.strip()
             
-            # البحث عن عمود الملاحظات وعمود التقييم في شيت الموديل
             map_notes_col = find_col_in(map_df, ['notes', 'note', 'الملاحظات', 'ملاحظات', 'feedback'])
             map_eval_col = [c for c in map_df.columns if c != map_notes_col][0] if len(map_df.columns) > 1 else map_df.columns[0]
             
             if map_notes_col:
-                # تحويل الموديل إلى قاموس للمقارنة
                 mapping_dict = dict(zip(map_df[map_notes_col].astype(str).str.strip(), map_df[map_eval_col]))
                 
-                # فحص الملاحظات الموجودة في الشيت وغير موجودة في الموديل
                 all_sheet_notes = act_df[notes_col_name].dropna().astype(str).str.strip().unique()
                 unmapped_notes = [n for n in all_sheet_notes if n not in mapping_dict]
                 
@@ -820,7 +826,6 @@ else:
             else:
                 act_df['Call_Status'] = 'غير مصنف'
         else:
-            # لو مفيش موديل مرفوع، نعتمد الافتراضي من عمود الملاحظات أو أي عمود تقييم
             target_col = notes_col_name if notes_col_name else find_col_in(act_df, ['التقييم', 'status', 'الحالة', 'sub state', 'result'])
             if target_col:
                 available_vals = act_df[target_col].dropna().astype(str).unique().tolist()
