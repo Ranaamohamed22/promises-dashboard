@@ -191,16 +191,12 @@ with nav_cols[3]:
 st.markdown(f"<hr style='margin: 10px 0 15px 0; border-color: {border_color}; clear: both;'>", unsafe_allow_html=True)
 
 # ==========================================
-# 3. شريط التحكم الجديد (رفع الملفات بجوار البحث والتاريخ في كل الصفحات)
+# 3. شريط التحكم العلوي (بحث وتاريخ فقط)
 # ==========================================
-ctrl_cols = st.columns([3.5, 1.5, 5])
+ctrl_cols = st.columns([2, 8])
 with ctrl_cols[0]:
-    uploaded_files = st.file_uploader("📁 ارفعي ملفات الإكسيل (متعددة)", type=["xlsx", "xls", "csv"], accept_multiple_files=True)
-with ctrl_cols[1]:
-    st.markdown("<div style='padding-top: 2px;'>", unsafe_allow_html=True)
     report_date = st.date_input("📅 تاريخ التقرير", value=date.today(), format="DD/MM/YYYY")
-    st.markdown("</div>", unsafe_allow_html=True)
-with ctrl_cols[2]:
+with ctrl_cols[1]:
     st.markdown("<div style='padding-top: 28px;'>", unsafe_allow_html=True)
     search_query = st.text_input("", placeholder="🔍 ابحثي هنا (برقم العميل، الاسم، أو أي بيان)...", label_visibility="collapsed")
     st.markdown("</div>", unsafe_allow_html=True)
@@ -440,8 +436,30 @@ def build_report_xlsx(active_df, broken_df, neglect_df=None):
     return buf
 
 # ==========================================
-# 4. معالجة البيانات المجمعة
+# 4. معالجة البيانات المجمعة (مع خانة رفع مستقلة تظهر عند الحاجة)
 # ==========================================
+# التحقق مما إذا كانت الصفحة الحالية تتطلب رفع ملفات لو لم تقم برفعها مسبقاً
+if 'uploaded_files_cache' not in st.session_state:
+    st.session_state.uploaded_files_cache = None
+
+# إذا لم يتم رفع ملفات بعد، نعرض واجهة الرفع في منتصف الشاشة الرئيسية بأسلوب أنيق جداً
+if st.session_state.uploaded_files_cache is None:
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    col_up1, col_up2, col_up3 = st.columns([1, 2, 1])
+    with col_up2:
+        st.markdown(f"""
+        <div style="background-color: {card_color}; padding: 30px; border-radius: 15px; border: 2px dashed {border_color}; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+            <h3 style="color: {text_color}; font-weight: 900; margin-bottom: 10px;">📁 أهلاً بيكي يا رنا</h3>
+            <p style="color: {sub_text_color}; font-size: 15px; font-weight: bold; margin-bottom: 20px;">يرجى رفع شيتات الإكسيل اليومية لفتح لوحة القيادة والتقارير</p>
+        </div>
+        """, unsafe_allow_html=True)
+        uploaded_files = st.file_uploader("رفـع الملفات", type=["xlsx", "xls", "csv"], accept_multiple_files=True, label_visibility="collapsed")
+        if uploaded_files:
+            st.session_state.uploaded_files_cache = uploaded_files
+            st.reruns = st.rerun() if hasattr(st, 'rerun') else st.experimental_rerun()
+else:
+    uploaded_files = st.session_state.uploaded_files_cache
+
 if uploaded_files:
     today = pd.Timestamp(report_date).normalize()
     
