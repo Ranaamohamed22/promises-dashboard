@@ -1096,4 +1096,220 @@ def render_activity_boxes(activity_base_df=None):
                 with hdr_col1:
                     st.markdown(f"<p style='font-size: 13px; color: {sub_text_color}; direction: rtl; text-align: right; margin: 0; font-weight: bold;'>الملف الحالي: {cur_names}</p>", unsafe_allow_html=True)
                 with hdr_col2:
-                    st.button("✖", key="clear_act_files_btn", on_click=clear_activity
+                    st.button("✖", key="clear_act_files_btn", on_click=clear_activity_files, help="إزالة الملف المرفوع")
+            else:
+                st.markdown(f"<p style='font-size: 13px; color: {sub_text_color}; direction: rtl; text-align: right; margin: 0 0 2px 0; font-weight: bold;'>الملف الحالي: لسه ما اترفعش ملف</p>", unsafe_allow_html=True)
+
+            uploader_key = f"uploader_inpage_Activity_{st.session_state.act_uploader_ver}"
+            new_files = st.file_uploader("ارفعي الملف هنا يا رنا", type=["xlsx", "csv"], accept_multiple_files=True, key=uploader_key)
+            if new_files:
+                new_sig = [(f.name, f.size) for f in new_files]
+                cur_sig = [(f.name, f.size) for f in cur_files]
+                if new_sig != cur_sig:
+                    st.session_state.page_files['Activity'] = new_files
+                    st.rerun()
+
+    collector_col_name = None
+    selected_collector = "الكل (جميع المحصلين)"
+    with col_coll:
+        with st.container(border=True):
+            st.markdown(f"<p style='font-size: 13px; color: {sub_text_color}; direction: rtl; text-align: right; margin: 0 0 2px 0; font-weight: bold;'>فلترة حسب المحصل</p>", unsafe_allow_html=True)
+            collector_options = ["الكل (جميع المحصلين)"]
+            if activity_base_df is not None:
+                collector_col_name = find_col_in(activity_base_df, ['collecter', 'collector', 'المحصل', 'اسم المحصل'])
+                if collector_col_name and collector_col_name in activity_base_df.columns:
+                    unique_colls = activity_base_df[collector_col_name].dropna().astype(str).unique().tolist()
+                    collector_options.extend(sorted(unique_colls))
+            selected_collector = st.selectbox("👤 اسم المحصل (Collector):", options=collector_options, disabled=(activity_base_df is None))
+
+    return selected_collector, mapping_file, collector_col_name
+
+# التحقق من الملفات الخاصة بالصفحة الحالية فقط
+page_uploaded = st.session_state.page_files[curr_page]
+
+if page_uploaded is None:
+    if curr_page == 'Overview':
+        st.markdown(f"""
+        <div style="background-color: {card_color}; border-radius: 15px; text-align: center; padding: 60px 20px; direction: rtl; border: 1px solid {border_color}; margin-top: 20px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            <h2 style="color: {text_color}; margin-bottom: 15px; font-weight:900;">أهلاً بيكي يا رنا في منصة تقارير شركة إجادة لتحصيل الديون</h2>
+            <p style="color: {kpi_title_color}; font-size: 18px; font-weight: bold;">من شريط التنقل بالأعلى، اختاري أي تقرير لعرضه ورفع ملفاته الخاصة.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    elif curr_page == 'Activity':
+        render_activity_header()
+        render_activity_boxes(None)
+        st.markdown(f"<p style='color: {label_color}; font-weight: 800; font-size: 16px; text-align: right; direction: rtl; margin-top: 10px;'>ارفعي ملف النشاط من الخانة اللي فوق عشان يظهر التقرير.</p>", unsafe_allow_html=True)
+    else:
+        st.markdown(f"<p style='color: {label_color}; font-weight: 800; font-size: 18px; text-align: right; direction: rtl; margin-top: 20px;'>ارفعي الملفات هنا ي رنا</p>", unsafe_allow_html=True)
+        col_up1, col_up2 = st.columns([7, 3])
+        with col_up1:
+            files_in = st.file_uploader("ارفعي الملفات هنا ي رنا", type=["xlsx"], accept_multiple_files=True, label_visibility="collapsed", key=f"uploader_{curr_page}")
+            if files_in:
+                st.session_state.page_files[curr_page] = files_in
+                st.rerun()
+else:
+    active_promises_df, broken_promises_df, neglect_df, activity_base_df, report_bytes, total_rows, total_unhandled, active_count, broken_count, neglect_count, total_activity_count = process_page_data(st.session_state.page_files[curr_page])
+
+    # ==========================================
+    # صفحة الـ Overview الشاملة
+    # ==========================================
+    if curr_page == 'Overview':
+        st.markdown(f"<h2 style='text-align:center; margin:0; color:{label_color}; font-weight:900;'>📊 لوحة القيادة الشاملة (Executive Overview)</h2>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align:center; color:{sub_text_color}; font-weight: bold; margin-bottom: 30px;'>ملخص أداء محفظة الديون ونشاط المحصلين</p>", unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; margin-bottom: 30px;">
+            <div class="kpi-card" style="border-right-color: {border_color}; padding: 15px;">
+                <div class="kpi-icon">📋</div>
+                <div class="kpi-title">إجمالي الحسابات</div>
+                <div class="kpi-value">{total_rows:,}</div>
+            </div>
+            <div class="kpi-card" style="border-right-color: #586F8C; padding: 15px;">
+                <div class="kpi-icon">⏳</div>
+                <div class="kpi-title">وعود قيد التنفيذ</div>
+                <div class="kpi-value">{total_unhandled:,}</div>
+            </div>
+            <div class="kpi-card" style="border-right-color: #304D73; padding: 15px;">
+                <div class="kpi-icon">✅</div>
+                <div class="kpi-title">وعود قائمة</div>
+                <div class="kpi-value">{active_count:,}</div>
+            </div>
+            <div class="kpi-card" style="border-right-color: #586F8C; padding: 15px;">
+                <div class="kpi-icon">⚠️</div>
+                <div class="kpi-title">وعود مكسورة</div>
+                <div class="kpi-value">{broken_count:,}</div>
+            </div>
+            <div class="kpi-card" style="border-right-color: #99AABF; padding: 15px;">
+                <div class="kpi-icon">🚨</div>
+                <div class="kpi-title">حالات إهمال</div>
+                <div class="kpi-value">{neglect_count:,}</div>
+            </div>
+            <div class="kpi-card" style="border-right-color: {border_color}; padding: 15px;">
+                <div class="kpi-icon">📞</div>
+                <div class="kpi-title">إجمالي النشاط</div>
+                <div class="kpi-value">{total_activity_count:,}</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        chart_col1, chart_col2, chart_col3 = st.columns(3)
+
+        with chart_col1:
+            with st.container(border=True):
+                fig_donut = go.Figure(go.Pie(
+                    labels=['الوعود القائمة', 'الوعود المكسورة', 'حالات الإهمال'],
+                    values=[active_count, broken_count, neglect_count],
+                    hole=0.6,
+                    marker_colors=["#1F4373", "#304D73", "#586F8C"],
+                    textinfo='percent+label',
+                    textfont_color="#FFFFFF"
+                ))
+                fig_donut.update_layout(
+                    title=dict(text="توزيع الوعود وحالات الإهمال", x=0.5, xanchor='center', font=dict(color=ejada_navy_dark, size=15, weight='bold')),
+                    paper_bgcolor='white', plot_bgcolor='white', font_color=ejada_navy_dark, 
+                    margin=dict(t=50, b=10, l=10, r=10), showlegend=False
+                )
+                st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
+
+        with chart_col2:
+            with st.container(border=True):
+                total_extracted = active_count + broken_count
+                gauge_val = int((active_count / total_extracted * 100)) if total_extracted > 0 else 0
+                fig_gauge = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=gauge_val,
+                    number={'suffix': "%", 'font': {'color': ejada_navy_dark, 'size': 34, 'weight': 'bold'}},
+                    title_text="نسبة الوعود القائمة من الإجمالي",
+                    gauge={
+                        'axis': {'range': [0, 100], 'visible': False},
+                        'bar': {'color': "#304D73"}, 'bgcolor': "#E2E8F0", 'borderwidth': 0,
+                        'steps': [{'range': [0, 50], 'color': '#99AABF'}, {'range': [50, 100], 'color': '#586F8C'}]
+                    }
+                ))
+                fig_gauge.update_layout(
+                    title_font=dict(color=ejada_navy_dark, size=15, weight='bold'),
+                    title_x=0.5,
+                    paper_bgcolor='white', 
+                    font_color=ejada_navy_dark, 
+                    margin=dict(l=20, r=20, t=50, b=20)
+                )
+                st.plotly_chart(fig_gauge, use_container_width=True, config={'displayModeBar': False})
+
+        with chart_col3:
+            with st.container(border=True):
+                collector_col = find_col_in(activity_base_df, ['collecter', 'collector', 'المحصل', 'اسم المحصل'])
+                if collector_col and collector_col in activity_base_df.columns and total_activity_count > 0:
+                    top_colls = activity_base_df[collector_col].value_counts().head(5)
+                    fig_bar = go.Figure(go.Bar(
+                        x=top_colls.index, y=top_colls.values,
+                        marker_color=["#1F4373", "#304D73", "#586F8C", "#99AABF", "#1F4373"],
+                        text=top_colls.values,
+                        textposition='auto',
+                        textfont=dict(color="#FFFFFF", weight='bold')
+                    ))
+                    fig_bar.update_layout(
+                        title=dict(text="أكثر 5 محصلين نشاطاً", x=0.5, xanchor='center', font=dict(color=ejada_navy_dark, size=15, weight='bold')),
+                        paper_bgcolor='white', plot_bgcolor='white', font_color=ejada_navy_dark, margin=dict(t=50, b=10, l=10, r=10)
+                    )
+                    fig_bar.update_yaxes(showgrid=False, visible=False)
+                    st.plotly_chart(fig_bar, use_container_width=True, config={'displayModeBar': False})
+                else:
+                    st.info("لا توجد بيانات نشاط كافية لعرض رسم بياني.")
+                
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.download_button(label=f"📥 تحميل التقرير الكامل.xlsx", data=report_bytes, file_name=f"Daily_Promises_Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+
+    # ==========================================
+    # صفحة الوعود القائمة والمكسورة (مدمجة)
+    # ==========================================
+    elif curr_page == 'Promises':
+        st.markdown(f"""
+        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; text-align: right; margin-bottom: 20px;">
+            <h3 style="margin:0; color:#1F4373; font-weight:900;">🤝 إدارة ومتابعة الوعود (القائمة والمكسورة)</h3>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        tab_active, tab_broken = st.tabs([f"✅ الوعود القائمة ({active_count:,})", f"⚠️ الوعود المكسورة ({broken_count:,})"])
+        
+        with tab_active:
+            st.markdown(f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900;'>📊 ملخص تقرير الوعود القائمة (Pivot)</h4>", unsafe_allow_html=True)
+            st.dataframe(pivot_to_frame(build_pivot(active_promises_df, order='first')), use_container_width=True, hide_index=True)
+            st.markdown(f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900; margin-top:20px;'>📋 تفاصيل شيت الوعود القائمة</h4>", unsafe_allow_html=True)
+            st.dataframe(active_promises_df, use_container_width=True, height=400)
+            
+        with tab_broken:
+            st.markdown(f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900;'>📊 ملخص تقرير الوعود المكسورة (Pivot)</h4>", unsafe_allow_html=True)
+            st.dataframe(pivot_to_frame(build_pivot(broken_promises_df, order='desc')), use_container_width=True, hide_index=True)
+            st.markdown(f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900; margin-top:20px;'>📋 تفاصيل شيت الوعود المكسورة</h4>", unsafe_allow_html=True)
+            st.dataframe(broken_promises_df, use_container_width=True, height=400)
+            
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.download_button("📥 تحميل التقرير الشامل (الإكسيل بالملخصات).xlsx", data=report_bytes, file_name=f"Daily_Promises_Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="dl_promises_all")
+        
+    elif curr_page == 'Neglect':
+        st.markdown(f"""
+        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; text-align: right; margin-bottom: 20px;">
+            <h3 style="margin:0; color:#586F8C; font-weight:900;">🚨 تقرير الإهمال (تأخير أكثر من 3 أيام)</h3>
+        </div>
+        """, unsafe_allow_html=True)
+        default_sub_states = ['وعد بسداد مبلغ المعالجة', 'واعد بسداد مبلغ المعالجه', 'رافض السداد', 'الجوال مغلق', 'مماطل', 'تم سداد جزء وليس مبلغ المعالجه', 'لا يجيب', 'متقاعد الراتب علي بنك آخر', 'يرغب بجدوله المديونيه']
+        selected_sub_states = st.multiselect("فلاتر الـ Sub State المشمولة:", options=default_sub_states, default=default_sub_states)
+        sub_col = 'Sub State' if 'Sub State' in neglect_df.columns else 'sub state' if 'sub state' in neglect_df.columns else None
+        final_neglect_df = neglect_df[neglect_df[sub_col].isin(selected_sub_states)] if sub_col else neglect_df
+        st.markdown(f"<p style='text-align:right; direction:rtl; color:{label_color}; font-weight: bold;'>العدد الإجمالي: <b style='color:#586F8C; font-size:18px;'>{len(final_neglect_df):,}</b> حساب مهمل</p>", unsafe_allow_html=True)
+        st.dataframe(final_neglect_df, use_container_width=True, height=450)
+
+    # ==========================================
+    # صفحة تقرير النشاط
+    # ==========================================
+    elif curr_page == 'Activity':
+        render_activity_header()
+        selected_collector, mapping_file, collector_col_name = render_activity_boxes(activity_base_df)
+
+        # فلاتر المدى الزمني والشفت والبريك
+        filter_act_col1, filter_act_col2, filter_act_col3, filter_act_col4 = st.columns([1.5, 2, 1.5, 1.5])
+        with filter_act_col1:
+            time_range_mode = st.selectbox("📅 مدى التقرير:", ["يومي", "أسبوعي", "شهري"])
+        with filter_act_col2:
+            shift_option = st.selectbox("⏰ فترة النشاط (الشفت):", ["كل اليوم بدون تحديد", "من 2:00 م إلى 12:00 منتصف الليل (14:00 - 00:00)", "من 12:00 ظهراً إلى 4:00 عصراً (12:00 - 16:00)", "من 4:00 عصراً إلى آخر اليوم (16:00 - 23:59)"])
+        with filter_act_col3:
