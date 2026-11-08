@@ -42,15 +42,23 @@ if 'act_uploader_ver' not in st.session_state:
     st.session_state.act_uploader_ver = 0
 
 # ==========================================
-# دالات استجابة سريعة للزراير (Callbacks) والأيقونات
+# دالات استجابة سريعة للزراير (Callbacks) والأيقونات المخصصة
 # ==========================================
 PHONE_ICON_B64 = "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"
-PHONE_ICON_COLOR = "#1F4373"
+PHONE_ICON_COLOR = "#1F4373"  # لون لوجو التليفون
 
-# الأيقونات الجديدة باللون الأخضر للمكالمات الناجحة والمكالمات المغطاة
-GREEN_CHECK_SVG = """<svg viewBox="0 0 100 100" width="32" height="32" xmlns="http://www.w3.org/2000/svg"><path fill="#2CA549" d="M50 4 C54 4 57 8 61 9 C65 10 70 8 73 10 C77 13 77 18 80 21 C83 24 88 24 90 28 C92 31 90 36 91 40 C92 44 96 47 96 51 C96 55 92 58 91 62 C90 66 92 71 90 74 C88 78 83 78 80 81 C77 84 77 89 73 92 C70 94 65 92 61 93 C57 94 54 98 50 98 C46 98 43 94 39 93 C35 92 30 94 27 92 C23 89 23 84 20 81 C17 78 12 78 10 74 C8 71 10 66 9 62 C8 58 4 55 4 51 C4 47 8 44 9 40 C10 36 8 31 10 28 C12 24 17 24 20 21 C23 18 23 13 27 10 C30 8 35 10 39 9 C43 8 46 4 50 4 Z"/><circle cx="50" cy="51" r="28" fill="#82D197"/><path d="M38 51 L46 59 L63 42" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>"""
+# اللوجو الأول: علامة الصح الخضراء داخل الشكل المزخرف (للمكالمات الناجحة)
+GREEN_CHECK_SVG = """<svg viewBox="0 0 100 100" width="30" height="30" style="display:block;">
+  <path fill="#2CA549" d="M50 4 C54 4 57 9 61 10 C65 11 70 8 73 10 C77 13 76 19 79 22 C82 25 88 24 90 28 C92 31 89 36 90 40 C91 44 96 46 96 50 C96 54 91 56 90 60 C89 64 92 69 90 72 C88 76 82 75 79 78 C76 81 77 87 73 90 C70 92 65 89 61 90 C57 91 54 96 50 96 C46 96 43 91 39 90 C35 89 30 92 27 90 C23 87 24 81 21 78 C18 75 12 76 10 72 C8 69 11 64 10 60 C9 56 4 54 4 50 C4 46 9 44 10 40 C11 36 8 31 10 28 C12 24 18 25 21 22 C24 19 23 13 27 10 C30 8 35 11 39 10 C43 9 46 4 50 4 Z"/>
+  <circle cx="50" cy="50" r="28" fill="#82D197"/>
+  <path d="M38 51 L46 59 L63 42" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>"""
 
-GREEN_PHONE_X_SVG = """<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#2CA549" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/><line x1="15" y1="3" x2="21" y2="9" stroke="#2CA549" stroke-width="2.6"/><line x1="21" y1="3" x2="15" y2="9" stroke="#2CA549" stroke-width="2.6"/></svg>"""
+# اللوجو الثاني: سماعة التليفون وعليها علامة X باللون الأخضر (للمكالمات المغطاة)
+GREEN_PHONE_X_SVG = """<svg viewBox="0 0 100 100" width="30" height="30" style="display:block;">
+  <path d="M26 20 C17 20 12 28 12 37 C12 63 37 88 63 88 C72 88 80 83 80 74 C80 69 76 65 71 63 L61 60 C57 59 52 60 49 64 L45 68 C36 63 29 56 24 47 L28 43 C32 40 33 35 32 31 L29 21 C28 18 27 20 26 20 Z" fill="none" stroke="#2CA549" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M58 18 L84 44 M84 18 L58 44" fill="none" stroke="#2CA549" stroke-width="10" stroke-linecap="round"/>
+</svg>"""
 
 def toggle_theme():
     if st.session_state.theme_choice == 'ثيم إجادة (Navy)':
@@ -134,6 +142,7 @@ st.markdown(f"""
 
     .block-container {{ padding-top: 2.5rem !important; padding-left: 1.5rem !important; padding-right: 1.5rem !important; max-width: 100% !important; direction: rtl; text-align: right; }}
     
+    /* ضمان عمل الزراير العلوية وعدم تغطيتها بأي عنصر */
     div[data-testid="stButton"] {{
         position: relative !important;
         z-index: 9999 !important;
@@ -342,6 +351,7 @@ st.markdown(f"""
         background-color: {ejada_navy_dark} !important;
         color: #FFFFFF !important;
     }}
+    /* تنسيق الملف المرفوع وعلامة X لحذفه */
     [data-testid="stFileUploaderFile"] {{
         background-color: #FFFFFF !important;
         border: 1px solid {border_color} !important;
@@ -376,7 +386,7 @@ st.markdown(f"""
         font-size: 14px !important;
     }}
 
-    /* تصغير بطاقات الـ KPI وتوسيط الأسماء والأرقام في المنتصف */
+    /* ===== تصميم مربعات الـ KPIs بحجم أصغر والنصوص والأرقام في المنتصف ===== */
     .kpi-card {{
         background-color: {card_color};
         border-radius: 10px;
@@ -385,29 +395,38 @@ st.markdown(f"""
         border: 1px solid {border_color};
         border-right-width: 5px;
         border-right-style: solid;
-        text-align: center;
+        text-align: center !important;
         direction: rtl;
         position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 95px;
     }}
     .kpi-title {{
         color: {kpi_title_color};
         font-size: 13px;
         font-weight: 800;
         margin-bottom: 4px;
-        text-align: center;
+        text-align: center !important;
+        width: 100%;
     }}
     .kpi-value {{
         color: {text_color};
         font-size: 24px;
         font-weight: 900;
         margin-bottom: 2px;
-        text-align: center;
+        line-height: 1.15;
+        text-align: center !important;
+        width: 100%;
     }}
     .kpi-sub {{
         color: {kpi_title_color};
         font-size: 11px;
         font-weight: 700;
-        text-align: center;
+        text-align: center !important;
+        width: 100%;
     }}
     .kpi-icon {{
         position: absolute;
@@ -423,7 +442,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 0. الصف العلوي: زر القمر + Overview
+# 0. الصف العلوي: زر القمر + Overview (شغالين 100% بدون تداخل)
 # ==========================================
 top_cols = st.columns([0.6, 1.6, 7.8], gap="small")
 
@@ -434,7 +453,7 @@ with top_cols[1]:
     st.button("📊 Overview", key="top_overview_btn", type="primary" if st.session_state.current_page == 'Overview' else "secondary", use_container_width=True, on_click=set_page, args=('Overview',))
 
 # ==========================================
-# 1. الهيدر الرئيسي
+# 1. الهيدر الرئيسي (pointer-events: none لمنع حجب الزراير)
 # ==========================================
 st.markdown(f"""
 <div style="position: relative; width: 100%; min-height: 110px; margin-top: -45px; margin-bottom: 20px; pointer-events: none; z-index: 1;">
@@ -1209,7 +1228,7 @@ else:
                 <div class="kpi-title">وعود قيد التنفيذ</div>
                 <div class="kpi-value">{total_unhandled:,}</div>
             </div>
-            <div class="kpi-card" style="border-right-color: #2CA549;">
+            <div class="kpi-card" style="border-right-color: {snb_green};">
                 <div class="kpi-icon">{GREEN_CHECK_SVG}</div>
                 <div class="kpi-title">وعود قائمة</div>
                 <div class="kpi-value">{active_count:,}</div>
@@ -1450,7 +1469,7 @@ else:
                 top_calls = top_collector_series.values[0]
                 top_pct = (top_calls / total_activity * 100) if total_activity > 0 else 0
                 st.markdown(f"""
-                <div style="background-color: {card_color}; border-radius: 12px; padding: 20px 30px; border: 2px solid #586F8C; direction:rtl; text-align: right; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="background-color: {card_color}; border-radius: 12px; padding: 16px 24px; border: 2px solid #586F8C; direction:rtl; text-align: right; margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between;">
                     <div>
                         <h4 style="margin:0; color: #586F8C; font-weight:900;">🏆 بطل الشفت (الأكثر نشاطاً)</h4>
                         <p style="margin: 5px 0 0 0; color: {text_color}; font-size: 18px;">المحصل: <b style="color:#1F4373; font-size: 22px;">{top_name}</b></p>
@@ -1470,12 +1489,45 @@ else:
                 <div class="kpi-value">{total_activity:,}</div>
                 <div class="kpi-sub">بعد إزالة التكرار</div>
             </div>
-            <div class="kpi-card" style="border-right-color: #2CA549;">
+            <div class="kpi-card" style="border-right-color: {snb_green};">
                 <div class="kpi-icon">{GREEN_CHECK_SVG}</div>
                 <div class="kpi-title">المكالمات الناجحة (1)</div>
                 <div class="kpi-value">{success_count:,}</div>
-                <div class="kpi-sub" style="color: #2CA549;">تقييم ناجح</div>
+                <div class="kpi-sub" style="color: {snb_green};">تقييم ناجح</div>
             </div>
-            <div class="kpi-card" style="border-right-color: #2CA549;">
+            <div class="kpi-card" style="border-right-color: {snb_green};">
                 <div class="kpi-icon">{GREEN_PHONE_X_SVG}</div>
-                <div class="kpi-title">المكالمات المغط
+                <div class="kpi-title">المكالمات المغطاة (0)</div>
+                <div class="kpi-value">{covered_count:,}</div>
+                <div class="kpi-sub">تقييم مغطاة</div>
+            </div>
+            <div class="kpi-card" style="border-right-color: #586F8C;">
+                <div class="kpi-icon">🎯</div>
+                <div class="kpi-title">نسبة النجاح الإجمالية</div>
+                <div class="kpi-value">{success_rate:.1f}%</div>
+                <div class="kpi-sub" style="color: #586F8C;">معدل الوصول للعملاء</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if collector_col and collector_col in act_df.columns:
+            pivot_summary = act_df.groupby([collector_col, 'Call_Status']).size().unstack(fill_value=0)
+            if 'ناجحة' not in pivot_summary.columns: pivot_summary['ناجحة'] = 0
+            if 'مغطاة' not in pivot_summary.columns: pivot_summary['مغطاة'] = 0
+            pivot_summary['إجمالي المحاولات'] = pivot_summary['ناجحة'] + pivot_summary['مغطاة']
+            pivot_summary['نسبة النجاح %'] = (pivot_summary['ناجحة'] / pivot_summary['إجمالي المحاولات'] * 100).round(1).astype(str) + '%'
+            pivot_summary = pivot_summary.sort_values(by='إجمالي المحاولات', ascending=False).reset_index()
+
+            with st.expander("📊 تفصيل أداء المحصلين (ناجحة مقابل مغطاة)", expanded=True):
+                st.dataframe(pivot_summary, use_container_width=True)
+
+        st.markdown("<div style='text-align: right; direction: rtl;'>", unsafe_allow_html=True)
+        extra_time_cols = [c for c in ['Date', 'Time', 'Call_Status'] if c in act_df.columns]
+        display_cols = extra_time_cols + [c for c in act_df.columns if c not in ['Created_DateTime', 'Date', 'Time', 'Call_Status']]
+        st.dataframe(act_df[display_cols], use_container_width=True, height=450)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        act_buf = io.BytesIO()
+        act_df[display_cols].to_excel(act_buf, index=False, sheet_name='تقرير النشاط والتقييم')
+        act_buf.seek(0)
+        st.download_button("📥 تحميل تقرير النشاط مفلتر.xlsx", data=act_buf, file_name=f"Activity_Success_Report.xlsx")
