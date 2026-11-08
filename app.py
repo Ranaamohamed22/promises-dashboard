@@ -22,6 +22,9 @@ if 'theme_choice' not in st.session_state:
 # ==========================================
 # دالات استجابة سريعة للزراير (Callbacks)
 # ==========================================
+PHONE_ICON_B64 = "iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAeRklEQVR42u1d6XNcWX09773u1r5YsmR5Gbxoxh4YZolnGAYmMBBIYIBAJQQmECpkKyrJh/wN+Zqq5Eu+pFJUUUmKpEgoliSQBCYwBMzuWe3BY2zjRZZlS9a+tKTufi8f7rno+M573S3p9Wapq7pkS728d++5v+X8Ng879+EDCPnzEQAfBvB2ACcAjAAoAcjz5zKAeQAzABYATAMYB3AFwFUAU/zbJIB15zsC/jsEEMmzKR6ZHQyACEAWwDEATwJ4DMAbAHRx4zwA7dy4gGvVAWAQwDCA/QCOEgzzAJYAzPL/YwCuERBhAviaAgjeDtx4TwAwBOCPAHwCwIPcmBJ/Vrs+IYAin+uUBi8B+D8APyEQlgAU+JqwmRYjk+KierJwesq8mAULmwQAewC8C8Cb5dqDLaiSHJ+dAPopIR6imrgE4AKAV/m8TpCBEiji/xsiDYKUNt2Ks9B5Jv1O39dIAIwC+ANu2Dp/5yeoC/13VOb+QFWxlyrijVQth/jcx2tYArAm7/FbEQAKBE+MnhwXoZP/9uX1vrMJjdh8C75jAD5Cve7LfSSB3b3XuKf7/iw//z4AbwXwKFXPkhiNmQatx6ZVgIr5knPR9/MmhwF0A+gB0EbdtwJgDsAtisFfOGAI63jzukHLPIWenOBiAri9Km2CSFSdHoqA63GCa3MPgB/x+TwNSN2TuqjKzBYsZ9VfnQAGABwnuk8COMgb7OUNrxMAs9R/PwTwDQCXuQHFOlv+nmzSJIDTFNG9vKetfF4cwAJHZUTiURzg8ySAN9Ht/AGAm3Q9o2ZTAb6jo9q56U8D+GMAnwLwFPXdCEVcL9VAN/89xIU+STGYBTBBF8pei1dnMVggMAMCt7vMa4sJ+j6q4FXFqQz76AFwBMDDVEcFgjLvHNCoUQDwhDCxfvODAD4K4DcB/Bqt6ENcvBwv2ncu3OPv23jTR2kM5QiAWS5wVGfjsEi37TafFwGcp6SaILlTJJCzVej9yLnnuPW0rymKWrCHYy8PUC/XZbHWaxJsQsz1AfgVAL8L4E+58fu5iVEFT8F1A0sEzX383W0SKKUGGMJFbvZPAXyPKuoFAC8D+DntllWRGKvitm3FVrB/Dxx7oY1eyWP8uUQOYa1RRFBG9PMJAL/BE/8YNy/JTUr67MgBlP37ZQBfBfAFAGco/hrlJdiH9WK6CPw9tHWG5DlM634vDboDCbaSStJya+I7xukLXJevco0yjutZMwngiVUMnvrfAvAxAO/kYpQEHF6VJ8D9e4E3vYeLmSVxMlnGH6/VIbCWut2kEk/6IqXTGKXBqyR1LlBVvEa1cYlqY4Hv7xZV6DveTpILHcma5giog/ycGRqIYdoMbhIAAn7ZMQCfodi/T8S9u2Bb/W67KAP8rjku5JK4UfWQAlEMUZWkvpYFFBcJilMAvktQ5MVmKImoD8uoRV13X0A5TMMaBN2CSIKaACAjC/EIgN8D8DvcHL0RLyUUqmvUTSAsADgrBElUx+jgZq7bivl1SrNFADdgIoRnaUOcoR73aNypp1OKUYdxaqGH0mCAUmlS7IJgu+sTJOjtEQCfBPD7tNjV7QlSFEGeYxmPkFu4RUmw6jB3tZYC1sXt44L30Q7oLOPhuG7lFFXDaf68RC+nxPdn+Fl62uMMSrUlBskXdNA7uM21idKSALqhwwDeD+AZmCCJvcCgRtFDlyLeT9/YLqSqpFrZAFbkDtHmeR+AD5LbOEmW8zBB0SWqcK0CoFa4Wa8A+D5B7RNYPY5X5KpTN8DWRkk8RBBM8fO3FVfJOF8aAHiAYv+BOtO01ghqh0nMGOfineLv046he464HYBJCnkfpZ41TPNUS/bkzfA5x9/P8PfXSHEX5DtsMskypcA8QfAiVezDdPl8hz72YlzVgKB5txyY/+V1xN1T1RLAFxH0BhI8H6N1XpTX1NoS1xsvUR10ADjHm0zbNdRT0wXgHQD+nOzmfor9Hp7WYa7NCW7aowCeoFf0qzwsVkfnE8Aa8G8/JwAuUIIM8zvKSVkrHda5JscIztvkMNa3Kp11czvo53+E+sarszuGGONngDdnM23SZMVUrTwK4E8o8nOiduKifoHDE+whWI/C5AA8TKOtgxu8iNfH/tdozF0hENb5nq4YjyEODIG8/iptpmArEjKQheigu/de/nszEbBaEFMRPYNh6rszXKhaAOBdAD5NUmctRj3Exf51sXMEwijthXtIlh2ESRBZpaqwOYhZStdpuo5TBEY/P0ddZC8mj7HAzd/HNRmnBxJt1k0M5EOt5f8WQVO9AaDqoMiFGqIOPc8FCxOicNsBwGNkOntiTn+52H8cD9JG0N5PNXGSv7/K+8jGhNLHaChmqX76nT2I4wtANXWIUuYsgZbZDKUeSFTqbTSCDiTQk2iQKvCoCtpE3HkpS4BHALyHEqeQkPSCKjOFPDnl7TxYBykV9pLkmsJGcM0n2BeoFuaFBGoXyeMnGIZ9MMGjNYeNrEpSWpQdBfBxmJh+d4xvigalbVvfup9IH6POXE0hrUwBsI8n9qBkMPmbCOzEkTklkVb7CLJD/Nw5unDr4gL6BMAveKL75Xq8CiAcpqS8TruiWO3eWQnwMIA/BHBvlchvhCSwRpV1uaJtUsX63jw36wg3y41chmXy+r0ygAicZNO9MOH0h7lJ1yT45UkgaJwnuZuSI1cmjmD1/gD/bRNvwmoOiALgGYqTcJNp0fV4hBKSXoKJlC07Lux2Hss00pYkOTRHEbzVHACXzbMiv0cInYAqbU7+bgFpKd/DZAIzCaALxfYY4HteFVVSdn0sAN4M4ENEXNRkANAUqz7++wrVwXpKVHHEE3eOxqYV0cv8W4HfFRcsquQtqRGpnsRRStwFgmBZIqS+BJ3aaEfsSzAM9d77CNwJSoGVSusTiBH0tPihzSYB9Kb3UD/edJJLoxSkzCoNtKuUMt+DKfD4EU/VFdksj+ul5FXoGINehUjoII3uNp74WdHfkRiMgzyk7QSJCwTds34e5OuMQ6AclW4v5CQp0M4mBQCECevkot3kpuRTCBvrKS1SAkxww88B+BkX0xZ5XCL4rnKTLE0bVBn/Vyt+hEZcTmjmohBH07zvHrqIPWXsj3WCZC9MqPplodHDcjyADYB0NCkAXJGX5SmcJtLXUuAsyrFoRerUG9z8MzDBnVMESIEbkxVKt5wk8Jyi0SGYJNsCgT0n7qgntYajfF1S2p3du4yogWl+Vuz62It4ACYC2NHEEsBNquzngv+UpyYtzsJSrVkntRtODsAa9fdNSgKbA3CNm2qDSZ6T+u6VyYcYFlJnRd5foj2wl67hnio8tT5e4/P8rCAulmJ/eS8B0NMCALCnppeL9gpFdVoMYSTuX8k5VXHBmgLtgp/BBHmuSoSumyI5W0YSePKdQzyEk3QFV0SigBs6QJstm0AQWdWzl9d8mtcXlQPAYZjI1pBzoc1aPax+9goNpRtymqJtfq7Sunu4LoOSCwCnD4Cqihnq3xcogvtlM+JYPc8hvvaRj7gFkw9hAWBjB0Mk7Hqd4JjnBPA8gsT2LZiO4wYsAA6Qtz7g+LheCzR36OBCv+LkDWzVxrBJKe+CSQp5B9fGVj6dJG9yH8XsOg1B9SZWqBquUXQH3LhuJ6PI/d4CAbaf9zJOIJREldjElQNOUokLqpJELcdoMIeuR6CxgFEir7tM2VOz1fdneSovAvgx3bjtAMCjjv0gTMXTJwiAxwA8DhMoexufbyWh49MTyYsLZwth5rnw0zyxex3XMelnSaKCZ/k5nvADC/zuYzEA8JzC1H4ekOexkavwOgCsUdw9RLekmQEAWSSf132RVvnCFuIY6kL2w0QF/4yb3s1FbOPPnJyqPTyF9zGOMMjNWRTm0tolVhoEfF1vhfoJy3p20suYEHDlKXFOkBvIJXyOro8NO89QyvxyfaxRs8qLfYIGYbOrADgp11ZfTjj1CtXGQ6zevB/Ab8NkReUkKTWuD4DNoRghCPbzhIdS5OlxA1Z5CmcJsvvF4/ISwBjwNQt87y05uUWCb5SACsoAyarMRR6UWSXPArEmQT7gBC/aa3IpoMbOCvXcZcnAqVYVWJ2YhUnveg9pWl9EeVI8QD9jhPbBADdsUsrN7bVYgJ4gYLwEvt4TI66Hm/+KcAPWMNxD8HXGxCPUoB0goF+kx/RLsGlGkE+SYZQf7Dc5AFTvTXKBzvHEbCZB0urEHEyzqCd4kivlBEQxOQAZnswR/n+aLqEyg9MU4UP0vpLSwksS/xinO7con7XIg/qU5BTGXW8oaWwvSgoaAHh6SoowCYsXEkqfm/mxxNO1sk2Jkucpa5eM6XKVPL6T0Wsp2w/RiHw/3bqSpI7NAvgKgOf476hCskkbibq382Bau2JO0smiCp8TSjLpHTZe4DBcRVrBJ/nFYYOzgqqxAUJa2l8jCRNuoyikjzbQA+KWRQlUcVIOvxbXHODpvcm1tcTSOnX3Qb4uW+ZzQWlhDcJxuY4MTH7BYQldhzFso7URblEFWLYyCBxxmeeFPUq9gSZWBaHc2GkA/0GfeyvX60mhx5r47b1OgMd36Og4Zq8kPritdJrgaY2EYs7z328RBjaOhCvyMHbTlTsvvECW9PFhfpdXhh0EpcZlspZFAH7gbHJRumXc0wKcgPXBv8VnfpsAWKYUucaNG+aCrsWccq9CLMGu5TGqpjOOmzrN1zxJSRGVKUi1wLLVyUvy+hz5mzc5BBliyvHXYaKYp3lPfhBjMC3RbTkiREOpiVSBiuJ1mKaM/0UDp7TN3AArBaa40KfFcLpJwysrB6NYJnk2lLT7Xl7bmLhh9vuOEAC9CSJcN/QaT/BNJ/ZxnB5cJuF6POl8ehnAd3hYgrjq4FUi9Y0MOgRNkCHspj9ZcXwDwL/QoLqdQkm5/dw1yTc4z1NziYtngz22asivwC6WpMnEBUnatF5DF0X4kZhOpXD4/mlew0UBX0mMxPYEFaDS4jpMKfusSgDXJSrRHRwlcZGp0Pum3q5fgZLqOQCfJQmEFDyXOGs6Lwt/Dqab18vcuKO0rsMEWtcTvd8pjOCsnGCf6/yQ45LHeRzrvI4XxZVbo+H6ZJkAkX7mDN8/BqAYlKFFbYHDvVIN6zUIACXHmp2BaZ3yDyL6a9E1xHNavNk8gAk+F8gZDJSJoobSTnZeikhLYne9kbGGnBOx8xJE+A8cl3cfpcA+CT0npYwtilTL+wkiNqKl+F2i32uwzre61Box/8nN/zalQSblyuEopq1tIPX9WZhw72cB/DvVgpsGFufW2YyenKy3rTrOl5Gw9r56JdFEP3+S0mm+DGcBKYQ9TMn+ukaRKj6mYCJsF6mfoga4hJHkx4Gn/Ys8/WOOhKhl04gkYI0D+DJP3uGEjmlaF3CUIOgQynqN/vk0pYmf4FoGkmSSc65xmvbFnBA9SQDo5bX2VmqLEvIGT5EhRJ173Ifi606RPfscF/wSpUGuAc0lIQYVaCj+hMZVMWEDI6nAHpH0dvuYks6pXgVAtjvRRKvXLwgNngTaSGyXPpTpjB1JlPBbvMEoQcTVumVLgW7L38K0krsm5Mx6g+hqVRFrPCAvCFfvboCuWX+MGJ+EiftPV9F6z2b9ZuV3SwTQfBXX3SbtfKsCwFlpZoA69urxeCKe46k/TYSXmmTahn7/Vaqn6Sq8kW76/dqW9hbXeTbh/W6a2iCliSsFZip0C9GGGG2VVIAnRsoF2gKFpOzSGrl7tyn6T0lma6bO3cWr4SRuk5CariLlLEtOQDdwgVJktorvtRKgOyadbM5prIVKZYF+lUg/A+BZEi9+DQHgGl1XuPnjjlHYbHT0ErmIqSo7qPqOpFunUTtTRb+fdgKo3ZHYBQKwGinkVQOASG7wMoCv0zUs1NATUK5hkt831URMZLnNtTV+K07lstsu3pJYeef9ts6gUIFwS2o7a7OGZ6rwXjYFAKuLX4Kpkbse0062Fo9bPBVeA4ZKbMUrKEmlrxdzgu3GrUjhpuekba2ICPc26ZralPT5KtZpUwCIhEE6RRYqn3bT4jKUbNjkiSn2WlclVlCUZ0no9Yjq7BdiT/mygUu4M8U8Sui0XkpgS+cIgLBKNeT7m8i9A22BUxTLXkr8e9KjS/LomzlJNRI9/hOY7OQlmY+QkRyAc/z7dMIJXuSz5DSmKIlhbCXNPF6fJm+p6mr3w/M3oetK3PifEgRzNZ5osQcmcbKtBSSAXZ8zAP4bpqT8lgx9WCN/8SVs0NcuP7BO6XFd6G9fooa+qMbXKO7dwtCiRAmrmg25lbmBrwH4PDfo6ZQBoHZFLwxvPsiF8ercQXwrxmBEvuKvYOLzo7TWrSv9I6ebaOjUGL7E59udTbebOMHPvyytYVRVr9KOKEilMhLUSAggzGzyJm1Z9vdholePYyN1LO32rRkyVqME3dpW26HW8ZGlJf9DGIrY5urN0IXOl+ETStzYZ2HS0R4ia9jFe79CAH1DTr8LvjlJWvFiJo+FUuAS2rTwrWxQSQY9WDGd5jha7RU4BRNHn6y28VETkEOQhlYTJHgKVb5/jKfcpn7dhonK/iNM5PE1yQVwG2V5MDz/4ySa3DG4NkvpOkwO5flgG+3d5/kFj0q6chr5Am73K9sf8JWtdMJskEvoI7mjmFfFDCM7OOMyVcIP+XMuwQPwxI6wXP8Rp8WcJ02pvgDgfwDMBttgv+apDu4n6jIph4ttJk0vT9HL/L5WqFeInLqBzTS6tu+xwyHGKAVKZUbrafrZClVNJ0zET393GyZ/8nM2iyrYpp62s2/7qe/8FFk7LW4sUIfelEEJfosAYbOBq0pFHlGFvbFlcq/R4LzFtfsxgH+FCaydt8WmwTbKs+1UsdswKeRPSp/aIOUpn13UaRcoGrEDRtz7jiu4mb4JeYJgjOrzHDmKH9CYLKUhpdWDeIY6qiCMVxjDhW/laWMPkwD+gvYG0PzVy2hwgCqQp5806CtIyWWbpWi+BybjJUrZFrCqwAZcJlJoFXu3P5IOINIaH6+fYTtdj9Bv70rod78doBVp2MxRnK3WeJbQ3aJGfDEeX2eMBimSN9Yg7MPGSJM0iks1t36A+u0FSgI/JZDdrY8oRh2nLgEgHTZn+JnHK+TKbydPwI6lv0FVgBbgBpr2EaT8edbfzMmAhLQ6jVhmsJe8wzJMdvDCrhRoHgB41NFXYRIf31SmYHGrncF8adIU0TVcqXFkchcAqH7qdkEGJA3TKAxSGnysaVaDBIGOWonSGKe6C4Dth0azNNLWYJoq9qdUXOo5PMQgTORsjpKguOsaNh4AnlTVLlBnDxIEXoogsFM99kmruCmYgEjQBFSxjoxxp4J7dysAEJPkOAMTMn5QRqb5KSaO5AiyDiGJSk6T5Xr73l5MNnDczKGGN+UOalzRW+CG9NEgTLPvkFbj9sEEowq0B2ZkWnfYgCbWbiuZuGdTSIKgTr39Z3AnVRymGDW0ZFOndPUOZLQLyqRHpbmOgXPKe2Dq/h+A6bTyICVhF1+3FCMNgnp7MkEdcuWyMLGCK+IV9KTI4vmOZzBKSbMiaVhhnYpF22nrjMJ0G/91mO6j74DpBnach+AAwdolJFrBSYGvi3TIoH5pUrdg6voHYWYUt0vtf1pZROAGPMWfBwD8G0wIORMTJEnL0LNl4Q8C+ABMu9kjvMecNJ0s0jOyvZknYLKEvwkTTZ2XfYnqURMR1FnSzNIzsD30ep0++Nt9FKVB8whFbi8XdtxRPWnNHg5hUrA+AtNo+gMwaXJ9POEWBLbreBf/Zqeh2tGyh6jGlmASO6MqizxbAgCQ2P4NnsgRmKbJaWYRucMY9sNk1/ow7OSiiNy0TlYfgI/C5Cq8lxKuXDjcDdD08RpPEgi28GO1Hv0YggZEpwpSGbOHyM9uoc17te5YB/XuMdoeC1JBGyS0Wq8EsoxkRj8D4FMwdQC5KiqZvJisH4+nfx9M9+9RfseUNIPK1oLkqjcAAimknKWVfhAmaJRLqSupO4ipJD3693LTenjC5oUz0E2pRuz3Ang3gM/ApGHr3/wq3EC3oiciCPbTWNxLlbGMjTFyqVdJBw2qorGjWsdlwtWI1L4FKefVQUayv5Ub5lPU5hNStpNm/dnchPcA+DRMLmRnzIne7PAr34mp3IuNiSCz0lo2VW6j3gBwT+gyLWHb73agRk0pQxGjWZm/N4qN4RCTMYWVnoyLK0lhxUkAn4QpjevfTC1elQkcFkzWkzlE43FKRtL5aQS+GgEASIEHKIYX+P/9kkiSdqWRO8nbll8dl5av6zG0rZZXtfM9n4SZBXDQGQWXpjtrr3OAhNIBfs+sDJredoS1UQBwc9ztrL0+6WAVpazzXBoW0rTpPqoGS1LZ9nS+1PEfIJnzcT4POgGeWkhJX077EIEwzPW6KXGVLUuCRgJA++3ZBkfT3IDj1Kt+DdSB55xsnyd7AMAbuNHHYGIXD5HceVyYvXfydX6K/EWl69TmUof4s1uqfcKY3kNotbC0Xch3whQuLogoTqvGIOkZOh09CnS/Zmkb3CaHsO50/Yjq+AylL+IqTKncX9JYDLYKxKAJwTBJoqgdJsLXIbq71hx5ICcpy2voojTKxSy01yADOkOVcA9VUZFrVhDauSUBYGfsXRHDcESGKdRqeokXoxrCmBMYOaHoRmx+SULdA1RXA7ymWdw5iMprNQCUZIGvwmT9DlIvt6dMG1cqpkh6ek1S9gWxDU7AhJwXKQny1fZSCJq0rs0ifZLPdfruQ0IW1at3YNSkdYjqJQWUAsP0pCzdvuYQWC0BgEjYtoiIth1KbSZwpo6t670mHqLtOdzGQaqEDh6cG5X6KjUjAJJ4Atuw2rJ4EDdsJxeFuJxBL41DO7R6qlz3lqAFbi7Hjbb5/0tiBXemnE/QyiCIhLTq4kHJ0JaaQUKEMmiBm9Ms4nkahjcJgKNyDzu9NMyTiGSJADhAW2Bcxtr7aVcH11st5CnWbGbRIXoI6w0ebNWMxnQvDLM6hY2Jo3eU1LcaAOyUjFVKgWmZbtbn5OTvVKmgfIFHSXADptNYXpJxWxIAoSMJxkgatWFjGFOhGQoumqR7eUaGRZ6GobTvINOCFu58YTNpbDXQvEzTyMkUjZ2qEjREPUfbacKZKBIFaN3OF76QQjdgRq7kpXS80+mr5+3A7iCWAFqitLwoCSVeKwMgrmfeoszm9WASLPukEXMzt5yv5SGxEuAcTDfz2bsFAG7alh3zfp03aef3HKSN4NUwmNTMAACN5Zdh2u3eIQEyd8mNFsU2CGG6ar8CM3PIB/AExWFuh0kA+1imAbiKFmMCt1o2HsqQ52s0EPukZ1FJCKa7FRCaXf0iTIvYi25GcXAXot6Tgo88TL/ccaI/C5Np2xnTeNm7S1VABDPf4aswlLDf6m7gZqp1IVlG52gXdNAuaHfcxLtREngwjOlzMON3V1udCt5OyDQPwx5epz7soKeQEdVRugukgc54LtAz+jaJoOJOAwCcAUwrMEMYLklUsYNeQjamt7/X4ve8DDMY4lnyAOFOBABixrksycRvKw2GpD6xlOIElEZY/najxwB8FmbkTKmWrWLRYm3UQ+rDW9gYqHATG+XeHU4PolaRBhoNvcGT/yVnzmO0kwGgxqFVC4vkDGyHjg6Y1LN2EaVei/H/RW7+52EmhxRaKSm03lk0JSFLxmkf2Bz7PTDZNZBaPK9JE0Q1eeYWgC/CFNgsuSHgXQC8fjp6RoZkX+XzJl0oDyapQrmDsMn4A80OHifp83VyICiXHr6TAeCqBZc6/TkMfz5OdbCPIFhvsozhyJkY9jUAfw0zuNJrxbqAZqhJsHTyIgEwRrUwA1OUOehkH5UaIBG0gsnu49dhRsKdrnay2i4Akhs0WLWQhwkxv0owrEvXL0hfoHrHFbQP0hLMRLC/h2H8qp6ntAuA6unkPAyl/DwMtz5OEPSIoYgYi9urwckvOVTvlwH8DUGQd1rx7AIgpT5DEU//Mn3scRqKV6QCZ9BhFL2U5iRETimY/fyL3Px/IigLm93TXQBsThIoIBZh8g1OAzhLDqGLEgExncLS6m4SiZH6FQB/R2M1G8N47gKgDvV46zBM2zhJl/M0FttgWMVAythKTrvauFFukdMYw+UersHw+/9Mo+8C4ieJb3oCx+5j8x6D7zR0AtXAIzCNIx+CmZhyVCTDVvX+dWyMgP0ObZF5MVgL2x3BsvtIt54RMF3P3g3gwwDeho1BV21lJq3A6ZWwQl3/TRhm7ywNvVIa/QJ3AZDulJQ4y3sApoHDvTDdTmzvv8N82pyEvHQFvUlRP8HnVaoWN6XL327n810A1G5iSCDNp+zDNn08DtNR/HGCo126pI1T1L/E034Fd6ZyZ50mVdt6/D+/AnlNWdPaoQAAAABJRU5ErkJggg=="
+PHONE_ICON_COLOR = "#1F4373"  # لون لوجو التليفون (غيّريه من هنا)
+
 def toggle_theme():
     if st.session_state.theme_choice == 'ثيم إجادة (Navy)':
         st.session_state.theme_choice = 'التصميم الفاتح (Light)'
@@ -144,62 +147,109 @@ st.markdown(f"""
         cursor: pointer !important;
     }}
 
-    /* تبييض جميع الشرائط السوداء في Selectbox و Multiselect بالكامل */
-    div[data-baseweb="select"],
-    div[data-baseweb="select"] > div,
-    div[data-baseweb="select"] > div > div,
-    div[data-baseweb="base-input"],
-    .stSelectbox div[data-baseweb="select"] > div,
-    .stMultiSelect div[data-baseweb="select"] > div {{
+    /* ===== تبييض كل المربعات السوداء (Selectbox / Multiselect / Checkbox / Expander) ===== */
+    html body .stApp div[data-baseweb="select"] > div,
+    html body .stApp [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+    html body .stApp [data-testid="stMultiSelect"] div[data-baseweb="select"] > div,
+    html body .stApp div[data-baseweb="base-input"],
+    html body .stApp div[data-baseweb="input"] {{
         background-color: #FFFFFF !important;
+        background: #FFFFFF !important;
         color: {input_text} !important;
         border: 1px solid {border_color} !important;
         border-radius: 8px !important;
         direction: rtl !important;
         text-align: right !important;
     }}
-
-    /* لون النص والأيقونات داخل الشرائط البيضاء */
-    div[data-baseweb="select"] span,
-    div[data-baseweb="select"] div,
-    div[data-baseweb="select"] input {{
+    html body .stApp div[data-baseweb="select"] div,
+    html body .stApp div[data-baseweb="select"] span,
+    html body .stApp div[data-baseweb="select"] input {{
         color: {input_text} !important;
         -webkit-text-fill-color: {input_text} !important;
     }}
-    div[data-baseweb="select"] svg {{
+    html body .stApp div[data-baseweb="select"] input {{
+        background-color: transparent !important;
+        background: transparent !important;
+    }}
+    html body .stApp div[data-baseweb="select"] svg {{
         fill: {input_text} !important;
+        color: {input_text} !important;
     }}
 
-    /* تبييض القائمة المنسدلة لما تفتح */
-    div[data-baseweb="popover"],
-    div[data-baseweb="popover"] > div,
-    ul[data-baseweb="menu"],
-    ul[data-baseweb="menu"] li {{
+    /* القائمة المنسدلة لما تفتح */
+    html body div[data-baseweb="popover"],
+    html body div[data-baseweb="popover"] > div,
+    html body div[data-baseweb="popover"] ul,
+    html body div[data-baseweb="menu"],
+    html body ul[role="listbox"],
+    html body li[role="option"] {{
         background-color: #FFFFFF !important;
+        background: #FFFFFF !important;
         color: {input_text} !important;
         direction: rtl !important;
         text-align: right !important;
     }}
-    ul[data-baseweb="menu"] li:hover {{
+    html body li[role="option"] *,
+    html body ul[role="listbox"] * {{
+        color: {input_text} !important;
+        -webkit-text-fill-color: {input_text} !important;
+    }}
+    html body li[role="option"]:hover,
+    html body li[role="option"][aria-selected="true"] {{
         background-color: #E2E8F0 !important;
     }}
 
-    /* تنسيق التاجات المختارة داخل MultiSelect */
-    span[data-baseweb="tag"] {{
+    /* الاختيارات المحددة داخل Multiselect (كانت حمرا) */
+    html body .stApp span[data-baseweb="tag"] {{
         background-color: {ejada_navy_dark} !important;
+        background: {ejada_navy_dark} !important;
         color: #FFFFFF !important;
         border-radius: 6px !important;
     }}
-    span[data-baseweb="tag"] span {{
+    html body .stApp span[data-baseweb="tag"] span,
+    html body .stApp span[data-baseweb="tag"] svg {{
         color: #FFFFFF !important;
         -webkit-text-fill-color: #FFFFFF !important;
+        fill: #FFFFFF !important;
     }}
 
-    /* تبييض مربع الـ Checkbox الأسود */
-    div[data-testid="stCheckbox"] label span[ role="checkbox" ],
-    div[data-baseweb="checkbox"] > div:first-child {{
+    /* مربع الـ Checkbox */
+    html body .stApp label[data-baseweb="checkbox"] > span:first-child,
+    html body .stApp label[data-baseweb="checkbox"] > div:first-child,
+    html body .stApp div[data-baseweb="checkbox"] > span:first-child,
+    html body .stApp div[data-baseweb="checkbox"] > div:first-child {{
         background-color: #FFFFFF !important;
-        border: 2px solid {ejada_navy_dark} !important;
+        background: #FFFFFF !important;
+        border: 2px solid {ejada_grey_blue} !important;
+        border-radius: 4px !important;
+    }}
+    html body .stApp label[data-baseweb="checkbox"]:has(input:checked) > span:first-child,
+    html body .stApp label[data-baseweb="checkbox"]:has(input:checked) > div:first-child {{
+        background-color: {snb_green} !important;
+        background: {snb_green} !important;
+        border-color: {snb_green} !important;
+    }}
+    html body .stApp label[data-baseweb="checkbox"] svg {{
+        fill: #FFFFFF !important;
+        color: #FFFFFF !important;
+    }}
+
+    /* الـ Expander (تفصيل أداء المحصلين) */
+    html body .stApp [data-testid="stExpander"] details,
+    html body .stApp [data-testid="stExpander"] summary {{
+        background-color: #FFFFFF !important;
+        background: #FFFFFF !important;
+        color: {input_text} !important;
+        border-color: {border_color} !important;
+        border-radius: 10px !important;
+    }}
+    html body .stApp [data-testid="stExpander"] summary *,
+    html body .stApp [data-testid="stExpander"] summary p {{
+        color: {input_text} !important;
+        -webkit-text-fill-color: {input_text} !important;
+    }}
+    html body .stApp [data-testid="stExpander"] summary svg {{
+        fill: {input_text} !important;
     }}
 
     /* تبييض منطقة رفع الملفات وزرار الـ Upload الأسود */
@@ -303,12 +353,16 @@ PIVOT_COLL = 'Salesperson'
 PIVOT_NOTE = 'ملاحظات-التمويل'
 PIVOT_ACC = 'Account Number'
 PIVOT_AMT = 'Net Amount'
+FIXED_NOTES = ['NPL', 'Dpd60', 'Dpd30']  # أعمدة الـ Pivot الثابتة (بتظهر دايماً حتى لو أصفار)
 SUM_FMT = '_(* #,##0_);_(* \\(#,##0\\);_(* "-"??_);_(@_)'
 
+
 def build_pivot(df, order='desc'):
+    """order='desc' ترتيب Z→A (زي شيت المكسورة) | order='first' ترتيب ظهور الصفوف في الشيت (زي شيت القائمة)
+    Pivot: الصفوف = المشرف ثم المحصل | الأعمدة = ملاحظات-التمويل | القيم = عدد الحسابات + مجموع متبقي المديونية"""
     need = [PIVOT_TEAM, PIVOT_COLL, PIVOT_NOTE, PIVOT_ACC, PIVOT_AMT]
     if df is None or df.empty or any(c not in df.columns for c in need):
-        return {'notes': ['NPL'], 'teams': [], 'grand': {'by_note': {'NPL': (0, 0.0)}, 'cnt': 0, 'amt': 0.0}}
+        return {'notes': list(FIXED_NOTES), 'teams': [], 'grand': {'by_note': {n: (0, 0.0) for n in FIXED_NOTES}, 'cnt': 0, 'amt': 0.0}}
 
     d = df[need].copy()
     d['_c'] = d[PIVOT_ACC].notna().astype(int)
@@ -317,11 +371,13 @@ def build_pivot(df, order='desc'):
     d[PIVOT_COLL] = d[PIVOT_COLL].fillna('(فارغ)').astype(str)
     d[PIVOT_NOTE] = d[PIVOT_NOTE].fillna('(فارغ)').astype(str).str.strip()
 
+    # الترتيب في الشيت الأصلي تنازلي (Z→A): NPL ثم Dpd60
     def _ordered(values):
         vals = list(pd.unique(values))
         return sorted(vals, reverse=True) if order == 'desc' else vals
 
-    notes = sorted(d[PIVOT_NOTE].unique(), reverse=True)
+    # NPL ثم Dpd60 ثم Dpd30 دايماً، وأي قيمة تانية جديدة بتتضاف بعدهم
+    notes = list(FIXED_NOTES) + sorted([x for x in d[PIVOT_NOTE].unique() if x not in FIXED_NOTES], reverse=True)
     g = d.groupby([PIVOT_TEAM, PIVOT_COLL, PIVOT_NOTE]).agg(cnt=('_c', 'sum'), amt=(PIVOT_AMT, 'sum'))
 
     teams = []
@@ -350,7 +406,9 @@ def build_pivot(df, order='desc'):
     }
     return {'notes': notes, 'teams': teams, 'grand': grand}
 
+
 def pivot_to_frame(p):
+    """تحويل الـ Pivot لجدول للعرض على الشاشة"""
     cols = ['اسم المشرف', 'اسم المحصل']
     for n in p['notes']:
         cols += [f'{n} | عدد الحسابات', f'{n} | متبقي المديونية']
@@ -371,7 +429,9 @@ def pivot_to_frame(p):
     out.append(row)
     return pd.DataFrame(out, columns=cols)
 
+
 def _prepare_for_output(df):
+    """نفس أنواع الأعمدة في الشيت الأصلي: المبالغ أرقام، والتواريخ الأساسية تواريخ، والباقي نصوص"""
     d = df.copy()
     for c in ['Amount', 'Net Amount', 'Payment']:
         if c in d.columns:
@@ -380,6 +440,7 @@ def _prepare_for_output(df):
         if c in d.columns:
             d[c] = pd.to_datetime(d[c], errors='coerce')
     return d
+
 
 def _write_df_sheet(ws, df):
     if df is None or len(df.columns) == 0:
@@ -403,7 +464,9 @@ def _write_df_sheet(ws, df):
             elif isinstance(v, float):
                 cell.number_format = '#,##0.00'
 
+
 def _write_pivot_sheet(ws, p, title):
+    """نفس تنسيق شيت الملخص: عنوان - رؤوس - مشرف/محصل - إجمالي"""
     notes = p['notes']
     n = len(notes)
     last_col = 2 + 2 * n + 2
@@ -423,12 +486,14 @@ def _write_pivot_sheet(ws, p, title):
         cell.border = Border(left=thin, right=thin, top=thin, bottom=thin)
         return cell
 
+    # عنوان التقرير
     for r in (1, 2):
         for c in range(1, last_col + 1):
             hdr(r, c, None)
     ws.cell(row=1, column=1, value=title).font = Font(name='Calibri', bold=True, color='FFFFFF', size=18)
     ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=last_col)
 
+    # الصفوف 3-5
     for c in range(1, last_col + 1):
         hdr(3, c)
         hdr(4, c)
@@ -479,6 +544,7 @@ def _write_pivot_sheet(ws, p, title):
         if r - 1 > start:
             ws.merge_cells(start_row=start, start_column=1, end_row=r - 1, end_column=1)
 
+    # صف الإجمالي
     g = p['grand']
     for c in range(1, last_col + 1):
         cell = ws.cell(row=r, column=c)
@@ -503,7 +569,298 @@ def _write_pivot_sheet(ws, p, title):
     ws.column_dimensions[get_column_letter(tc)].width = 16.7
     ws.column_dimensions[get_column_letter(tc + 1)].width = 17.6
 
+
+# ==========================================
+# Pivot Table حقيقي داخل ملف الإكسيل (Cache + Pivot Table definition)
+# ==========================================
+import re
+import zipfile
+from xml.sax.saxutils import escape as _xml_escape
+
+_ILLEGAL_XML = re.compile('[\x00-\x08\x0b\x0c\x0e-\x1f]')
+
+
+def _xa(v):
+    """نص آمن داخل attribute في XML"""
+    return _xml_escape(_ILLEGAL_XML.sub('', str(v)), {'"': '&quot;'})
+
+
+def _cell_kind(v):
+    if isinstance(v, datetime):
+        return 'd'
+    if isinstance(v, bool):
+        return 's'
+    if isinstance(v, (int, float)):
+        return 'n'
+    return 's'
+
+
+def _normalize_value(v):
+    if v is None or (not isinstance(v, (list, tuple)) and pd.isna(v)):
+        return None
+    if isinstance(v, pd.Timestamp):
+        return v.to_pydatetime()
+    if hasattr(v, 'item') and not isinstance(v, (str, bytes)):
+        return v.item()
+    return v
+
+
+def _pivot_parts(data_df, data_sheet, p, order, idx):
+    """يبني ملفات الـ Pivot (cache definition + records + pivot table) لجدول بيانات واحد"""
+    df = _prepare_for_output(data_df)
+    cols = list(df.columns)
+    n_rows = len(df)
+    team_i, coll_i, note_i = cols.index(PIVOT_TEAM), cols.index(PIVOT_COLL), cols.index(PIVOT_NOTE)
+    acc_i, amt_i = cols.index(PIVOT_ACC), cols.index(PIVOT_AMT)
+
+    values = [[_normalize_value(v) for v in df[c].tolist()] for c in cols]
+
+    # نوع كل عمود
+    kinds = []
+    for col_vals in values:
+        ks = {_cell_kind(v) for v in col_vals if v is not None}
+        if not ks:
+            kinds.append('blank')
+        elif ks == {'n'}:
+            kinds.append('n')
+        elif ks == {'d'}:
+            kinds.append('d')
+        else:
+            kinds.append('s')
+
+    # الأعمدة اللي على المحاور بتتخزن كـ shared items (بترتيب ظهورها في البيانات)
+    shared_cols = {team_i, coll_i, note_i}
+    shared_maps = {}
+    for ci in shared_cols:
+        vals = ['' if v is None else str(v).strip() if ci == note_i else str(v) for v in values[ci]]
+        values[ci] = vals
+        uniq = list(dict.fromkeys(vals))
+        if ci == note_i:
+            uniq += [x for x in p['notes'] if x not in uniq]  # عناصر الأعمدة الثابتة حتى لو مفيش بيانات ليها
+        shared_maps[ci] = {u: k for k, u in enumerate(uniq)}
+
+    # ---------- cache definition ----------
+    fields_xml = []
+    for ci, name in enumerate(cols):
+        if ci in shared_cols:
+            items = ''.join(f'<s v="{_xa(u)}"/>' for u in shared_maps[ci])
+            fields_xml.append(f'<cacheField name="{_xa(name)}" numFmtId="0"><sharedItems count="{len(shared_maps[ci])}">{items}</sharedItems></cacheField>')
+            continue
+        col_vals = values[ci]
+        has_blank = any(v is None for v in col_vals)
+        k = kinds[ci]
+        if k == 'blank':
+            si = '<sharedItems containsNonDate="0" containsString="0" containsBlank="1"/>'
+        elif k == 'n':
+            nums = [float(v) for v in col_vals if v is not None]
+            is_int = all(float(v).is_integer() for v in nums)
+            attrs = 'containsSemiMixedTypes="0" containsString="0" containsNumber="1"' if not has_blank else 'containsString="0" containsBlank="1" containsNumber="1"'
+            if is_int:
+                attrs += ' containsInteger="1"'
+            si = f'<sharedItems {attrs} minValue="{repr(min(nums))}" maxValue="{repr(max(nums))}"/>'
+        elif k == 'd':
+            ds = [v for v in col_vals if v is not None]
+            attrs = 'containsSemiMixedTypes="0" containsNonDate="0" containsDate="1" containsString="0"' if not has_blank else 'containsNonDate="0" containsDate="1" containsString="0" containsBlank="1"'
+            si = f'<sharedItems {attrs} minDate="{min(ds).strftime("%Y-%m-%dT%H:%M:%S")}" maxDate="{max(ds).strftime("%Y-%m-%dT%H:%M:%S")}"/>'
+        else:
+            si = '<sharedItems containsBlank="1"/>' if has_blank else '<sharedItems/>'
+        fields_xml.append(f'<cacheField name="{_xa(name)}" numFmtId="0">{si}</cacheField>')
+
+    last_col_letter = get_column_letter(len(cols))
+    ns = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
+    cache_def = (
+        f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<pivotCacheDefinition {ns} r:id="rId1" refreshedBy="Ejada" '
+        f'refreshedDate="46330.5" createdVersion="8" refreshedVersion="8" minRefreshableVersion="3" recordCount="{n_rows}">'
+        f'<cacheSource type="worksheet"><worksheetSource ref="A1:{last_col_letter}{n_rows + 1}" sheet="{_xa(data_sheet)}"/></cacheSource>'
+        f'<cacheFields count="{len(cols)}">{"".join(fields_xml)}</cacheFields></pivotCacheDefinition>'
+    )
+
+    # ---------- records ----------
+    recs = []
+    for ri in range(n_rows):
+        cells = []
+        for ci in range(len(cols)):
+            v = values[ci][ri]
+            if ci in shared_cols:
+                cells.append(f'<x v="{shared_maps[ci][v]}"/>')
+            elif v is None:
+                cells.append('<m/>')
+            elif kinds[ci] == 'n':
+                cells.append(f'<n v="{repr(float(v)) if not float(v).is_integer() else int(float(v))}"/>')
+            elif kinds[ci] == 'd':
+                cells.append(f'<d v="{v.strftime("%Y-%m-%dT%H:%M:%S")}"/>')
+            else:
+                cells.append(f'<s v="{_xa(v if not isinstance(v, datetime) else v.strftime("%Y-%m-%d %H:%M:%S"))}"/>')
+        recs.append('<r>' + ''.join(cells) + '</r>')
+    cache_records = f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<pivotCacheRecords {ns} count="{n_rows}">{"".join(recs)}</pivotCacheRecords>'
+
+    # ---------- pivot table ----------
+    notes = p['notes']
+    n_notes = len(notes)
+    # ترتيب العناصر على المحاور (display order)
+    team_order = [t['team'] for t in p['teams']]
+    coll_order = []
+    for t in p['teams']:
+        for r in t['rows']:
+            if r['coll'] not in coll_order:
+                coll_order.append(r['coll'])
+    note_pos = {n: k for k, n in enumerate(notes)}
+    team_pos = {t: k for k, t in enumerate(team_order)}
+    coll_pos = {c: k for k, c in enumerate(coll_order)}
+
+    def items_xml(order_list, ci):
+        return f'<items count="{len(order_list)}">' + ''.join(f'<item x="{shared_maps[ci][o]}"/>' for o in order_list) + '</items>'
+
+    pf = []
+    for ci in range(len(cols)):
+        base = 'compact="0" outline="0" showAll="0" defaultSubtotal="0"'
+        if ci == note_i:
+            pf.append(f'<pivotField axis="axisCol" compact="0" outline="0" showAll="1" defaultSubtotal="0" sortType="descending">{items_xml(notes, ci)}</pivotField>')
+        elif ci == team_i:
+            pf.append(f'<pivotField name="اسم المشرف " axis="axisRow" {base}>{items_xml(team_order, ci)}</pivotField>')
+        elif ci == coll_i:
+            st_attr = ' sortType="descending"' if order == 'desc' else ''
+            pf.append(f'<pivotField name="اسم المحصل " axis="axisRow" {base}{st_attr}>{items_xml(coll_order, ci)}</pivotField>')
+        elif ci == acc_i:
+            pf.append(f'<pivotField dataField="1" compact="0" outline="0" showAll="0" defaultSubtotal="0"/>')
+        elif ci == amt_i:
+            pf.append(f'<pivotField dataField="1" compact="0" outline="0" showAll="0" defaultSubtotal="0"/>')
+        else:
+            pf.append(f'<pivotField compact="0" outline="0" showAll="0" defaultSubtotal="0"/>')
+
+    row_items = []
+    for t in p['teams']:
+        for k, r in enumerate(t['rows']):
+            if k == 0:
+                tp = team_pos[t['team']]
+                tx = '<x/>' if tp == 0 else f'<x v="{tp}"/>'
+                cp = coll_pos[r['coll']]
+                cx = '<x/>' if cp == 0 else f'<x v="{cp}"/>'
+                row_items.append(f'<i>{tx}{cx}</i>')
+            else:
+                row_items.append(f'<i r="1"><x v="{coll_pos[r["coll"]]}"/></i>')
+    row_items.append('<i t="grand"><x/></i>')
+
+    col_items = []
+    for k in range(n_notes):
+        first = '<x/>' if k == 0 else f'<x v="{k}"/>'
+        col_items.append(f'<i>{first}<x/></i>')
+        col_items.append('<i r="1" i="1"><x v="1"/></i>')
+    col_items.append('<i t="grand"><x/></i>')
+    col_items.append('<i t="grand" i="1"><x/></i>')
+
+    n_body = len(row_items) - 1
+    last_row = 5 + n_body + 1
+    last_col = 2 + 2 * n_notes + 2
+    ref = f'A3:{get_column_letter(last_col)}{last_row}'
+
+    pivot_def = (
+        f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        f'name="PivotTable{idx}" cacheId="{idx}" applyNumberFormats="0" applyBorderFormats="0" applyFontFormats="0" applyPatternFormats="0" '
+        f'applyAlignmentFormats="0" applyWidthHeightFormats="1" dataCaption="Values" grandTotalCaption="الاجمالي" missingCaption="0" '
+        f'updatedVersion="8" minRefreshableVersion="3" useAutoFormatting="1" itemPrintTitles="1" mergeItem="1" createdVersion="8" indent="0" '
+        f'compact="0" compactData="0" multipleFieldFilters="0" rowHeaderCaption="المحصل" colHeaderCaption="الفرع">'
+        f'<location ref="{ref}" firstHeaderRow="1" firstDataRow="3" firstDataCol="2"/>'
+        f'<pivotFields count="{len(cols)}">{"".join(pf)}</pivotFields>'
+        f'<rowFields count="2"><field x="{team_i}"/><field x="{coll_i}"/></rowFields>'
+        f'<rowItems count="{len(row_items)}">{"".join(row_items)}</rowItems>'
+        f'<colFields count="2"><field x="{note_i}"/><field x="-2"/></colFields>'
+        f'<colItems count="{len(col_items)}">{"".join(col_items)}</colItems>'
+        f'<dataFields count="2"><dataField name="عدد الحسابات" fld="{acc_i}" subtotal="count" baseField="{coll_i}" baseItem="0"/>'
+        f'<dataField name="متبقي المديونية" fld="{amt_i}" baseField="0" baseItem="0" numFmtId="3"/></dataFields>'
+        f'<pivotTableStyleInfo name="PivotStyleLight16" showRowHeaders="1" showColHeaders="1" showRowStripes="0" showColStripes="0" showLastColumn="1"/>'
+        f'</pivotTableDefinition>'
+    )
+    return cache_def, cache_records, pivot_def
+
+
+def inject_pivot_tables(xlsx_bytes, specs):
+    """specs: قائمة {summary_sheet, data_sheet, data_df, pivot, order} - بتحوّل شيتات الملخص لـ Pivot Table حقيقي"""
+    zin = zipfile.ZipFile(io.BytesIO(xlsx_bytes))
+    files = {n: zin.read(n) for n in zin.namelist()}
+    zin.close()
+
+    wb_xml = files['xl/workbook.xml'].decode('utf-8')
+    wb_rels = files['xl/_rels/workbook.xml.rels'].decode('utf-8')
+    ct = files['[Content_Types].xml'].decode('utf-8')
+
+    # اسم الشيت -> ملف الشيت
+    sheet_rid = {}
+    for m in re.finditer(r'<sheet\b[^>]*?>', wb_xml):
+        tag = m.group(0)
+        nm = re.search(r'name="([^"]*)"', tag).group(1)
+        rid = re.search(r'r:id="([^"]*)"', tag).group(1)
+        sheet_rid[nm.replace('&amp;', '&')] = rid
+    rid_target = {}
+    for m in re.finditer(r'<Relationship\b[^>]*?>', wb_rels):
+        tag = m.group(0)
+        rid_target[re.search(r'Id="([^"]*)"', tag).group(1)] = re.search(r'Target="([^"]*)"', tag).group(1)
+
+    pivot_caches_xml = ''
+    new_rels = ''
+    new_ct = ''
+    for idx, sp in enumerate(specs, 1):
+        cache_def, cache_records, pivot_def = _pivot_parts(sp['data_df'], sp['data_sheet'], sp['pivot'], sp['order'], idx)
+        files[f'xl/pivotCache/pivotCacheDefinition{idx}.xml'] = cache_def.encode('utf-8')
+        files[f'xl/pivotCache/pivotCacheRecords{idx}.xml'] = cache_records.encode('utf-8')
+        files[f'xl/pivotCache/_rels/pivotCacheDefinition{idx}.xml.rels'] = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            f'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords" Target="pivotCacheRecords{idx}.xml"/></Relationships>'
+        ).encode('utf-8')
+        files[f'xl/pivotTables/pivotTable{idx}.xml'] = pivot_def.encode('utf-8')
+        files[f'xl/pivotTables/_rels/pivotTable{idx}.xml.rels'] = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            f'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition" Target="../pivotCache/pivotCacheDefinition{idx}.xml"/></Relationships>'
+        ).encode('utf-8')
+
+        # ربط الشيت بالـ Pivot
+        target = rid_target[sheet_rid[sp['summary_sheet']]]
+        sheet_file = target.lstrip('/') if target.startswith('/') else 'xl/' + target
+        rels_path = sheet_file.replace('worksheets/', 'worksheets/_rels/') + '.rels'
+        rel = (f'<Relationship Id="rIdPv{idx}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable" '
+               f'Target="../pivotTables/pivotTable{idx}.xml"/>')
+        if rels_path in files:
+            files[rels_path] = files[rels_path].decode('utf-8').replace('</Relationships>', rel + '</Relationships>').encode('utf-8')
+        else:
+            files[rels_path] = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                                + rel + '</Relationships>').encode('utf-8')
+
+        new_rels += (f'<Relationship Id="rIdPc{idx}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition" '
+                     f'Target="pivotCache/pivotCacheDefinition{idx}.xml"/>')
+        pivot_caches_xml += f'<pivotCache cacheId="{idx}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rIdPc{idx}"/>'
+        new_ct += (f'<Override PartName="/xl/pivotCache/pivotCacheDefinition{idx}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml"/>'
+                   f'<Override PartName="/xl/pivotCache/pivotCacheRecords{idx}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml"/>'
+                   f'<Override PartName="/xl/pivotTables/pivotTable{idx}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml"/>')
+
+    if specs:
+        wb_rels = wb_rels.replace('</Relationships>', new_rels + '</Relationships>')
+        ct = ct.replace('</Types>', new_ct + '</Types>')
+        if re.search(r'<calcPr\b[^>]*/>', wb_xml):
+            wb_xml = re.sub(r'(<calcPr\b[^>]*/>)', r'\1<pivotCaches>' + pivot_caches_xml.replace('\\', '\\\\') + '</pivotCaches>', wb_xml, count=1)
+        else:
+            wb_xml = wb_xml.replace('</workbook>', '<pivotCaches>' + pivot_caches_xml + '</pivotCaches></workbook>')
+        files['xl/workbook.xml'] = wb_xml.encode('utf-8')
+        files['xl/_rels/workbook.xml.rels'] = wb_rels.encode('utf-8')
+        files['[Content_Types].xml'] = ct.encode('utf-8')
+
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as zout:
+        # [Content_Types].xml لازم أول ملف
+        zout.writestr('[Content_Types].xml', files.pop('[Content_Types].xml'))
+        for n, b in files.items():
+            zout.writestr(n, b)
+    out.seek(0)
+    return out
+
+
+def _can_pivot(df):
+    need = [PIVOT_TEAM, PIVOT_COLL, PIVOT_NOTE, PIVOT_ACC, PIVOT_AMT]
+    return (df is not None and len(df) > 0 and all(c in df.columns for c in need)
+            and len(set(df.columns)) == len(df.columns))
+
+
 def build_report_xlsx(active_df, broken_df, neglect_df=None):
+    """نفس ملف التقرير: 4 شيتات (قائمة + ملخصها + مكسورة + ملخصها) وبعدهم تقرير الإهمال لو موجود"""
     wb = Workbook()
     ws = wb.active
     ws.title = 'تقرير الوعود القائمة'
@@ -524,6 +881,20 @@ def build_report_xlsx(active_df, broken_df, neglect_df=None):
 
     buf = io.BytesIO()
     wb.save(buf)
+
+    # تحويل شيتات الملخص لـ Pivot Table حقيقي (لو فيه بيانات)
+    specs = []
+    if _can_pivot(active_df):
+        specs.append({'summary_sheet': 'ملخص تقرير الوعود القائمة', 'data_sheet': 'تقرير الوعود القائمة',
+                      'data_df': active_df, 'pivot': build_pivot(active_df, order='first'), 'order': 'first'})
+    if _can_pivot(broken_df):
+        specs.append({'summary_sheet': 'ملخص تقرير الوعود المكسورة', 'data_sheet': 'تقرير الوعود المكسورة',
+                      'data_df': broken_df, 'pivot': build_pivot(broken_df, order='desc'), 'order': 'desc'})
+    if specs:
+        try:
+            return inject_pivot_tables(buf.getvalue(), specs)
+        except Exception:
+            pass  # لو حصل أي خطأ يفضل الملف بالجداول العادية
     buf.seek(0)
     return buf
 
@@ -552,6 +923,10 @@ def process_page_data(uploaded_files):
 
     for f in uploaded_files:
         try:
+            try:
+                f.seek(0)
+            except Exception:
+                pass
             temp_df = pd.read_csv(f, dtype=str) if f.name.endswith('.csv') else pd.read_excel(f, dtype=str)
             temp_df.columns = temp_df.columns.astype(str).str.strip()
             all_dfs.append(temp_df)
@@ -601,6 +976,7 @@ def process_page_data(uploaded_files):
         _diff = (last_date[broken_promises_df.index] - due_date[broken_promises_df.index]).dt.days
         broken_promises_df = broken_promises_df[_diff < 0]
         if not broken_promises_df.empty:
+            broken_promises_df = broken_promises_df.drop(columns=['الفرق '], errors='ignore')
             broken_promises_df.insert(broken_promises_df.columns.get_loc('Follow up Last Date') + 1, 'الفرق ', _diff[_diff < 0].astype(int))
 
         neglect_base = df_promises[
@@ -802,12 +1178,13 @@ else:
     # ==========================================
     elif curr_page == 'Activity':
         st.markdown(f"""
-        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; text-align: center; margin-bottom: 20px;">
-            <h3 style="margin:0; color:{text_color}; font-weight:900;">📈 تقرير النشاط وموديل التقييم (ناجحة / مغطاة)</h3>
+        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px; display:flex; align-items:center; justify-content:center; gap:14px;">
+            <div style="width:42px; height:42px; flex-shrink:0; background-color:{PHONE_ICON_COLOR}; -webkit-mask: url(data:image/png;base64,{PHONE_ICON_B64}) no-repeat center / contain; mask: url(data:image/png;base64,{PHONE_ICON_B64}) no-repeat center / contain;"></div>
+            <div style="margin:0; color:{text_color}; font-weight:900; font-size:28px; line-height:1.3;">تقرير نشاط المحصلين</div>
         </div>
         """, unsafe_allow_html=True)
 
-        col_act_right, col_act_left = st.columns([1, 1], gap="medium")
+        col_act_right, col_act_mid, col_act_left = st.columns([1, 1, 1], gap="medium")
 
         with col_act_right:
             with st.container(border=True):
@@ -816,13 +1193,26 @@ else:
                 if collector_col_name and collector_col_name in activity_base_df.columns:
                     unique_colls = activity_base_df[collector_col_name].dropna().astype(str).unique().tolist()
                     collector_options.extend(sorted(unique_colls))
-                
+
                 selected_collector = st.selectbox("👤 ابحثي عن اسم المحصل (Collector):", options=collector_options)
+
+        with col_act_mid:
+            with st.container(border=True):
+                cur_files = st.session_state.page_files.get('Activity') or []
+                cur_names = "، ".join(f.name for f in cur_files)
+                st.markdown(f"<p style='font-size: 13px; color: {sub_text_color}; direction: rtl; text-align: right; margin-bottom: 5px; font-weight: bold;'>الملف الحالي: {cur_names}</p>", unsafe_allow_html=True)
+                new_files = st.file_uploader("رفع الملف", type=["xlsx", "csv"], accept_multiple_files=True, key="uploader_inpage_Activity")
+                if new_files:
+                    new_sig = [(f.name, f.size) for f in new_files]
+                    cur_sig = [(f.name, f.size) for f in cur_files]
+                    if new_sig != cur_sig:
+                        st.session_state.page_files['Activity'] = new_files
+                        st.rerun()
 
         with col_act_left:
             with st.container(border=True):
                 st.markdown(f"<p style='font-size: 13px; color: {sub_text_color}; direction: rtl; text-align: right; margin-bottom: 5px; font-weight: bold;'>التقييم (1) يعني 'ناجحة'، والتقييم (0) يعني 'مغطاة'.</p>", unsafe_allow_html=True)
-                mapping_file = st.file_uploader("شيت موديل النشاط (اختياري)", type=["xlsx"], key="mapping_uploader")
+                mapping_file = st.file_uploader("شيت موديل النشاط", type=["xlsx"], key="mapping_uploader")
 
         # فلاتر المدى الزمني والشفت والبريك
         filter_act_col1, filter_act_col2, filter_act_col3, filter_act_col4 = st.columns([1.5, 2, 1.5, 1.5])
