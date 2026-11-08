@@ -1,35 +1,3 @@
-                    st.plotly_chart(fig_top, use_container_width=True, config={'displayModeBar': False})
-
-            # 2) الشارت الثانية: تاريخ ووقت أول وآخر إفادة لكل محصل (بنظام الـ 12 ساعة)
-            with ch_col2:
-                with st.container(border=True):
-                    if 'Created_DateTime' in act_df.columns and act_df['Created_DateTime'].notna().any():
-                        dt_valid = act_df.dropna(subset=['Created_DateTime', collector_col]).sort_values('Created_DateTime')
-                        first_rows = dt_valid.groupby(collector_col, as_index=False).first()
-                        last_rows = dt_valid.groupby(collector_col, as_index=False).last()
-                        fl_df = pd.merge(
-                            first_rows[[collector_col, 'Created_DateTime'] + ([notes_col_name] if notes_col_name else [])],
-                            last_rows[[collector_col, 'Created_DateTime'] + ([notes_col_name] if notes_col_name else [])],
-                            on=collector_col,
-                            suffixes=('_first', '_last')
-                        )
-                        # عرض جميع المحصلين حتى لا تختفي مواعيد أي محصل
-                        fl_df = fl_df.sort_values('Created_DateTime_first').copy()
-                        fl_df['first_hour'] = fl_df['Created_DateTime_first'].dt.hour + fl_df['Created_DateTime_first'].dt.minute / 60.0
-                        fl_df['last_hour'] = fl_df['Created_DateTime_last'].dt.hour + fl_df['Created_DateTime_last'].dt.minute / 60.0
-                        fl_df['first_time_12h'] = format_12h(fl_df['Created_DateTime_first'])
-                        fl_df['last_time_12h'] = format_12h(fl_df['Created_DateTime_last'])
-                        fl_df['first_str_12h'] = format_dt_12h(fl_df['Created_DateTime_first'])
-                        fl_df['last_str_12h'] = format_dt_12h(fl_df['Created_DateTime_last'])
-                        first_note_txt = fl_df[f"{notes_col_name}_first"].astype(str) if notes_col_name else pd.Series([""] * len(fl_df))
-                        last_note_txt = fl_df[f"{notes_col_name}_last"].astype(str) if notes_col_name else pd.Series([""] * len(fl_df))
-
-                        fig_fl = go.Figure()
-                        fig_fl.add_trace(go.Bar(
-                            name="أول إفادة",
-                            y=fl_df[collector_col],
-                            x=fl_df['first_hour'],
-                            orientation='h',
                             marker_color="#99AABF",
                             text=fl_df['first_time_12h'],
                             textposition='outside',
