@@ -44,7 +44,7 @@ if 'act_uploader_ver' not in st.session_state:
 # ==========================================
 # دالات استجابة سريعة للزراير (Callbacks) والأيقونات المخصصة
 # ==========================================
-PHONE_ICON_B64 = "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"
+PHONE_ICON_B64 = "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"
 PHONE_ICON_COLOR = "#1F4373"  # لون لوجو التليفون
 
 # اللوجو الأول: علامة الصح الخضراء داخل الشكل المزخرف (للمكالمات الناجحة)
@@ -86,14 +86,17 @@ def find_col_in(target_df, candidates):
     return None
 
 # ==========================================
-# إعدادات الثيم والألوان
+# إعدادات الثيم والألوان وباليت الرسوم البيانية
 # ==========================================
 ejada_navy_dark = "#1F4373"
 ejada_navy_light = "#304D73"
 ejada_grey_blue = "#586F8C"
 ejada_border_light = "#99AABF"
+ejada_soft_grey = "#F2F2F2"
 white_bg = "#FFFFFF"  
 snb_green = "#2CA549"  
+
+CHART_PALETTE = ["#1F4373", "#304D73", "#586F8C", "#99AABF", "#F2F2F2"]
 
 if st.session_state.theme_choice == "ثيم إجادة (Navy)":
     bg_color = ejada_navy_dark 
@@ -191,6 +194,7 @@ st.markdown(f"""
         padding: 10px 14px !important;
         border-radius: 10px !important;
         border: 1px solid {border_color} !important;
+        background-color: #FFFFFF !important;
     }}
     div[data-testid="stVerticalBlockBorderWrapper"] > div {{
         gap: 0.4rem !important;
@@ -360,7 +364,7 @@ st.markdown(f"""
         margin-top: 4px !important;
     }}
     [data-testid="stFileUploaderFile"] * {{
-        color: {label_color} !important;
+        color: {input_text} !important;
     }}
     [data-testid="stFileUploaderDeleteBtn"] button {{
         background-color: #EF4444 !important;
@@ -384,6 +388,10 @@ st.markdown(f"""
         color: {label_color} !important;
         font-weight: 800 !important;
         font-size: 14px !important;
+    }}
+    /* عناوين داخل المربعات البيضاء تكون كحلي دائماً */
+    div[data-testid="stVerticalBlockBorderWrapper"] label[data-testid="stWidgetLabel"] p {{
+        color: {input_text} !important;
     }}
 
     /* ===== تصغير مربعات الـ KPIs وتكبير خط العناوين في المنتصف ===== */
@@ -1160,7 +1168,7 @@ def render_activity_boxes(activity_base_df=None):
 
     with col_model:
         with st.container(border=True):
-            st.markdown(f"<p style='font-size: 13px; color: {sub_text_color}; direction: rtl; text-align: right; margin: 0 0 2px 0; font-weight: bold;'>التقييم (1) يعني 'ناجحة'، والتقييم (0) يعني 'مغطاة'.</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size: 13px; color: {input_text}; direction: rtl; text-align: right; margin: 0 0 2px 0; font-weight: bold;'>التقييم (1) يعني 'ناجحة'، والتقييم (0) يعني 'مغطاة'.</p>", unsafe_allow_html=True)
             mapping_file = st.file_uploader("شيت موديل النشاط", type=["xlsx"], key="mapping_uploader")
 
     with col_file:
@@ -1170,11 +1178,11 @@ def render_activity_boxes(activity_base_df=None):
                 cur_names = "، ".join(f.name for f in cur_files)
                 hdr_col1, hdr_col2 = st.columns([8.5, 1.5])
                 with hdr_col1:
-                    st.markdown(f"<p style='font-size: 13px; color: {sub_text_color}; direction: rtl; text-align: right; margin: 0; font-weight: bold;'>الملف الحالي: {cur_names}</p>", unsafe_allow_html=True)
+                    st.markdown(f"<p style='font-size: 13px; color: {input_text}; direction: rtl; text-align: right; margin: 0; font-weight: bold;'>الملف الحالي: {cur_names}</p>", unsafe_allow_html=True)
                 with hdr_col2:
                     st.button("✖", key="clear_act_files_btn", on_click=clear_activity_files, help="إزالة الملف المرفوع")
             else:
-                st.markdown(f"<p style='font-size: 13px; color: {sub_text_color}; direction: rtl; text-align: right; margin: 0 0 2px 0; font-weight: bold;'>الملف الحالي: لسه ما اترفعش ملف</p>", unsafe_allow_html=True)
+                st.markdown(f"<p style='font-size: 13px; color: {input_text}; direction: rtl; text-align: right; margin: 0 0 2px 0; font-weight: bold;'>الملف الحالي: لسه ما اترفعش ملف</p>", unsafe_allow_html=True)
 
             uploader_key = f"uploader_inpage_Activity_{st.session_state.act_uploader_ver}"
             new_files = st.file_uploader("ارفعي الملف هنا يا رنا", type=["xlsx", "csv"], accept_multiple_files=True, key=uploader_key)
@@ -1189,7 +1197,7 @@ def render_activity_boxes(activity_base_df=None):
     selected_collector = "الكل (جميع المحصلين)"
     with col_coll:
         with st.container(border=True):
-            st.markdown(f"<p style='font-size: 13px; color: {sub_text_color}; direction: rtl; text-align: right; margin: 0 0 2px 0; font-weight: bold;'>فلترة حسب المحصل</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size: 13px; color: {input_text}; direction: rtl; text-align: right; margin: 0 0 2px 0; font-weight: bold;'>فلترة حسب المحصل</p>", unsafe_allow_html=True)
             collector_options = ["الكل (جميع المحصلين)"]
             if activity_base_df is not None:
                 collector_col_name = find_col_in(activity_base_df, ['collecter', 'collector', 'المحصل', 'اسم المحصل'])
@@ -1526,6 +1534,143 @@ else:
             </div>
         </div>
         """, unsafe_allow_html=True)
+
+        # ==========================================
+        # الرسوم البيانية الثلاثة في صفحة النشاط بدرجات ألوان الباليت المرفقة
+        # ==========================================
+        if collector_col and collector_col in act_df.columns and total_activity > 0:
+            ch_col1, ch_col2, ch_col3 = st.columns(3, gap="medium")
+
+            # 1) الشارت الأولى: أكبر محصلين عملوا مكالمات
+            with ch_col1:
+                with st.container(border=True):
+                    top_c = act_df[collector_col].value_counts().head(10).iloc[::-1]
+                    bar_colors = [CHART_PALETTE[i % 4] for i in range(len(top_c))][::-1]
+                    fig_top = go.Figure(go.Bar(
+                        x=top_c.values,
+                        y=top_c.index,
+                        orientation='h',
+                        marker=dict(color=bar_colors, line=dict(color="#1F4373", width=1)),
+                        text=top_c.values,
+                        textposition='auto',
+                        textfont=dict(color="#FFFFFF", weight='bold', size=12)
+                    ))
+                    fig_top.update_layout(
+                        title=dict(text="📞 أكبر المحصلين مكالمات", x=0.5, xanchor='center', font=dict(color="#1F4373", size=15, weight='bold')),
+                        paper_bgcolor="#FFFFFF",
+                        plot_bgcolor="#F2F2F2",
+                        font=dict(color="#1F4373", family="Tahoma"),
+                        height=360,
+                        margin=dict(l=10, r=10, t=45, b=20),
+                        xaxis=dict(title="عدد المكالمات", gridcolor="#FFFFFF"),
+                        yaxis=dict(title="", automargin=True)
+                    )
+                    st.plotly_chart(fig_top, use_container_width=True, config={'displayModeBar': False})
+
+            # 2) الشارت الثانية: تاريخ ووقت أول وآخر إفادة (Notes) لكل محصل
+            with ch_col2:
+                with st.container(border=True):
+                    if 'Created_DateTime' in act_df.columns and act_df['Created_DateTime'].notna().any():
+                        dt_valid = act_df.dropna(subset=['Created_DateTime', collector_col]).sort_values('Created_DateTime')
+                        first_rows = dt_valid.groupby(collector_col, as_index=False).first()
+                        last_rows = dt_valid.groupby(collector_col, as_index=False).last()
+                        fl_df = pd.merge(
+                            first_rows[[collector_col, 'Created_DateTime'] + ([notes_col_name] if notes_col_name else [])],
+                            last_rows[[collector_col, 'Created_DateTime'] + ([notes_col_name] if notes_col_name else [])],
+                            on=collector_col,
+                            suffixes=('_first', '_last')
+                        )
+                        # ترتيب حسب أصحاب أكبر نشاط (أعلى 10)
+                        top_names_list = act_df[collector_col].value_counts().head(10).index.tolist()
+                        fl_df = fl_df[fl_df[collector_col].isin(top_names_list)].copy()
+                        fl_df['first_hour'] = fl_df['Created_DateTime_first'].dt.hour + fl_df['Created_DateTime_first'].dt.minute / 60.0
+                        fl_df['last_hour'] = fl_df['Created_DateTime_last'].dt.hour + fl_df['Created_DateTime_last'].dt.minute / 60.0
+                        fl_df['first_str'] = fl_df['Created_DateTime_first'].dt.strftime('%Y-%m-%d %H:%M')
+                        fl_df['last_str'] = fl_df['Created_DateTime_last'].dt.strftime('%Y-%m-%d %H:%M')
+                        first_note_txt = fl_df[f"{notes_col_name}_first"].astype(str) if notes_col_name else pd.Series([""] * len(fl_df))
+                        last_note_txt = fl_df[f"{notes_col_name}_last"].astype(str) if notes_col_name else pd.Series([""] * len(fl_df))
+
+                        fig_fl = go.Figure()
+                        fig_fl.add_trace(go.Bar(
+                            name="أول إفادة",
+                            y=fl_df[collector_col],
+                            x=fl_df['first_hour'],
+                            orientation='h',
+                            marker_color="#99AABF",
+                            text=fl_df['Created_DateTime_first'].dt.strftime('%H:%M'),
+                            textposition='auto',
+                            customdata=list(zip(fl_df['first_str'], first_note_txt)),
+                            hovertemplate="<b>%{y}</b><br>أول إفادة: %{customdata[0]}<br>الإفادة: %{customdata[1]}<extra></extra>"
+                        ))
+                        fig_fl.add_trace(go.Bar(
+                            name="آخر إفادة",
+                            y=fl_df[collector_col],
+                            x=fl_df['last_hour'],
+                            orientation='h',
+                            marker_color="#1F4373",
+                            text=fl_df['Created_DateTime_last'].dt.strftime('%H:%M'),
+                            textposition='auto',
+                            textfont=dict(color="#FFFFFF"),
+                            customdata=list(zip(fl_df['last_str'], last_note_txt)),
+                            hovertemplate="<b>%{y}</b><br>آخر إفادة: %{customdata[0]}<br>الإفادة: %{customdata[1]}<extra></extra>"
+                        ))
+                        fig_fl.update_layout(
+                            barmode='group',
+                            title=dict(text="🕒 تاريخ أول وآخر إفادة لكل محصل", x=0.5, xanchor='center', font=dict(color="#1F4373", size=15, weight='bold')),
+                            paper_bgcolor="#FFFFFF",
+                            plot_bgcolor="#F2F2F2",
+                            font=dict(color="#1F4373", family="Tahoma"),
+                            height=360,
+                            margin=dict(l=10, r=10, t=45, b=20),
+                            xaxis=dict(title="الساعة (نظام 24 ساعة)", range=[0, 24], gridcolor="#FFFFFF"),
+                            yaxis=dict(title="", automargin=True),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="center", x=0.5)
+                        )
+                        st.plotly_chart(fig_fl, use_container_width=True, config={'displayModeBar': False})
+                    else:
+                        st.info("لا يوجد عمود تاريخ/وقت لحساب أول وآخر إفادة.")
+
+            # 3) الشارت الثالثة: أول إفادة لكل محصل بعد البريك (بعد 12:30 ظهراً)
+            with ch_col3:
+                with st.container(border=True):
+                    if 'Created_DateTime' in act_df.columns and act_df['Created_DateTime'].notna().any():
+                        after_break_df = act_df[act_df['Created_DateTime'].dt.time > time(12, 30)].dropna(subset=['Created_DateTime', collector_col]).sort_values('Created_DateTime')
+                        if not after_break_df.empty:
+                            first_ab = after_break_df.groupby(collector_col, as_index=False).first()
+                            top_names_list = act_df[collector_col].value_counts().head(10).index.tolist()
+                            first_ab = first_ab[first_ab[collector_col].isin(top_names_list)].copy()
+                            first_ab['ab_hour'] = first_ab['Created_DateTime'].dt.hour + first_ab['Created_DateTime'].dt.minute / 60.0
+                            first_ab['ab_time_str'] = first_ab['Created_DateTime'].dt.strftime('%Y-%m-%d %H:%M')
+                            ab_note_txt = first_ab[notes_col_name].astype(str) if notes_col_name and notes_col_name in first_ab.columns else pd.Series(["-"] * len(first_ab))
+                            first_ab['short_note'] = ab_note_txt.apply(lambda s: s[:18] + ".." if len(str(s)) > 18 else str(s))
+
+                            ab_colors = [CHART_PALETTE[i % 4] for i in range(len(first_ab))]
+                            fig_ab = go.Figure(go.Bar(
+                                y=first_ab[collector_col],
+                                x=first_ab['ab_hour'],
+                                orientation='h',
+                                marker=dict(color=ab_colors, line=dict(color="#1F4373", width=1)),
+                                text=first_ab['Created_DateTime'].dt.strftime('%H:%M') + " | " + first_ab['short_note'],
+                                textposition='auto',
+                                textfont=dict(color="#FFFFFF", weight='bold', size=11),
+                                customdata=list(zip(first_ab['ab_time_str'], ab_note_txt)),
+                                hovertemplate="<b>%{y}</b><br>وقت أول إفادة بعد البريك: %{customdata[0]}<br>الإفادة (Notes): %{customdata[1]}<extra></extra>"
+                            ))
+                            fig_ab.update_layout(
+                                title=dict(text="☕ أول إفادة (Notes) بعد البريك (12:30)", x=0.5, xanchor='center', font=dict(color="#1F4373", size=15, weight='bold')),
+                                paper_bgcolor="#FFFFFF",
+                                plot_bgcolor="#F2F2F2",
+                                font=dict(color="#1F4373", family="Tahoma"),
+                                height=360,
+                                margin=dict(l=10, r=10, t=45, b=20),
+                                xaxis=dict(title="الساعة (بعد 12:30 ظهراً)", range=[12, 24], gridcolor="#FFFFFF"),
+                                yaxis=dict(title="", automargin=True)
+                            )
+                            st.plotly_chart(fig_ab, use_container_width=True, config={'displayModeBar': False})
+                        else:
+                            st.info("لا توجد إفادات مسجلة بعد وقت البريك (12:30 م).")
+                    else:
+                        st.info("لا يوجد عمود تاريخ/وقت لعرض أول إفادة بعد البريك.")
 
         if collector_col and collector_col in act_df.columns:
             pivot_summary = act_df.groupby([collector_col, 'Call_Status']).size().unstack(fill_value=0)
