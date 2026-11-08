@@ -20,25 +20,16 @@ if 'theme_choice' not in st.session_state:
     st.session_state.theme_choice = 'ثيم إجادة (Navy)'
 
 # ==========================================
-# دالات استجابة سريعة للزرار (Overview & Theme)
+# دالات استجابة سريعة للزراير (Callbacks)
 # ==========================================
 def toggle_theme():
-    if st.session_state.theme_choice == 'التصميم الأبيض (Light)':
-        st.session_state.theme_choice = 'ثيم إجادة (Navy)'
+    if st.session_state.theme_choice == 'ثيم إجادة (Navy)':
+        st.session_state.theme_choice = 'التصميم الفاتح (Light)'
     else:
-        st.session_state.theme_choice = 'التصميم الأبيض (Light)'
+        st.session_state.theme_choice = 'ثيم إجادة (Navy)'
 
-def go_to_overview():
-    st.session_state.current_page = 'Overview'
-
-def go_to_promises():
-    st.session_state.current_page = 'Promises'
-
-def go_to_neglect():
-    st.session_state.current_page = 'Neglect'
-
-def go_to_activity():
-    st.session_state.current_page = 'Activity'
+def set_page(page_name):
+    st.session_state.current_page = page_name
 
 # ==========================================
 # دالة عامة للبحث عن الأعمدة
@@ -53,7 +44,7 @@ def find_col_in(target_df, candidates):
     return None
 
 # ==========================================
-# إعدادات الثيم والألوان بالترتيب المطلوب
+# إعدادات الثيم والألوان
 # ==========================================
 ejada_navy_dark = "#1F4373"
 ejada_navy_light = "#304D73"
@@ -69,7 +60,8 @@ if st.session_state.theme_choice == "ثيم إجادة (Navy)":
     primary_color = ejada_navy_light 
     primary_text = "#FFFFFF"
     text_color = ejada_navy_dark
-    sub_text_color = ejada_grey_blue
+    label_color = "#FFFFFF"
+    sub_text_color = "#E2E8F0"
     gauge_bg = "#E2E8F0"
     nav_btn_bg = "#FFFFFF"
     nav_btn_text = ejada_navy_dark
@@ -79,24 +71,25 @@ if st.session_state.theme_choice == "ثيم إجادة (Navy)":
     input_bg = "#FFFFFF"
     input_text = "#1F4373"
 else:
-    bg_color = "#FFFFFF"
-    card_color = "#F3F4F6"
-    border_color = "#9CA3AF"
-    primary_color = ejada_navy_light
+    bg_color = "#F4F6F9"
+    card_color = "#FFFFFF"
+    border_color = "#CBD5E1"
+    primary_color = ejada_navy_dark
     primary_text = "#FFFFFF"
-    text_color = "#1F2937" 
-    sub_text_color = "#4B5563"
+    text_color = "#1F4373" 
+    label_color = "#1F4373"
+    sub_text_color = "#475569"
     gauge_bg = "#E2E8F0"
     nav_btn_bg = "#FFFFFF"
-    nav_btn_text = "#1F2937"
-    nav_btn_border = "#9CA3AF"
-    kpi_title_color = "#4B5563"
+    nav_btn_text = "#1F4373"
+    nav_btn_border = "#CBD5E1"
+    kpi_title_color = "#475569"
     header_logo_color = "#1F4373"
     input_bg = "#FFFFFF"
-    input_text = "#1F2937"
+    input_text = "#1F4373"
 
 # ==========================================
-# تصميم الـ UI الديناميكي (CSS)
+# تصميم الـ UI الديناميكي (CSS) وتبييض الشرائط السوداء بالكامل
 # ==========================================
 st.markdown(f"""
 <style>
@@ -105,8 +98,14 @@ st.markdown(f"""
     
     .stApp {{ background-color: {bg_color} !important; }}
 
-    .block-container {{ padding-top: 3.8rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; direction: rtl; text-align: right; }}
+    .block-container {{ padding-top: 2.5rem !important; padding-left: 1.5rem !important; padding-right: 1.5rem !important; max-width: 100% !important; direction: rtl; text-align: right; }}
     
+    /* ضمان عمل الزراير العلوية وعدم تغطيتها بأي عنصر */
+    div[data-testid="stButton"] {{
+        position: relative !important;
+        z-index: 9999 !important;
+    }}
+
     div[data-testid="stButton"] > button[kind="secondary"] {{
         background-color: {nav_btn_bg} !important;
         color: {nav_btn_text} !important;
@@ -135,58 +134,128 @@ st.markdown(f"""
         background: linear-gradient(90deg, {ejada_navy_dark} 50%, {ejada_grey_blue} 50%) !important;
         border: 2px solid #FFFFFF !important;
         border-radius: 50% !important; 
-        width: 38px !important;
-        height: 38px !important;
-        min-width: 38px !important;
-        min-height: 38px !important;
+        width: 40px !important;
+        height: 40px !important;
+        min-width: 40px !important;
+        min-height: 40px !important;
         padding: 0 !important;
-        margin-top: 1px !important; 
         color: transparent !important; 
         box-shadow: 0 2px 6px rgba(0,0,0,0.4) !important;
+        cursor: pointer !important;
     }}
 
-    .stTextInput input, div[data-baseweb="select"] > div, div[data-baseweb="base-input"], div[data-baseweb="tag"], div[data-baseweb="menu"] {{
-        background-color: {input_bg} !important;
+    /* تبييض جميع الشرائط السوداء في Selectbox و Multiselect بالكامل */
+    div[data-baseweb="select"],
+    div[data-baseweb="select"] > div,
+    div[data-baseweb="select"] > div > div,
+    div[data-baseweb="base-input"],
+    .stSelectbox div[data-baseweb="select"] > div,
+    .stMultiSelect div[data-baseweb="select"] > div {{
+        background-color: #FFFFFF !important;
         color: {input_text} !important;
         border: 1px solid {border_color} !important;
         border-radius: 8px !important;
-        direction: rtl;
-        text-align: right;
+        direction: rtl !important;
+        text-align: right !important;
     }}
-    
-    div[data-baseweb="select"] span, div[data-baseweb="select"] div, span[data-baseweb="tag"] span, div[data-baseweb="menu"] div {{
+
+    /* لون النص والأيقونات داخل الشرائط البيضاء */
+    div[data-baseweb="select"] span,
+    div[data-baseweb="select"] div,
+    div[data-baseweb="select"] input {{
+        color: {input_text} !important;
+        -webkit-text-fill-color: {input_text} !important;
+    }}
+    div[data-baseweb="select"] svg {{
+        fill: {input_text} !important;
+    }}
+
+    /* تبييض القائمة المنسدلة لما تفتح */
+    div[data-baseweb="popover"],
+    div[data-baseweb="popover"] > div,
+    ul[data-baseweb="menu"],
+    ul[data-baseweb="menu"] li {{
+        background-color: #FFFFFF !important;
+        color: {input_text} !important;
+        direction: rtl !important;
+        text-align: right !important;
+    }}
+    ul[data-baseweb="menu"] li:hover {{
+        background-color: #E2E8F0 !important;
+    }}
+
+    /* تنسيق التاجات المختارة داخل MultiSelect */
+    span[data-baseweb="tag"] {{
+        background-color: {ejada_navy_dark} !important;
+        color: #FFFFFF !important;
+        border-radius: 6px !important;
+    }}
+    span[data-baseweb="tag"] span {{
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }}
+
+    /* تبييض مربع الـ Checkbox الأسود */
+    div[data-testid="stCheckbox"] label span[ role="checkbox" ],
+    div[data-baseweb="checkbox"] > div:first-child {{
+        background-color: #FFFFFF !important;
+        border: 2px solid {ejada_navy_dark} !important;
+    }}
+
+    /* تبييض منطقة رفع الملفات وزرار الـ Upload الأسود */
+    [data-testid="stFileUploader"] > section {{
+        background-color: #FFFFFF !important;
+        border: 2px dashed {border_color} !important;
+        border-radius: 10px !important;
+        direction: rtl !important;
+    }}
+    [data-testid="stFileUploader"] section * {{
         color: {input_text} !important;
     }}
+    [data-testid="stFileUploader"] button {{
+        background-color: #FFFFFF !important;
+        color: {input_text} !important;
+        border: 2px solid {ejada_navy_dark} !important;
+        border-radius: 8px !important;
+        font-weight: 800 !important;
+    }}
+    [data-testid="stFileUploader"] button:hover {{
+        background-color: {ejada_navy_dark} !important;
+        color: #FFFFFF !important;
+    }}
 
-    .stTextInput input::placeholder {{ color: {sub_text_color} !important; }}
-    
-    [data-testid="stFileUploader"] > section {{ background-color: {input_bg} !important; border: 1px dashed {border_color} !important; border-radius: 8px !important; }}
-    [data-testid="stFileUploader"] section * {{ color: {input_text} !important; }}
+    /* عناوين الفلاتر والـ Checkboxes */
+    label[data-testid="stWidgetLabel"] p,
+    div[data-testid="stCheckbox"] p {{
+        color: {label_color} !important;
+        font-weight: 800 !important;
+        font-size: 14px !important;
+    }}
 
-    .kpi-card {{ background-color: {card_color}; border-radius: 12px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); border: 1px solid {border_color}; border-right-width: 6px; border-right-style: solid; text-align: right; direction: rtl; position: relative; }}
+    .kpi-card {{ background-color: {card_color}; border-radius: 12px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); border: 1px solid {border_color}; border-right-width: 6px; border-right-style: solid; text-align: right; direction: rtl; position: relative; }}
     .kpi-title {{ color: {kpi_title_color}; font-size: 13px; text-transform: uppercase; font-weight: 800; margin-bottom: 10px; }}
     .kpi-value {{ color: {text_color}; font-size: 30px; font-weight: 900; margin-bottom: 5px; }}
-    .kpi-sub {{ color: {sub_text_color}; font-size: 12px; font-weight: 600; }}
+    .kpi-sub {{ color: {kpi_title_color}; font-size: 12px; font-weight: 600; }}
     .kpi-icon {{ position: absolute; top: 20px; left: 20px; font-size: 24px; opacity: 0.9; }}
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 0. الصف العلوي: زر القمر (تبديل الثيم الفوري) + Overview
+# 0. الصف العلوي: زر القمر + Overview (شغالين 100% بدون تداخل)
 # ==========================================
-top_cols = st.columns([0.5, 1.5, 6], gap="small")
+top_cols = st.columns([0.6, 1.6, 7.8], gap="small")
 
 with top_cols[0]:
-    st.button(" ", key="theme_toggle", on_click=toggle_theme)
+    st.button("🌓", key="theme_toggle", on_click=toggle_theme, help="تغيير الثيم (كحلي / أبيض)")
 
 with top_cols[1]:
-    st.button("📊 Overview", type="primary" if st.session_state.current_page == 'Overview' else "secondary", use_container_width=True, on_click=go_to_overview)
+    st.button("📊 Overview", key="top_overview_btn", type="primary" if st.session_state.current_page == 'Overview' else "secondary", use_container_width=True, on_click=set_page, args=('Overview',))
 
 # ==========================================
-# 1. الهيدر الرئيسي (إجادة في المنتصف + البنك الأهلي SNB ناحية اليسار تماماً)
+# 1. الهيدر الرئيسي (pointer-events: none لمنع حجب الزراير)
 # ==========================================
 st.markdown(f"""
-<div style="position: relative; width: 100%; min-height: 110px; margin-top: -50px; margin-bottom: 25px;">
+<div style="position: relative; width: 100%; min-height: 110px; margin-top: -45px; margin-bottom: 20px; pointer-events: none; z-index: 1;">
     <div style="text-align: center; line-height: 1.1;">
         <div style="color: {header_logo_color}; font-size: 45px; font-weight: 900; font-family: Tahoma, sans-serif;">إجـــادة</div>
         <div style="color: {header_logo_color}; font-size: 20px; letter-spacing: 10px; font-weight: 900; margin-top: -8px; margin-right:-10px;">EJADA</div>
@@ -207,24 +276,24 @@ st.markdown(f"""
 # ==========================================
 # 2. شريط التنقل
 # ==========================================
-nav_cols = st.columns([1, 1.5, 1.3, 1.3, 4.9], gap="small") 
+nav_cols = st.columns([1.1, 1.6, 1.3, 1.3, 4.7], gap="small") 
 
 with nav_cols[0]:
-    st.button("🏠 الرئيسية", type="primary" if st.session_state.current_page == 'Overview' else "secondary", use_container_width=True, on_click=go_to_overview)
+    st.button("🏠 الرئيسية", key="nav_home_btn", type="primary" if st.session_state.current_page == 'Overview' else "secondary", use_container_width=True, on_click=set_page, args=('Overview',))
 
 with nav_cols[1]:
-    st.button("🤝 الوعود القائمة والمكسورة", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=True, on_click=go_to_promises)
+    st.button("🤝 الوعود القائمة والمكسورة", key="nav_prom_btn", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=True, on_click=set_page, args=('Promises',))
 
 with nav_cols[2]:
-    st.button("🚨 تقرير الإهمال", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=True, on_click=go_to_neglect)
+    st.button("🚨 تقرير الإهمال", key="nav_neg_btn", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=True, on_click=set_page, args=('Neglect',))
 
 with nav_cols[3]:
-    st.button("📈 النشاط", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=True, on_click=go_to_activity)
+    st.button("📈 النشاط", key="nav_act_btn", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=True, on_click=set_page, args=('Activity',))
 
 with nav_cols[4]:
     st.markdown("")
 
-st.markdown(f"<hr style='margin: 10px 0 15px 0; border-color: {border_color}; clear: both;'>", unsafe_allow_html=True)
+st.markdown(f"<hr style='margin: 10px 0 20px 0; border-color: {border_color}; clear: both;'>", unsafe_allow_html=True)
 
 # ==========================================
 # دوال تقرير الوعود والإكسيل
@@ -471,8 +540,6 @@ if 'page_files' not in st.session_state:
 
 curr_page = st.session_state.current_page
 
-st.markdown(f"<hr style='margin: 15px 0 25px 0; border-color: {border_color}; clear: both;'>", unsafe_allow_html=True)
-
 # دالة معالجة بيانات أي صفحة
 def process_page_data(uploaded_files):
     if not uploaded_files:
@@ -567,11 +634,11 @@ if page_uploaded is None:
         st.markdown(f"""
         <div style="background-color: {card_color}; border-radius: 15px; text-align: center; padding: 60px 20px; direction: rtl; border: 1px solid {border_color}; margin-top: 20px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
             <h2 style="color: {text_color}; margin-bottom: 15px; font-weight:900;">أهلاً بيكي يا رنا في منصة تقارير شركة إجادة لتحصيل الديون</h2>
-            <p style="color: {sub_text_color}; font-size: 18px; font-weight: bold;">من شريط التنقل بالأعلى، اختاري أي تقرير لعرضه ورفع ملفاته الخاصة.</p>
+            <p style="color: {kpi_title_color}; font-size: 18px; font-weight: bold;">من شريط التنقل بالأعلى، اختاري أي تقرير لعرضه ورفع ملفاته الخاصة.</p>
         </div>
         """, unsafe_allow_html=True)
     else:
-        st.markdown(f"<p style='color: {text_color}; font-weight: 800; font-size: 18px; text-align: right; direction: rtl; margin-top: 20px;'>ارفعي الملفات هنا ي رنا</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color: {label_color}; font-weight: 800; font-size: 18px; text-align: right; direction: rtl; margin-top: 20px;'>ارفعي الملفات هنا ي رنا</p>", unsafe_allow_html=True)
         col_up1, col_up2 = st.columns([7, 3])
         with col_up1:
             files_in = st.file_uploader("ارفعي الملفات هنا ي رنا", type=["xlsx"], accept_multiple_files=True, label_visibility="collapsed", key=f"uploader_{curr_page}")
@@ -585,8 +652,8 @@ else:
     # صفحة الـ Overview الشاملة
     # ==========================================
     if curr_page == 'Overview':
-        st.markdown(f"<h2 style='text-align:center; margin:0; color:{ejada_navy_light}; font-weight:900;'>📊 لوحة القيادة الشاملة (Executive Overview)</h2>", unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align:center; color:#FFFFFF; font-weight: bold; margin-bottom: 30px;'>ملخص أداء محفظة الديون ونشاط المحصلين</p>", unsafe_allow_html=True)
+        st.markdown(f"<h2 style='text-align:center; margin:0; color:{label_color}; font-weight:900;'>📊 لوحة القيادة الشاملة (Executive Overview)</h2>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align:center; color:{sub_text_color}; font-weight: bold; margin-bottom: 30px;'>ملخص أداء محفظة الديون ونشاط المحصلين</p>", unsafe_allow_html=True)
         
         st.markdown(f"""
         <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; margin-bottom: 30px;">
@@ -703,15 +770,15 @@ else:
         tab_active, tab_broken = st.tabs([f"✅ الوعود القائمة ({active_count:,})", f"⚠️ الوعود المكسورة ({broken_count:,})"])
         
         with tab_active:
-            st.markdown(f"<h4 style='text-align:right; direction:rtl; color:#FFFFFF; font-weight:900;'>📊 ملخص تقرير الوعود القائمة (Pivot)</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900;'>📊 ملخص تقرير الوعود القائمة (Pivot)</h4>", unsafe_allow_html=True)
             st.dataframe(pivot_to_frame(build_pivot(active_promises_df, order='first')), use_container_width=True, hide_index=True)
-            st.markdown(f"<h4 style='text-align:right; direction:rtl; color:#FFFFFF; font-weight:900; margin-top:20px;'>📋 تفاصيل شيت الوعود القائمة</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900; margin-top:20px;'>📋 تفاصيل شيت الوعود القائمة</h4>", unsafe_allow_html=True)
             st.dataframe(active_promises_df, use_container_width=True, height=400)
             
         with tab_broken:
-            st.markdown(f"<h4 style='text-align:right; direction:rtl; color:#FFFFFF; font-weight:900;'>📊 ملخص تقرير الوعود المكسورة (Pivot)</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900;'>📊 ملخص تقرير الوعود المكسورة (Pivot)</h4>", unsafe_allow_html=True)
             st.dataframe(pivot_to_frame(build_pivot(broken_promises_df, order='desc')), use_container_width=True, hide_index=True)
-            st.markdown(f"<h4 style='text-align:right; direction:rtl; color:#FFFFFF; font-weight:900; margin-top:20px;'>📋 تفاصيل شيت الوعود المكسورة</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900; margin-top:20px;'>📋 تفاصيل شيت الوعود المكسورة</h4>", unsafe_allow_html=True)
             st.dataframe(broken_promises_df, use_container_width=True, height=400)
             
         st.markdown("<br>", unsafe_allow_html=True)
@@ -727,7 +794,7 @@ else:
         selected_sub_states = st.multiselect("فلاتر الـ Sub State المشمولة:", options=default_sub_states, default=default_sub_states)
         sub_col = 'Sub State' if 'Sub State' in neglect_df.columns else 'sub state' if 'sub state' in neglect_df.columns else None
         final_neglect_df = neglect_df[neglect_df[sub_col].isin(selected_sub_states)] if sub_col else neglect_df
-        st.markdown(f"<p style='text-align:right; direction:rtl; color:#FFFFFF; font-weight: bold;'>العدد الإجمالي: <b style='color:#586F8C; font-size:18px;'>{len(final_neglect_df):,}</b> حساب مهمل</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align:right; direction:rtl; color:{label_color}; font-weight: bold;'>العدد الإجمالي: <b style='color:#586F8C; font-size:18px;'>{len(final_neglect_df):,}</b> حساب مهمل</p>", unsafe_allow_html=True)
         st.dataframe(final_neglect_df, use_container_width=True, height=450)
 
     # ==========================================
@@ -754,7 +821,7 @@ else:
 
         with col_act_left:
             with st.container(border=True):
-                st.markdown(f"<p style='font-size: 13px; color: {sub_text_color}; direction: rtl; text-align: right; margin-bottom: 0;'>التقييم (1) يعني 'ناجحة'، والتقييم (0) يعني 'مغطاة'.</p>", unsafe_allow_html=True)
+                st.markdown(f"<p style='font-size: 13px; color: {sub_text_color}; direction: rtl; text-align: right; margin-bottom: 5px; font-weight: bold;'>التقييم (1) يعني 'ناجحة'، والتقييم (0) يعني 'مغطاة'.</p>", unsafe_allow_html=True)
                 mapping_file = st.file_uploader("شيت موديل النشاط (اختياري)", type=["xlsx"], key="mapping_uploader")
 
         # فلاتر المدى الزمني والشفت والبريك
@@ -823,7 +890,7 @@ else:
                         st.session_state.custom_note_evals = {}
                         
                     for un_note in unmapped_notes:
-                        eval_choice = st.radio(f"كيف تحسبين الملاحظة الآتية: **({un_note})**؟", options=["ناجحة (1)", "مغطاة (0)"], key=f"eval_radio_{un_note}")
+                        eval_choice = st.radio(f"كيف تحسبين الملاحظة الآتية: **({un_note})**؟", options=["ناجحة (1)", "مغطاة (0)"], key=f"eval_radio_{un_note}", horizontal=True)
                         st.session_state.custom_note_evals[un_note] = 1 if "ناجحة" in eval_choice else 0
                         
                 def classify_with_model(val):
@@ -866,9 +933,9 @@ else:
                         <h4 style="margin:0; color: #586F8C; font-weight:900;">🏆 بطل الشفت (الأكثر نشاطاً)</h4>
                         <p style="margin: 5px 0 0 0; color: {text_color}; font-size: 18px;">المحصل: <b style="color:#1F4373; font-size: 22px;">{top_name}</b></p>
                     </div>
-                    <div style="text-align: left; background-color: {bg_color}; padding: 10px 20px; border-radius: 8px; border: 1px solid #586F8C;">
-                        <h3 style="margin:0; color: #586F8C; font-weight:900;">{top_calls:,} مكالمة</h3>
-                        <p style="margin: 0; color: #FFFFFF; font-size: 14px; font-weight: bold;">استحوذ على <span style="color:#99AABF;">{top_pct:.1f}%</span> من إجمالي شغل الفترة</p>
+                    <div style="text-align: left; background-color: {ejada_navy_dark}; padding: 10px 20px; border-radius: 8px; border: 1px solid #586F8C;">
+                        <h3 style="margin:0; color: #FFFFFF; font-weight:900;">{top_calls:,} مكالمة</h3>
+                        <p style="margin: 0; color: #E2E8F0; font-size: 14px; font-weight: bold;">استحوذ على <span style="color:#2CA549;">{top_pct:.1f}%</span> من إجمالي شغل الفترة</p>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -879,7 +946,7 @@ else:
                 <div class="kpi-icon">📞</div>
                 <div class="kpi-title">إجمالي المحاولات</div>
                 <div class="kpi-value">{total_activity:,}</div>
-                <div class="kpi-sub" style="color: {sub_text_color};">بعد إزالة التكرار</div>
+                <div class="kpi-sub">بعد إزالة التكرار</div>
             </div>
             <div class="kpi-card" style="border-right-color: #1F4373;">
                 <div class="kpi-icon">✅</div>
@@ -891,7 +958,7 @@ else:
                 <div class="kpi-icon">🎧</div>
                 <div class="kpi-title">المكالمات المغطاة (0)</div>
                 <div class="kpi-value">{covered_count:,}</div>
-                <div class="kpi-sub" style="color: {sub_text_color};">تقييم مغطاة</div>
+                <div class="kpi-sub">تقييم مغطاة</div>
             </div>
             <div class="kpi-card" style="border-right-color: #586F8C;">
                 <div class="kpi-icon">🎯</div>
