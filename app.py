@@ -60,6 +60,22 @@ GREEN_PHONE_X_SVG = """<svg viewBox="0 0 100 100" width="26" height="26" style="
   <path d="M58 18 L84 44 M84 18 L58 44" fill="none" stroke="#2CA549" stroke-width="10" stroke-linecap="round"/>
 </svg>"""
 
+def format_12h(dt_series):
+    """تحويل الوقت لنظام 12 ساعة بالعربي (ص / م)"""
+    return (
+        dt_series.dt.strftime('%I:%M %p')
+        .str.replace('AM', 'ص', regex=False)
+        .str.replace('PM', 'م', regex=False)
+    )
+
+def format_dt_12h(dt_series):
+    """تحويل التاريخ والوقت لنظام 12 ساعة بالعربي (ص / م)"""
+    return (
+        dt_series.dt.strftime('%Y-%m-%d %I:%M %p')
+        .str.replace('AM', 'ص', regex=False)
+        .str.replace('PM', 'م', regex=False)
+    )
+
 def toggle_theme():
     if st.session_state.theme_choice == 'ثيم إجادة (Navy)':
         st.session_state.theme_choice = 'التصميم الفاتح (Light)'
@@ -306,7 +322,7 @@ st.markdown(f"""
         color: #FFFFFF !important;
     }}
 
-    /* الـ Expander (تفصيل أداء المحصلين) */
+    /* الـ Expander (تفصيل أداء المحصلين + الملاحظات الجديدة) */
     html body .stApp [data-testid="stExpander"] details,
     html body .stApp [data-testid="stExpander"] summary {{
         background-color: #FFFFFF !important;
@@ -319,16 +335,22 @@ st.markdown(f"""
     html body .stApp [data-testid="stExpander"] summary p {{
         color: {input_text} !important;
         -webkit-text-fill-color: {input_text} !important;
+        font-weight: 800 !important;
     }}
     html body .stApp [data-testid="stExpander"] summary svg {{
         fill: {input_text} !important;
     }}
+    /* المحتوى الداخلي للـ Expander عشان الكلام يبان بوضوح على الخلفية البيضاء */
+    html body .stApp [data-testid="stExpander"] details > div,
+    html body .stApp [data-testid="stExpander"] details > div p,
+    html body .stApp [data-testid="stExpander"] details > div label,
+    html body .stApp [data-testid="stExpander"] details > div span {{
+        color: {input_text} !important;
+    }}
 
-    /* التابات وخيارات الراديو */
+    /* التابات وخيارات الراديو خارج الـ Expander */
     html body .stApp [role="tab"],
-    html body .stApp [role="tab"] *,
-    html body .stApp [role="radiogroup"] label,
-    html body .stApp [role="radiogroup"] label * {{
+    html body .stApp [role="tab"] * {{
         color: {label_color} !important;
     }}
 
@@ -389,8 +411,9 @@ st.markdown(f"""
         font-weight: 800 !important;
         font-size: 14px !important;
     }}
-    /* عناوين داخل المربعات البيضاء تكون كحلي دائماً */
-    div[data-testid="stVerticalBlockBorderWrapper"] label[data-testid="stWidgetLabel"] p {{
+    /* عناوين داخل المربعات البيضاء والـ Expander تكون كحلي دائماً */
+    div[data-testid="stVerticalBlockBorderWrapper"] label[data-testid="stWidgetLabel"] p,
+    [data-testid="stExpander"] label[data-testid="stWidgetLabel"] p {{
         color: {input_text} !important;
     }}
 
@@ -1433,7 +1456,7 @@ else:
                 curr_times = act_df['Created_DateTime'].dt.time
                 act_df = act_df[~((curr_times >= time(12, 0)) & (curr_times <= time(12, 30)))]
 
-        # ربط التقييم بعمود Notes والتعامل مع الملاحظات الجديدة
+        # ربط التقييم بعمود Notes والتعامل مع الملاحظات الجديدة داخل Expander تفتحه وتقفله براحتها
         notes_col_name = find_col_in(act_df, ['notes', 'note', 'الملاحظات', 'ملاحظات', 'feedback'])
         
         if mapping_file is not None and notes_col_name:
@@ -1450,14 +1473,18 @@ else:
                 unmapped_notes = [n for n in all_sheet_notes if n not in mapping_dict]
                 
                 if unmapped_notes:
-                    st.warning(f"⚠️ وجدنا ملاحظات جديدة ({len(unmapped_notes)} ملاحظة) غير موجودة في موديل التقييم المرفوع:")
-                    
                     if 'custom_note_evals' not in st.session_state:
                         st.session_state.custom_note_evals = {}
-                        
-                    for un_note in unmapped_notes:
-                        eval_choice = st.radio(f"كيف تحسبين الملاحظة الآتية: **({un_note})**؟", options=["ناجحة (1)", "مغطاة (0)"], key=f"eval_radio_{un_note}", horizontal=True)
-                        st.session_state.custom_note_evals[un_note] = 1 if "ناجحة" in eval_choice else 0
+                    
+                    with st.expander(f"⚠️ ملاحظات جديدة غير موجودة في الموديل ({len(unmapped_notes)} ملاحظة) - اضغطي هنا لفتحها أو قفلها وتحديد تقييمها", expanded=False):
+                        for un_note in unmapped_notes:
+                            eval_choice = st.radio(
+                                f"كيف تحسبين الملاحظة الآتية: **({un_note})**؟",
+                                options=["ناجحة (1)", "مغطاة (0)"],
+                                key=f"eval_radio_{un_note}",
+                                horizontal=True
+                            )
+                            st.session_state.custom_note_evals[un_note] = 1 if "ناجحة" in eval_choice else 0
                         
                 def classify_with_model(val):
                     v_str = str(val).strip()
@@ -1476,7 +1503,12 @@ else:
             target_col = notes_col_name if notes_col_name else find_col_in(act_df, ['التقييم', 'status', 'الحالة', 'sub state', 'result'])
             if target_col:
                 available_vals = act_df[target_col].dropna().astype(str).unique().tolist()
-                selected_success_vals = st.multiselect(f"حددي القيم التي تعتبر (ناجحة = 1) من عمود [{target_col}]:", options=available_vals, default=[v for v in available_vals if str(v).strip() in ['1', '1.0', 'ناجح', 'وعد', 'سداد', 'تم']])
+                with st.expander(f"📝 تحديد الملاحظات التي تعتبر (ناجحة = 1) من عمود [{target_col}] - اضغطي هنا للفتح أو القفل", expanded=False):
+                    selected_success_vals = st.multiselect(
+                        f"حددي القيم التي تعتبر (ناجحة = 1) من عمود [{target_col}]:",
+                        options=available_vals,
+                        default=[v for v in available_vals if str(v).strip() in ['1', '1.0', 'ناجح', 'وعد', 'سداد', 'تم']]
+                    )
                 act_df['Call_Status'] = act_df[target_col].astype(str).apply(lambda x: 'ناجحة' if x in selected_success_vals else 'مغطاة')
             else:
                 act_df['Call_Status'] = 'غير مصنف'
@@ -1536,7 +1568,7 @@ else:
         """, unsafe_allow_html=True)
 
         # ==========================================
-        # الرسوم البيانية الثلاثة في صفحة النشاط بدرجات ألوان الباليت المرفقة
+        # الرسوم البيانية الثلاثة في صفحة النشاط بنظام الـ 12 ساعة
         # ==========================================
         if collector_col and collector_col in act_df.columns and total_activity > 0:
             ch_col1, ch_col2, ch_col3 = st.columns(3, gap="medium")
@@ -1567,7 +1599,7 @@ else:
                     )
                     st.plotly_chart(fig_top, use_container_width=True, config={'displayModeBar': False})
 
-            # 2) الشارت الثانية: تاريخ ووقت أول وآخر إفادة (Notes) لكل محصل
+            # 2) الشارت الثانية: تاريخ ووقت أول وآخر إفادة لكل محصل (بنظام الـ 12 ساعة)
             with ch_col2:
                 with st.container(border=True):
                     if 'Created_DateTime' in act_df.columns and act_df['Created_DateTime'].notna().any():
@@ -1580,13 +1612,14 @@ else:
                             on=collector_col,
                             suffixes=('_first', '_last')
                         )
-                        # ترتيب حسب أصحاب أكبر نشاط (أعلى 10)
                         top_names_list = act_df[collector_col].value_counts().head(10).index.tolist()
                         fl_df = fl_df[fl_df[collector_col].isin(top_names_list)].copy()
                         fl_df['first_hour'] = fl_df['Created_DateTime_first'].dt.hour + fl_df['Created_DateTime_first'].dt.minute / 60.0
                         fl_df['last_hour'] = fl_df['Created_DateTime_last'].dt.hour + fl_df['Created_DateTime_last'].dt.minute / 60.0
-                        fl_df['first_str'] = fl_df['Created_DateTime_first'].dt.strftime('%Y-%m-%d %H:%M')
-                        fl_df['last_str'] = fl_df['Created_DateTime_last'].dt.strftime('%Y-%m-%d %H:%M')
+                        fl_df['first_time_12h'] = format_12h(fl_df['Created_DateTime_first'])
+                        fl_df['last_time_12h'] = format_12h(fl_df['Created_DateTime_last'])
+                        fl_df['first_str_12h'] = format_dt_12h(fl_df['Created_DateTime_first'])
+                        fl_df['last_str_12h'] = format_dt_12h(fl_df['Created_DateTime_last'])
                         first_note_txt = fl_df[f"{notes_col_name}_first"].astype(str) if notes_col_name else pd.Series([""] * len(fl_df))
                         last_note_txt = fl_df[f"{notes_col_name}_last"].astype(str) if notes_col_name else pd.Series([""] * len(fl_df))
 
@@ -1597,9 +1630,10 @@ else:
                             x=fl_df['first_hour'],
                             orientation='h',
                             marker_color="#99AABF",
-                            text=fl_df['Created_DateTime_first'].dt.strftime('%H:%M'),
+                            text=fl_df['first_time_12h'],
                             textposition='auto',
-                            customdata=list(zip(fl_df['first_str'], first_note_txt)),
+                            textfont=dict(color="#1F4373", weight='bold', size=11),
+                            customdata=list(zip(fl_df['first_str_12h'], first_note_txt)),
                             hovertemplate="<b>%{y}</b><br>أول إفادة: %{customdata[0]}<br>الإفادة: %{customdata[1]}<extra></extra>"
                         ))
                         fig_fl.add_trace(go.Bar(
@@ -1608,10 +1642,10 @@ else:
                             x=fl_df['last_hour'],
                             orientation='h',
                             marker_color="#1F4373",
-                            text=fl_df['Created_DateTime_last'].dt.strftime('%H:%M'),
+                            text=fl_df['last_time_12h'],
                             textposition='auto',
-                            textfont=dict(color="#FFFFFF"),
-                            customdata=list(zip(fl_df['last_str'], last_note_txt)),
+                            textfont=dict(color="#FFFFFF", weight='bold', size=11),
+                            customdata=list(zip(fl_df['last_str_12h'], last_note_txt)),
                             hovertemplate="<b>%{y}</b><br>آخر إفادة: %{customdata[0]}<br>الإفادة: %{customdata[1]}<extra></extra>"
                         ))
                         fig_fl.update_layout(
@@ -1622,7 +1656,13 @@ else:
                             font=dict(color="#1F4373", family="Tahoma"),
                             height=360,
                             margin=dict(l=10, r=10, t=45, b=20),
-                            xaxis=dict(title="الساعة (نظام 24 ساعة)", range=[0, 24], gridcolor="#FFFFFF"),
+                            xaxis=dict(
+                                title="الوقت (نظام 12 ساعة)",
+                                range=[0, 24],
+                                tickvals=[0, 4, 8, 12, 16, 20, 24],
+                                ticktext=["12 ص", "4 ص", "8 ص", "12 م", "4 م", "8 م", "12 ص"],
+                                gridcolor="#FFFFFF"
+                            ),
                             yaxis=dict(title="", automargin=True),
                             legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="center", x=0.5)
                         )
@@ -1630,7 +1670,7 @@ else:
                     else:
                         st.info("لا يوجد عمود تاريخ/وقت لحساب أول وآخر إفادة.")
 
-            # 3) الشارت الثالثة: أول إفادة لكل محصل بعد البريك (بعد 12:30 ظهراً)
+            # 3) الشارت الثالثة: ميعاد أول إفادة لكل محصل بعد البريك (بعد 12:30 م) بنظام الـ 12 ساعة
             with ch_col3:
                 with st.container(border=True):
                     if 'Created_DateTime' in act_df.columns and act_df['Created_DateTime'].notna().any():
@@ -1640,9 +1680,9 @@ else:
                             top_names_list = act_df[collector_col].value_counts().head(10).index.tolist()
                             first_ab = first_ab[first_ab[collector_col].isin(top_names_list)].copy()
                             first_ab['ab_hour'] = first_ab['Created_DateTime'].dt.hour + first_ab['Created_DateTime'].dt.minute / 60.0
-                            first_ab['ab_time_str'] = first_ab['Created_DateTime'].dt.strftime('%Y-%m-%d %H:%M')
+                            first_ab['ab_time_12h'] = format_12h(first_ab['Created_DateTime'])
+                            first_ab['ab_dt_12h'] = format_dt_12h(first_ab['Created_DateTime'])
                             ab_note_txt = first_ab[notes_col_name].astype(str) if notes_col_name and notes_col_name in first_ab.columns else pd.Series(["-"] * len(first_ab))
-                            first_ab['short_note'] = ab_note_txt.apply(lambda s: s[:18] + ".." if len(str(s)) > 18 else str(s))
 
                             ab_colors = [CHART_PALETTE[i % 4] for i in range(len(first_ab))]
                             fig_ab = go.Figure(go.Bar(
@@ -1650,20 +1690,26 @@ else:
                                 x=first_ab['ab_hour'],
                                 orientation='h',
                                 marker=dict(color=ab_colors, line=dict(color="#1F4373", width=1)),
-                                text=first_ab['Created_DateTime'].dt.strftime('%H:%M') + " | " + first_ab['short_note'],
+                                text=first_ab['ab_time_12h'],
                                 textposition='auto',
-                                textfont=dict(color="#FFFFFF", weight='bold', size=11),
-                                customdata=list(zip(first_ab['ab_time_str'], ab_note_txt)),
-                                hovertemplate="<b>%{y}</b><br>وقت أول إفادة بعد البريك: %{customdata[0]}<br>الإفادة (Notes): %{customdata[1]}<extra></extra>"
+                                textfont=dict(color="#FFFFFF", weight='bold', size=12),
+                                customdata=list(zip(first_ab['ab_dt_12h'], ab_note_txt)),
+                                hovertemplate="<b>%{y}</b><br>ميعاد أول إفادة بعد البريك: %{customdata[0]}<br>الإفادة (Notes): %{customdata[1]}<extra></extra>"
                             ))
                             fig_ab.update_layout(
-                                title=dict(text="☕ أول إفادة (Notes) بعد البريك (12:30)", x=0.5, xanchor='center', font=dict(color="#1F4373", size=15, weight='bold')),
+                                title=dict(text="☕ ميعاد أول إفادة بعد البريك (12:30 م)", x=0.5, xanchor='center', font=dict(color="#1F4373", size=15, weight='bold')),
                                 paper_bgcolor="#FFFFFF",
                                 plot_bgcolor="#F2F2F2",
                                 font=dict(color="#1F4373", family="Tahoma"),
                                 height=360,
                                 margin=dict(l=10, r=10, t=45, b=20),
-                                xaxis=dict(title="الساعة (بعد 12:30 ظهراً)", range=[12, 24], gridcolor="#FFFFFF"),
+                                xaxis=dict(
+                                    title="ميعاد أول إفادة (نظام 12 ساعة)",
+                                    range=[12, 24],
+                                    tickvals=[12, 14, 16, 18, 20, 22, 24],
+                                    ticktext=["12 م", "2 م", "4 م", "6 م", "8 م", "10 م", "12 ص"],
+                                    gridcolor="#FFFFFF"
+                                ),
                                 yaxis=dict(title="", automargin=True)
                             )
                             st.plotly_chart(fig_ab, use_container_width=True, config={'displayModeBar': False})
