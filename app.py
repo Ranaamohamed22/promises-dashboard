@@ -18,7 +18,7 @@ from openpyxl.utils import get_column_letter
 st.set_page_config(page_title="SNB Promises Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
 # ==========================================
-# ثيم Streamlit الفاتح: بيخلّي كل الحقول والمربعات (القوائم، الاختيارات، الرفع) بيضاء
+# ثيم Streamlit الفاتح: بيخلّي كل الحقول والمربعات بيضاء
 # ==========================================
 _LIGHT_THEME = {
     "base": "light",
@@ -45,30 +45,26 @@ if 'act_uploader_ver' not in st.session_state:
     st.session_state.act_uploader_ver = 0
 
 # ==========================================
-# دالات استجابة سريعة للزراير (Callbacks) والأيقونات المخصصة (SVG ثابت لا ينقطع أبداً)
+# الأيقونات والثيمات
 # ==========================================
-PHONE_ICON_COLOR = "#1F4373"  # لون لوجو التليفون في عنوان تقرير النشاط
+PHONE_ICON_COLOR = "#1F4373"
 
-# لوجو التليفون/الموبايل الخاص بعنوان "تقرير نشاط المحصلين" (SVG نقي وعالي الدقة)
 PHONE_HEADER_SVG = f"""<svg viewBox="0 0 24 24" width="38" height="38" fill="{PHONE_ICON_COLOR}" style="display:block; flex-shrink:0;">
   <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
 </svg>"""
 
-# اللوجو الأول: علامة الصح الخضراء داخل الشكل المزخرف (للمكالمات الناجحة)
 GREEN_CHECK_SVG = """<svg viewBox="0 0 100 100" width="26" height="26" style="display:block;">
   <path fill="#2CA549" d="M50 4 C54 4 57 9 61 10 C65 11 70 8 73 10 C77 13 76 19 79 22 C82 25 88 24 90 28 C92 31 89 36 90 40 C91 44 96 46 96 50 C96 54 91 56 90 60 C89 64 92 69 90 72 C88 76 82 75 79 78 C76 81 77 87 73 90 C70 92 65 89 61 90 C57 91 54 96 50 96 C46 96 43 91 39 90 C35 89 30 92 27 90 C23 87 24 81 21 78 C18 75 12 76 10 72 C8 69 11 64 10 60 C9 56 4 54 4 50 C4 46 9 44 10 40 C11 36 8 31 10 28 C12 24 18 25 21 22 C24 19 23 13 27 10 C30 8 35 11 39 10 C43 9 46 4 50 4 Z"/>
   <circle cx="50" cy="50" r="28" fill="#82D197"/>
   <path d="M38 51 L46 59 L63 42" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>"""
 
-# اللوجو الثاني: سماعة التليفون وعليها علامة X باللون الأخضر (للمكالمات المغطاة)
 GREEN_PHONE_X_SVG = """<svg viewBox="0 0 100 100" width="26" height="26" style="display:block;">
   <path d="M26 20 C17 20 12 28 12 37 C12 63 37 88 63 88 C72 88 80 83 80 74 C80 69 76 65 71 63 L61 60 C57 59 52 60 49 64 L45 68 C36 63 29 56 24 47 L28 43 C32 40 33 35 32 31 L29 21 C28 18 27 20 26 20 Z" fill="none" stroke="#2CA549" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M58 18 L84 44 M84 18 L58 44" fill="none" stroke="#2CA549" stroke-width="10" stroke-linecap="round"/>
 </svg>"""
 
 def format_12h(dt_series):
-    """تحويل الوقت لنظام 12 ساعة بالعربي (ص / م)"""
     return (
         dt_series.dt.strftime('%I:%M %p')
         .str.replace('AM', 'ص', regex=False)
@@ -76,7 +72,6 @@ def format_12h(dt_series):
     )
 
 def format_dt_12h(dt_series):
-    """تحويل التاريخ والوقت لنظام 12 ساعة بالعربي (ص / م)"""
     return (
         dt_series.dt.strftime('%Y-%m-%d %I:%M %p')
         .str.replace('AM', 'ص', regex=False)
@@ -96,9 +91,6 @@ def clear_activity_files():
     st.session_state.page_files['Activity'] = None
     st.session_state.act_uploader_ver += 1
 
-# ==========================================
-# دالة عامة للبحث عن الأعمدة
-# ==========================================
 def find_col_in(target_df, candidates):
     if target_df is None or target_df.empty:
         return None
@@ -108,14 +100,10 @@ def find_col_in(target_df, candidates):
                 return col
     return None
 
-# ==========================================
-# إعدادات الثيم والألوان وباليت الرسوم البيانية
-# ==========================================
 ejada_navy_dark = "#1F4373"
 ejada_navy_light = "#304D73"
 ejada_grey_blue = "#586F8C"
 ejada_border_light = "#99AABF"
-ejada_soft_grey = "#F2F2F2"
 white_bg = "#FFFFFF"  
 snb_green = "#2CA549"  
 
@@ -144,7 +132,7 @@ else:
     border_color = "#CBD5E1"
     primary_color = ejada_navy_dark
     primary_text = "#FFFFFF"
-    text_color = "#1F4373" 
+    text_color = ejada_navy_dark 
     label_color = "#1F4373"
     sub_text_color = "#475569"
     gauge_bg = "#E2E8F0"
@@ -156,9 +144,6 @@ else:
     input_bg = "#FFFFFF"
     input_text = "#1F4373"
 
-# ==========================================
-# تصميم الـ UI الديناميكي (CSS) وتبييض الشرائط السوداء بالكامل
-# ==========================================
 st.markdown(f"""
 <style>
     [data-testid="collapsedControl"] {{display: none !important;}}
@@ -168,7 +153,6 @@ st.markdown(f"""
 
     .block-container {{ padding-top: 2.5rem !important; padding-left: 1.5rem !important; padding-right: 1.5rem !important; max-width: 100% !important; direction: rtl; text-align: right; }}
     
-    /* ضمان عمل الزراير العلوية وعدم تغطيتها بأي عنصر */
     div[data-testid="stButton"] {{
         position: relative !important;
         z-index: 9999 !important;
@@ -212,7 +196,6 @@ st.markdown(f"""
         cursor: pointer !important;
     }}
 
-    /* تصغير حدود المربعات (Containers) لتكون على قد خانة رفع الملفات بالضبط */
     div[data-testid="stVerticalBlockBorderWrapper"] {{
         padding: 10px 14px !important;
         border-radius: 10px !important;
@@ -223,7 +206,6 @@ st.markdown(f"""
         gap: 0.4rem !important;
     }}
 
-    /* زرار X الصغير لمسح الملف المرفوع */
     div.st-key-clear_act_files_btn div[data-testid="stButton"] > button {{
         background-color: #EF4444 !important;
         color: #FFFFFF !important;
@@ -242,7 +224,6 @@ st.markdown(f"""
         font-weight: 900 !important;
     }}
 
-    /* ===== تبييض كل المربعات السوداء (Selectbox / Multiselect / Checkbox / Expander) ===== */
     html body .stApp div[data-baseweb="select"] > div,
     html body .stApp [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
     html body .stApp [data-testid="stMultiSelect"] div[data-baseweb="select"] > div,
@@ -271,7 +252,6 @@ st.markdown(f"""
         color: {input_text} !important;
     }}
 
-    /* القائمة المنسدلة لما تفتح */
     html body div[data-baseweb="popover"],
     html body div[data-baseweb="popover"] > div,
     html body div[data-baseweb="popover"] ul,
@@ -294,7 +274,6 @@ st.markdown(f"""
         background-color: #E2E8F0 !important;
     }}
 
-    /* الاختيارات المحددة داخل Multiselect */
     html body .stApp span[data-baseweb="tag"] {{
         background-color: {ejada_navy_dark} !important;
         background: {ejada_navy_dark} !important;
@@ -308,7 +287,6 @@ st.markdown(f"""
         fill: #FFFFFF !important;
     }}
 
-    /* مربع الـ Checkbox */
     html body .stApp label[data-baseweb="checkbox"] > span:first-child,
     html body .stApp label[data-baseweb="checkbox"] > div:first-child,
     html body .stApp div[data-baseweb="checkbox"] > span:first-child,
@@ -329,7 +307,6 @@ st.markdown(f"""
         color: #FFFFFF !important;
     }}
 
-    /* الـ Expander (تفصيل أداء المحصلين + الملاحظات الجديدة) */
     html body .stApp [data-testid="stExpander"] details,
     html body .stApp [data-testid="stExpander"] summary {{
         background-color: #FFFFFF !important;
@@ -354,13 +331,11 @@ st.markdown(f"""
         color: {input_text} !important;
     }}
 
-    /* التابات وخيارات الراديو خارج الـ Expander */
     html body .stApp [role="tab"],
     html body .stApp [role="tab"] * {{
         color: {label_color} !important;
     }}
 
-    /* تبييض منطقة رفع الملفات وتصغير ارتفاعها وإظهار علامة X بوضوح */
     [data-testid="stFileUploader"] > section {{
         background-color: #FFFFFF !important;
         border: 2px dashed {border_color} !important;
@@ -383,7 +358,6 @@ st.markdown(f"""
         background-color: {ejada_navy_dark} !important;
         color: #FFFFFF !important;
     }}
-    /* تنسيق الملف المرفوع وعلامة X لحذفه */
     [data-testid="stFileUploaderFile"] {{
         background-color: #FFFFFF !important;
         border: 1px solid {border_color} !important;
@@ -392,7 +366,7 @@ st.markdown(f"""
         margin-top: 4px !important;
     }}
     [data-testid="stFileUploaderFile"] * {{
-        color: {input_text} !important;
+        color: {label_color} !important;
     }}
     [data-testid="stFileUploaderDeleteBtn"] button {{
         background-color: #EF4444 !important;
@@ -410,7 +384,6 @@ st.markdown(f"""
         color: #FFFFFF !important;
     }}
 
-    /* عناوين الفلاتر والـ Checkboxes */
     label[data-testid="stWidgetLabel"] p,
     div[data-testid="stCheckbox"] p {{
         color: {label_color} !important;
@@ -422,7 +395,6 @@ st.markdown(f"""
         color: {input_text} !important;
     }}
 
-    /* ===== تصغير مربعات الـ KPIs وتكبير خط العناوين في المنتصف ===== */
     .kpi-grid-4 {{
         display: grid;
         grid-template-columns: repeat(4, minmax(180px, 270px));
@@ -560,7 +532,6 @@ PIVOT_AMT = 'Net Amount'
 FIXED_NOTES = ['NPL', 'Dpd60', 'Dpd30']
 SUM_FMT = '_(* #,##0_);_(* \\(#,##0\\);_(* "-"??_);_(@_)'
 
-
 def build_pivot(df, order='desc'):
     need = [PIVOT_TEAM, PIVOT_COLL, PIVOT_NOTE, PIVOT_ACC, PIVOT_AMT]
     if df is None or df.empty or any(c not in df.columns for c in need):
@@ -606,7 +577,6 @@ def build_pivot(df, order='desc'):
     }
     return {'notes': notes, 'teams': teams, 'grand': grand}
 
-
 def pivot_to_frame(p):
     cols = ['اسم المشرف', 'اسم المحصل']
     for n in p['notes']:
@@ -628,7 +598,6 @@ def pivot_to_frame(p):
     out.append(row)
     return pd.DataFrame(out, columns=cols)
 
-
 def _prepare_for_output(df):
     d = df.copy()
     for c in ['Amount', 'Net Amount', 'Payment']:
@@ -638,7 +607,6 @@ def _prepare_for_output(df):
         if c in d.columns:
             d[c] = pd.to_datetime(d[c], errors='coerce')
     return d
-
 
 def _write_df_sheet(ws, df):
     if df is None or len(df.columns) == 0:
@@ -661,7 +629,6 @@ def _write_df_sheet(ws, df):
                 cell.number_format = 'yyyy-mm-dd'
             elif isinstance(v, float):
                 cell.number_format = '#,##0.00'
-
 
 def _write_pivot_sheet(ws, p, title):
     notes = p['notes']
@@ -762,34 +729,6 @@ def _write_pivot_sheet(ws, p, title):
         ws.column_dimensions[get_column_letter(c)].width = 18.9
     ws.column_dimensions[get_column_letter(tc)].width = 16.7
     ws.column_dimensions[get_column_letter(tc + 1)].width = 17.6
-
-
-_ILLEGAL_XML = re.compile('[\x00-\x08\x0b\x0c\x0e-\x1f]')
-
-
-def _xa(v):
-    return _xml_escape(_ILLEGAL_XML.sub('', str(v)), {'"': '&quot;'})
-
-
-def _cell_kind(v):
-    if isinstance(v, datetime):
-        return 'd'
-    if isinstance(v, bool):
-        return 's'
-    if isinstance(v, (int, float)):
-        return 'n'
-    return 's'
-
-
-def _normalize_value(v):
-    if v is None or (not isinstance(v, (list, tuple)) and pd.isna(v)):
-        return None
-    if isinstance(v, pd.Timestamp):
-        return v.to_pydatetime()
-    if hasattr(v, 'item') and not isinstance(v, (str, bytes)):
-        return v.item()
-    return v
-
 
 def _pivot_parts(data_df, data_sheet, p, order, idx):
     df = _prepare_for_output(data_df)
@@ -951,7 +890,6 @@ def _pivot_parts(data_df, data_sheet, p, order, idx):
     )
     return cache_def, cache_records, pivot_def
 
-
 def inject_pivot_tables(xlsx_bytes, specs):
     zin = zipfile.ZipFile(io.BytesIO(xlsx_bytes))
     files = {n: zin.read(n) for n in zin.namelist()}
@@ -1026,12 +964,10 @@ def inject_pivot_tables(xlsx_bytes, specs):
     out.seek(0)
     return out
 
-
 def _can_pivot(df):
     need = [PIVOT_TEAM, PIVOT_COLL, PIVOT_NOTE, PIVOT_ACC, PIVOT_AMT]
     return (df is not None and len(df) > 0 and all(c in df.columns for c in need)
             and len(set(df.columns)) == len(df.columns))
-
 
 def build_report_xlsx(active_df, broken_df, neglect_df=None):
     wb = Workbook()
@@ -1187,7 +1123,6 @@ def render_activity_header():
     """, unsafe_allow_html=True)
 
 def render_activity_boxes(activity_base_df=None):
-    """الترتيب (من اليمين): ملف الموديل - ارفعي الملف هنا يا رنا (مع زر X للمسح) - اسم المحصل"""
     col_model, col_file, col_coll = st.columns([1, 1, 1], gap="medium")
 
     with col_model:
@@ -1232,7 +1167,6 @@ def render_activity_boxes(activity_base_df=None):
 
     return selected_collector, mapping_file, collector_col_name
 
-# التحقق من الملفات الخاصة بالصفحة الحالية فقط
 page_uploaded = st.session_state.page_files[curr_page]
 
 if page_uploaded is None:
@@ -1258,9 +1192,6 @@ if page_uploaded is None:
 else:
     active_promises_df, broken_promises_df, neglect_df, activity_base_df, report_bytes, total_rows, total_unhandled, active_count, broken_count, neglect_count, total_activity_count = process_page_data(st.session_state.page_files[curr_page])
 
-    # ==========================================
-    # صفحة الـ Overview الشاملة
-    # ==========================================
     if curr_page == 'Overview':
         st.markdown(f"<h2 style='text-align:center; margin:0; color:{label_color}; font-weight:900;'>📊 لوحة القيادة الشاملة (Executive Overview)</h2>", unsafe_allow_html=True)
         st.markdown(f"<p style='text-align:center; color:{sub_text_color}; font-weight: bold; margin-bottom: 30px;'>ملخص أداء محفظة الديون ونشاط المحصلين</p>", unsafe_allow_html=True)
@@ -1367,9 +1298,6 @@ else:
         st.markdown("<br>", unsafe_allow_html=True)
         st.download_button(label=f"📥 تحميل التقرير الكامل.xlsx", data=report_bytes, file_name=f"Daily_Promises_Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
-    # ==========================================
-    # صفحة الوعود القائمة والمكسورة (مدمجة)
-    # ==========================================
     elif curr_page == 'Promises':
         st.markdown(f"""
         <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; text-align: right; margin-bottom: 20px;">
@@ -1408,13 +1336,12 @@ else:
         st.dataframe(final_neglect_df, use_container_width=True, height=450)
 
     # ==========================================
-    # صفحة تقرير النشاط
+    # صفحة تقرير النشاط (مع الرسوم البيانية الثلاثة المحدثة بالكامل)
     # ==========================================
     elif curr_page == 'Activity':
         render_activity_header()
         selected_collector, mapping_file, collector_col_name = render_activity_boxes(activity_base_df)
 
-        # فلاتر المدى الزمني والشفت والبريك
         filter_act_col1, filter_act_col2, filter_act_col3, filter_act_col4 = st.columns([1.5, 2, 1.5, 1.5])
         with filter_act_col1:
             time_range_mode = st.selectbox("📅 مدى التقرير:", ["يومي", "أسبوعي", "شهري"])
@@ -1457,7 +1384,7 @@ else:
                 curr_times = act_df['Created_DateTime'].dt.time
                 act_df = act_df[~((curr_times >= time(12, 0)) & (curr_times <= time(12, 30)))]
 
-        # ربط التقييم بعمود Notes والتعامل مع الملاحظات الجديدة داخل Expander تفتحه وتقفله براحتها
+        # ربط التقييم بعمود Notes داخل Expander قابل للفتح والقفل
         notes_col_name = find_col_in(act_df, ['notes', 'note', 'الملاحظات', 'ملاحظات', 'feedback'])
         
         if mapping_file is not None and notes_col_name:
@@ -1480,7 +1407,7 @@ else:
                     with st.expander(f"⚠️ ملاحظات جديدة غير موجودة في الموديل ({len(unmapped_notes)} ملاحظة) - اضغطي هنا لفتحها أو قفلها وتحديد تقييمها", expanded=False):
                         for un_note in unmapped_notes:
                             eval_choice = st.radio(
-                                f"كيف تحسبين الملاحظة الآتية: **({un_note})**؟",
+                                f"كيف تحسبين الملاحظة الآتية من عمود [Notes]: **({un_note})**؟",
                                 options=["ناجحة (1)", "مغطاة (0)"],
                                 key=f"eval_radio_{un_note}",
                                 horizontal=True
@@ -1504,9 +1431,9 @@ else:
             target_col = notes_col_name if notes_col_name else find_col_in(act_df, ['التقييم', 'status', 'الحالة', 'sub state', 'result'])
             if target_col:
                 available_vals = act_df[target_col].dropna().astype(str).unique().tolist()
-                with st.expander(f"📝 تحديد الملاحظات التي تعتبر (ناجحة = 1) من عمود [{target_col}] - اضغطي هنا للفتح أو القفل", expanded=False):
+                with st.expander(f"📝 تحديد الملاحظات التي تعتبر (ناجحة = 1) من عمود [Notes] - اضغطي هنا للفتح أو القفل", expanded=False):
                     selected_success_vals = st.multiselect(
-                        f"حددي القيم التي تعتبر (ناجحة = 1) من عمود [{target_col}]:",
+                        f"حددي القيم التي تعتبر (ناجحة = 1) من عمود [Notes]:",
                         options=available_vals,
                         default=[v for v in available_vals if str(v).strip() in ['1', '1.0', 'ناجح', 'وعد', 'سداد', 'تم']]
                     )
@@ -1569,12 +1496,12 @@ else:
         """, unsafe_allow_html=True)
 
         # ==========================================
-        # الرسوم البيانية الثلاثة في صفحة النشاط بنظام الـ 12 ساعة
+        # الرسوم البيانية الثلاثة في صفحة النشاط
         # ==========================================
         if collector_col and collector_col in act_df.columns and total_activity > 0:
             ch_col1, ch_col2, ch_col3 = st.columns(3, gap="medium")
 
-            # 1) الشارت الأولى: أكبر محصلين عملوا مكالمات
+            # 1) الشارت الأولى: أكبر محصلين مكالمات
             with ch_col1:
                 with st.container(border=True):
                     top_c = act_df[collector_col].value_counts().head(10).iloc[::-1]
@@ -1589,7 +1516,7 @@ else:
                         textfont=dict(color="#FFFFFF", weight='bold', size=12)
                     ))
                     fig_top.update_layout(
-                        title=dict(text="📞 أكبر المحصلين مكالمات", x=0.5, xanchor='center', font=dict(color="#1F4373", size=19, weight='bold')),
+                        title=dict(text="<b>📞 أكبر المحصلين مكالمات</b>", x=0.5, xanchor='center', font=dict(color="#1F4373", size=19, weight='bold')),
                         paper_bgcolor="#FFFFFF",
                         plot_bgcolor="#F2F2F2",
                         font=dict(color="#1F4373", family="Tahoma", size=12),
@@ -1600,7 +1527,7 @@ else:
                     )
                     st.plotly_chart(fig_top, use_container_width=True, config={'displayModeBar': False})
 
-            # 2) الشارت الثانية: ميعاد أول وآخر إفادة لكل محصل (بنظام الـ 12 ساعة)
+            # 2) الشارت الثانية: ميعاد أول وآخر إفادة (بالوقت فقط ونظام 12 ساعة) وبخط عريض Bold
             with ch_col2:
                 with st.container(border=True):
                     if 'Created_DateTime' in act_df.columns and act_df['Created_DateTime'].notna().any():
@@ -1619,8 +1546,6 @@ else:
                         fl_df['last_hour'] = fl_df['Created_DateTime_last'].dt.hour + fl_df['Created_DateTime_last'].dt.minute / 60.0
                         fl_df['first_time_12h'] = format_12h(fl_df['Created_DateTime_first'])
                         fl_df['last_time_12h'] = format_12h(fl_df['Created_DateTime_last'])
-                        fl_df['first_str_12h'] = format_dt_12h(fl_df['Created_DateTime_first'])
-                        fl_df['last_str_12h'] = format_dt_12h(fl_df['Created_DateTime_last'])
                         first_note_txt = fl_df[f"{notes_col_name}_first"].astype(str) if notes_col_name else pd.Series([""] * len(fl_df))
                         last_note_txt = fl_df[f"{notes_col_name}_last"].astype(str) if notes_col_name else pd.Series([""] * len(fl_df))
 
@@ -1653,14 +1578,14 @@ else:
                         ))
                         fig_fl.update_layout(
                             barmode='group',
-                            title=dict(text="🕒 ميعاد أول وآخر إفادة", x=0.5, xanchor='center', font=dict(color="#1F4373", size=19, weight='bold')),
+                            title=dict(text="<b>🕒 ميعاد أول وآخر إفادة</b>", x=0.5, xanchor='center', font=dict(color="#1F4373", size=19, weight='bold')),
                             paper_bgcolor="#FFFFFF",
                             plot_bgcolor="#F2F2F2",
                             font=dict(color="#1F4373", family="Tahoma", size=12),
                             height=max(520, len(fl_df) * 58 + 170),
                             margin=dict(l=20, r=65, t=65, b=45),
                             xaxis=dict(
-                                title="الوقت (ساعات ودقائق - نظام 12 ساعة)",
+                                title="الوقت (نظام 12 ساعة)",
                                 range=[0, 27],
                                 tickvals=[0, 4, 8, 12, 16, 20, 24],
                                 ticktext=["12:00 ص", "4:00 ص", "8:00 ص", "12:00 م", "4:00 م", "8:00 م", "12:00 ص"],
@@ -1673,7 +1598,7 @@ else:
                     else:
                         st.info("لا يوجد عمود تاريخ/وقت لحساب أول وآخر إفادة.")
 
-            # 3) الشارت الثالثة: ميعاد أول إفادة لكل محصل بعد البريك (بعد 12:30 م) بنظام الـ 12 ساعة
+            # 3) الشارت الثالثة: ميعاد أول إفادة بعد البريك (بنظام 12 ساعة)
             with ch_col3:
                 with st.container(border=True):
                     if 'Created_DateTime' in act_df.columns and act_df['Created_DateTime'].notna().any():
@@ -1684,7 +1609,6 @@ else:
                             first_ab = first_ab[first_ab[collector_col].isin(top_names_list)].copy()
                             first_ab['ab_hour'] = first_ab['Created_DateTime'].dt.hour + first_ab['Created_DateTime'].dt.minute / 60.0
                             first_ab['ab_time_12h'] = format_12h(first_ab['Created_DateTime'])
-                            first_ab['ab_dt_12h'] = format_dt_12h(first_ab['Created_DateTime'])
                             ab_note_txt = first_ab[notes_col_name].astype(str) if notes_col_name and notes_col_name in first_ab.columns else pd.Series(["-"] * len(first_ab))
 
                             ab_colors = [CHART_PALETTE[i % 4] for i in range(len(first_ab))]
@@ -1697,11 +1621,11 @@ else:
                                 textposition='outside',
                                 textfont=dict(color="#1F4373", weight='bold', size=12),
                                 cliponaxis=False,
-                                customdata=list(zip(first_ab['ab_dt_12h'], ab_note_txt)),
+                                customdata=list(zip(first_ab['ab_time_12h'], ab_note_txt)),
                                 hovertemplate="<b>%{y}</b><br>ميعاد أول إفادة بعد البريك: %{customdata[0]}<br>الإفادة (Notes): %{customdata[1]}<extra></extra>"
                             ))
                             fig_ab.update_layout(
-                                title=dict(text="☕ ميعاد أول إفادة بعد البريك (12:30 م)", x=0.5, xanchor='center', font=dict(color="#1F4373", size=19, weight='bold')),
+                                title=dict(text="<b>☕ ميعاد أول إفادة بعد البريك (12:30 م)</b>", x=0.5, xanchor='center', font=dict(color="#1F4373", size=19, weight='bold')),
                                 paper_bgcolor="#FFFFFF",
                                 plot_bgcolor="#F2F2F2",
                                 font=dict(color="#1F4373", family="Tahoma", size=12),
