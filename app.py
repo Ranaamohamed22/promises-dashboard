@@ -1452,4 +1452,30 @@ else:
                 st.markdown(f"""
                 <div style="background-color: {card_color}; border-radius: 12px; padding: 20px 30px; border: 2px solid #586F8C; direction:rtl; text-align: right; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
                     <div>
-                        <h4 style="margin:0; color: #586F8C; font-weight:900;">🏆 بطل الشفت
+                        <h4 style="margin:0; color: #586F8C; font-weight:900;">🏆 بطل الشفت (الأكثر نشاطاً)</h4>
+                        <p style="margin: 5px 0 0 0; color: {text_color}; font-size: 18px;">المحصل: <b style="color:#1F4373; font-size: 22px;">{top_name}</b></p>
+                    </div>
+                    <div style="text-align: left; background-color: {ejada_navy_dark}; padding: 10px 20px; border-radius: 8px; border: 1px solid #586F8C;">
+                        <h3 style="margin:0; color: #FFFFFF; font-weight:900;">{top_calls:,} مكالمة</h3>
+                        <p style="margin: 0; color: #E2E8F0; font-size: 14px; font-weight: bold;">استحوذ على <span style="color:#2CA549;">{top_pct:.1f}%</span> من إجمالي شغل الفترة</p>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; direction: rtl;">
+            <div class="kpi-card" style="border-right-color: {border_color};">
+                <div class="kpi-icon">📞</div>
+                <div class="kpi-title">إجمالي المحاولات</div>
+                <div class="kpi-value">{total_activity:,}</div>
+                <div class="kpi-sub">بعد إزالة التكرار</div>
+            </div>
+            <div class="kpi-card" style="border-right-color: #2CA549;">
+                <div class="kpi-icon">{GREEN_CHECK_SVG}</div>
+                <div class="kpi-title">المكالمات الناجحة (1)</div>
+                <div class="kpi-value">{success_count:,}</div>
+                <div class="kpi-sub" style="color: #2CA549;">تقييم ناجح</div>
+            </div>
+            <div class="kpi-card" style="border-right-color: #2CA549;">
+                <div class="kpi-icon">{GREEN_PHONE_X_SVG}</div>
+                <div class="kpi-title">المكالمات المغط
