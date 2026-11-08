@@ -5,6 +5,9 @@ from datetime import date, datetime, time, timedelta
 import io
 import base64
 import os
+import re
+import zipfile
+from xml.sax.saxutils import escape as _xml_escape
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -42,10 +45,14 @@ if 'act_uploader_ver' not in st.session_state:
     st.session_state.act_uploader_ver = 0
 
 # ==========================================
-# دالات استجابة سريعة للزراير (Callbacks) والأيقونات المخصصة
+# دالات استجابة سريعة للزراير (Callbacks) والأيقونات المخصصة (SVG ثابت لا ينقطع أبداً)
 # ==========================================
-PHONE_ICON_B64 = "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"
-PHONE_ICON_COLOR = "#1F4373"  # لون لوجو التليفون
+PHONE_ICON_COLOR = "#1F4373"  # لون لوجو التليفون في عنوان تقرير النشاط
+
+# لوجو التليفون/الموبايل الخاص بعنوان "تقرير نشاط المحصلين" (SVG نقي وعالي الدقة)
+PHONE_HEADER_SVG = f"""<svg viewBox="0 0 24 24" width="38" height="38" fill="{PHONE_ICON_COLOR}" style="display:block; flex-shrink:0;">
+  <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
+</svg>"""
 
 # اللوجو الأول: علامة الصح الخضراء داخل الشكل المزخرف (للمكالمات الناجحة)
 GREEN_CHECK_SVG = """<svg viewBox="0 0 100 100" width="26" height="26" style="display:block;">
@@ -340,7 +347,6 @@ st.markdown(f"""
     html body .stApp [data-testid="stExpander"] summary svg {{
         fill: {input_text} !important;
     }}
-    /* المحتوى الداخلي للـ Expander عشان الكلام يبان بوضوح على الخلفية البيضاء */
     html body .stApp [data-testid="stExpander"] details > div,
     html body .stApp [data-testid="stExpander"] details > div p,
     html body .stApp [data-testid="stExpander"] details > div label,
@@ -411,7 +417,6 @@ st.markdown(f"""
         font-weight: 800 !important;
         font-size: 14px !important;
     }}
-    /* عناوين داخل المربعات البيضاء والـ Expander تكون كحلي دائماً */
     div[data-testid="stVerticalBlockBorderWrapper"] label[data-testid="stWidgetLabel"] p,
     [data-testid="stExpander"] label[data-testid="stWidgetLabel"] p {{
         color: {input_text} !important;
@@ -490,7 +495,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 0. الصف العلوي: زر القمر + Overview (شغالين 100% بدون تداخل)
+# 0. الصف العلوي: زر القمر + Overview
 # ==========================================
 top_cols = st.columns([0.6, 1.6, 7.8], gap="small")
 
@@ -501,7 +506,7 @@ with top_cols[1]:
     st.button("📊 Overview", key="top_overview_btn", type="primary" if st.session_state.current_page == 'Overview' else "secondary", use_container_width=True, on_click=set_page, args=('Overview',))
 
 # ==========================================
-# 1. الهيدر الرئيسي (pointer-events: none لمنع حجب الزراير)
+# 1. الهيدر الرئيسي
 # ==========================================
 st.markdown(f"""
 <div style="position: relative; width: 100%; min-height: 110px; margin-top: -45px; margin-bottom: 20px; pointer-events: none; z-index: 1;">
@@ -758,10 +763,6 @@ def _write_pivot_sheet(ws, p, title):
     ws.column_dimensions[get_column_letter(tc)].width = 16.7
     ws.column_dimensions[get_column_letter(tc + 1)].width = 17.6
 
-
-import re
-import zipfile
-from xml.sax.saxutils import escape as _xml_escape
 
 _ILLEGAL_XML = re.compile('[\x00-\x08\x0b\x0c\x0e-\x1f]')
 
@@ -1175,12 +1176,12 @@ def process_page_data(uploaded_files):
 
 
 # ==========================================
-# صفحة النشاط: العنوان + الخانات التلاتة بحجم محكوم على قد خانة الرفع وزر X للمسح
+# صفحة النشاط: العنوان مع لوجو التليفون الكامل + الخانات التلاتة
 # ==========================================
 def render_activity_header():
     st.markdown(f"""
     <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px; display:flex; align-items:center; justify-content:center; gap:14px;">
-        <div style="width:42px; height:42px; flex-shrink:0; background-color:{PHONE_ICON_COLOR}; -webkit-mask: url(data:image/png;base64,{PHONE_ICON_B64}) no-repeat center / contain; mask: url(data:image/png;base64,{PHONE_ICON_B64}) no-repeat center / contain;"></div>
+        {PHONE_HEADER_SVG}
         <div style="margin:0; color:{text_color}; font-weight:900; font-size:28px; line-height:1.3;">تقرير نشاط المحصلين</div>
     </div>
     """, unsafe_allow_html=True)
