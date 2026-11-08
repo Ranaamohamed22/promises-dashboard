@@ -14,6 +14,27 @@ from openpyxl.utils import get_column_letter
 # ==========================================
 st.set_page_config(page_title="SNB Promises Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
+# ==========================================
+# ثيم Streamlit الفاتح: بيخلّي كل الحقول والمربعات (القوائم، الاختيارات، الرفع) بيضاء
+# (لو عملتي ملف .streamlit/config.toml بنفس القيم دي مش هتحتاجي الجزء ده)
+# ==========================================
+_LIGHT_THEME = {
+    "base": "light",
+    "primaryColor": "#2CA549",
+    "backgroundColor": "#FFFFFF",
+    "secondaryBackgroundColor": "#FFFFFF",
+    "textColor": "#1F4373",
+    "borderColor": "#99AABF",
+}
+for _k, _v in _LIGHT_THEME.items():
+    try:
+        st._config.set_option(f"theme.{_k}", _v)
+    except Exception:
+        pass
+if not st.session_state.get('_light_theme_applied'):
+    st.session_state['_light_theme_applied'] = True
+    st.rerun()
+
 if 'current_page' not in st.session_state:
     st.session_state.current_page = 'Overview'
 if 'theme_choice' not in st.session_state:
@@ -250,6 +271,14 @@ st.markdown(f"""
     }}
     html body .stApp [data-testid="stExpander"] summary svg {{
         fill: {input_text} !important;
+    }}
+
+    /* التابات وخيارات الراديو (نصها يفضل واضح على الخلفية) */
+    html body .stApp [role="tab"],
+    html body .stApp [role="tab"] *,
+    html body .stApp [role="radiogroup"] label,
+    html body .stApp [role="radiogroup"] label * {{
+        color: {label_color} !important;
     }}
 
     /* تبييض منطقة رفع الملفات وزرار الـ Upload الأسود */
@@ -1002,6 +1031,56 @@ def process_page_data(uploaded_files):
 
     return active_promises_df, broken_promises_df, neglect_df, activity_base_df, report_bytes, total_rows, total_unhandled, active_count, broken_count, neglect_count, total_activity_count
 
+
+# ==========================================
+# صفحة النشاط: العنوان + الخانات التلاتة (موديل - رفع ملف - اسم المحصل)
+# ==========================================
+ACT_BOX_HEIGHT = 230  # طول موحّد للخانات التلاتة
+
+def render_activity_header():
+    st.markdown(f"""
+    <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px; display:flex; align-items:center; justify-content:center; gap:14px;">
+        <div style="width:42px; height:42px; flex-shrink:0; background-color:{PHONE_ICON_COLOR}; -webkit-mask: url(data:image/png;base64,{PHONE_ICON_B64}) no-repeat center / contain; mask: url(data:image/png;base64,{PHONE_ICON_B64}) no-repeat center / contain;"></div>
+        <div style="margin:0; color:{text_color}; font-weight:900; font-size:28px; line-height:1.3;">تقرير نشاط المحصلين</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+def render_activity_boxes(activity_base_df=None):
+    """الترتيب (من اليمين): ملف الموديل - ارفعي الملف هنا يا رنا - اسم المحصل"""
+    col_model, col_file, col_coll = st.columns([1, 1, 1], gap="medium")
+
+    with col_model:
+        with st.container(border=True, height=ACT_BOX_HEIGHT):
+            st.markdown(f"<p style='font-size: 13px; color: {sub_text_color}; direction: rtl; text-align: right; margin-bottom: 5px; font-weight: bold;'>التقييم (1) يعني 'ناجحة'، والتقييم (0) يعني 'مغطاة'.</p>", unsafe_allow_html=True)
+            mapping_file = st.file_uploader("شيت موديل النشاط", type=["xlsx"], key="mapping_uploader")
+
+    with col_file:
+        with st.container(border=True, height=ACT_BOX_HEIGHT):
+            cur_files = st.session_state.page_files.get('Activity') or []
+            cur_names = "، ".join(f.name for f in cur_files) if cur_files else "لسه ما اترفعش ملف"
+            st.markdown(f"<p style='font-size: 13px; color: {sub_text_color}; direction: rtl; text-align: right; margin-bottom: 5px; font-weight: bold;'>الملف الحالي: {cur_names}</p>", unsafe_allow_html=True)
+            new_files = st.file_uploader("ارفعي الملف هنا يا رنا", type=["xlsx", "csv"], accept_multiple_files=True, key="uploader_inpage_Activity")
+            if new_files:
+                new_sig = [(f.name, f.size) for f in new_files]
+                cur_sig = [(f.name, f.size) for f in cur_files]
+                if new_sig != cur_sig:
+                    st.session_state.page_files['Activity'] = new_files
+                    st.rerun()
+
+    collector_col_name = None
+    selected_collector = "الكل (جميع المحصلين)"
+    with col_coll:
+        with st.container(border=True, height=ACT_BOX_HEIGHT):
+            collector_options = ["الكل (جميع المحصلين)"]
+            if activity_base_df is not None:
+                collector_col_name = find_col_in(activity_base_df, ['collecter', 'collector', 'المحصل', 'اسم المحصل'])
+                if collector_col_name and collector_col_name in activity_base_df.columns:
+                    unique_colls = activity_base_df[collector_col_name].dropna().astype(str).unique().tolist()
+                    collector_options.extend(sorted(unique_colls))
+            selected_collector = st.selectbox("👤 اسم المحصل (Collector):", options=collector_options, disabled=(activity_base_df is None))
+
+    return selected_collector, mapping_file, collector_col_name
+
 # التحقق من الملفات الخاصة بالصفحة الحالية فقط
 page_uploaded = st.session_state.page_files[curr_page]
 
@@ -1013,6 +1092,10 @@ if page_uploaded is None:
             <p style="color: {kpi_title_color}; font-size: 18px; font-weight: bold;">من شريط التنقل بالأعلى، اختاري أي تقرير لعرضه ورفع ملفاته الخاصة.</p>
         </div>
         """, unsafe_allow_html=True)
+    elif curr_page == 'Activity':
+        render_activity_header()
+        render_activity_boxes(None)
+        st.markdown(f"<p style='color: {label_color}; font-weight: 800; font-size: 16px; text-align: right; direction: rtl; margin-top: 10px;'>ارفعي ملف النشاط من الخانة اللي فوق عشان يظهر التقرير.</p>", unsafe_allow_html=True)
     else:
         st.markdown(f"<p style='color: {label_color}; font-weight: 800; font-size: 18px; text-align: right; direction: rtl; margin-top: 20px;'>ارفعي الملفات هنا ي رنا</p>", unsafe_allow_html=True)
         col_up1, col_up2 = st.columns([7, 3])
@@ -1177,42 +1260,8 @@ else:
     # صفحة تقرير النشاط
     # ==========================================
     elif curr_page == 'Activity':
-        st.markdown(f"""
-        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; margin-bottom: 20px; display:flex; align-items:center; justify-content:center; gap:14px;">
-            <div style="width:42px; height:42px; flex-shrink:0; background-color:{PHONE_ICON_COLOR}; -webkit-mask: url(data:image/png;base64,{PHONE_ICON_B64}) no-repeat center / contain; mask: url(data:image/png;base64,{PHONE_ICON_B64}) no-repeat center / contain;"></div>
-            <div style="margin:0; color:{text_color}; font-weight:900; font-size:28px; line-height:1.3;">تقرير نشاط المحصلين</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        col_act_right, col_act_mid, col_act_left = st.columns([1, 1, 1], gap="medium")
-
-        with col_act_right:
-            with st.container(border=True):
-                collector_col_name = find_col_in(activity_base_df, ['collecter', 'collector', 'المحصل', 'اسم المحصل'])
-                collector_options = ["الكل (جميع المحصلين)"]
-                if collector_col_name and collector_col_name in activity_base_df.columns:
-                    unique_colls = activity_base_df[collector_col_name].dropna().astype(str).unique().tolist()
-                    collector_options.extend(sorted(unique_colls))
-
-                selected_collector = st.selectbox("👤 ابحثي عن اسم المحصل (Collector):", options=collector_options)
-
-        with col_act_mid:
-            with st.container(border=True):
-                cur_files = st.session_state.page_files.get('Activity') or []
-                cur_names = "، ".join(f.name for f in cur_files)
-                st.markdown(f"<p style='font-size: 13px; color: {sub_text_color}; direction: rtl; text-align: right; margin-bottom: 5px; font-weight: bold;'>الملف الحالي: {cur_names}</p>", unsafe_allow_html=True)
-                new_files = st.file_uploader("رفع الملف", type=["xlsx", "csv"], accept_multiple_files=True, key="uploader_inpage_Activity")
-                if new_files:
-                    new_sig = [(f.name, f.size) for f in new_files]
-                    cur_sig = [(f.name, f.size) for f in cur_files]
-                    if new_sig != cur_sig:
-                        st.session_state.page_files['Activity'] = new_files
-                        st.rerun()
-
-        with col_act_left:
-            with st.container(border=True):
-                st.markdown(f"<p style='font-size: 13px; color: {sub_text_color}; direction: rtl; text-align: right; margin-bottom: 5px; font-weight: bold;'>التقييم (1) يعني 'ناجحة'، والتقييم (0) يعني 'مغطاة'.</p>", unsafe_allow_html=True)
-                mapping_file = st.file_uploader("شيت موديل النشاط", type=["xlsx"], key="mapping_uploader")
+        render_activity_header()
+        selected_collector, mapping_file, collector_col_name = render_activity_boxes(activity_base_df)
 
         # فلاتر المدى الزمني والشفت والبريك
         filter_act_col1, filter_act_col2, filter_act_col3, filter_act_col4 = st.columns([1.5, 2, 1.5, 1.5])
