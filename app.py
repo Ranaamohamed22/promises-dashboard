@@ -48,14 +48,14 @@ PHONE_ICON_B64 = "iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAeRklEQVR42u1d6X
 PHONE_ICON_COLOR = "#1F4373"  # لون لوجو التليفون
 
 # اللوجو الأول: علامة الصح الخضراء داخل الشكل المزخرف (للمكالمات الناجحة)
-GREEN_CHECK_SVG = """<svg viewBox="0 0 100 100" width="30" height="30" style="display:block;">
+GREEN_CHECK_SVG = """<svg viewBox="0 0 100 100" width="26" height="26" style="display:block;">
   <path fill="#2CA549" d="M50 4 C54 4 57 9 61 10 C65 11 70 8 73 10 C77 13 76 19 79 22 C82 25 88 24 90 28 C92 31 89 36 90 40 C91 44 96 46 96 50 C96 54 91 56 90 60 C89 64 92 69 90 72 C88 76 82 75 79 78 C76 81 77 87 73 90 C70 92 65 89 61 90 C57 91 54 96 50 96 C46 96 43 91 39 90 C35 89 30 92 27 90 C23 87 24 81 21 78 C18 75 12 76 10 72 C8 69 11 64 10 60 C9 56 4 54 4 50 C4 46 9 44 10 40 C11 36 8 31 10 28 C12 24 18 25 21 22 C24 19 23 13 27 10 C30 8 35 11 39 10 C43 9 46 4 50 4 Z"/>
   <circle cx="50" cy="50" r="28" fill="#82D197"/>
   <path d="M38 51 L46 59 L63 42" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>"""
 
 # اللوجو الثاني: سماعة التليفون وعليها علامة X باللون الأخضر (للمكالمات المغطاة)
-GREEN_PHONE_X_SVG = """<svg viewBox="0 0 100 100" width="30" height="30" style="display:block;">
+GREEN_PHONE_X_SVG = """<svg viewBox="0 0 100 100" width="26" height="26" style="display:block;">
   <path d="M26 20 C17 20 12 28 12 37 C12 63 37 88 63 88 C72 88 80 83 80 74 C80 69 76 65 71 63 L61 60 C57 59 52 60 49 64 L45 68 C36 63 29 56 24 47 L28 43 C32 40 33 35 32 31 L29 21 C28 18 27 20 26 20 Z" fill="none" stroke="#2CA549" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M58 18 L84 44 M84 18 L58 44" fill="none" stroke="#2CA549" stroke-width="10" stroke-linecap="round"/>
 </svg>"""
@@ -108,7 +108,7 @@ if st.session_state.theme_choice == "ثيم إجادة (Navy)":
     nav_btn_bg = "#FFFFFF"
     nav_btn_text = ejada_navy_dark
     nav_btn_border = ejada_border_light
-    kpi_title_color = "#586F8C"
+    kpi_title_color = "#1F4373"
     header_logo_color = "#FFFFFF"
     input_bg = "#FFFFFF"
     input_text = "#1F4373"
@@ -125,7 +125,7 @@ else:
     nav_btn_bg = "#FFFFFF"
     nav_btn_text = "#1F4373"
     nav_btn_border = "#CBD5E1"
-    kpi_title_color = "#475569"
+    kpi_title_color = "#1F4373"
     header_logo_color = "#1F4373"
     input_bg = "#FFFFFF"
     input_text = "#1F4373"
@@ -386,12 +386,27 @@ st.markdown(f"""
         font-size: 14px !important;
     }}
 
-    /* ===== تصميم مربعات الـ KPIs بحجم أصغر والنصوص والأرقام في المنتصف ===== */
+    /* ===== تصغير مربعات الـ KPIs وتكبير خط العناوين في المنتصف ===== */
+    .kpi-grid-4 {{
+        display: grid;
+        grid-template-columns: repeat(4, minmax(180px, 270px));
+        justify-content: center;
+        gap: 14px;
+        margin-bottom: 16px;
+        direction: rtl;
+    }}
+    .kpi-grid-6 {{
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 10px;
+        margin-bottom: 20px;
+        direction: rtl;
+    }}
     .kpi-card {{
         background-color: {card_color};
         border-radius: 10px;
-        padding: 12px 14px;
-        box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+        padding: 8px 12px !important;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.12);
         border: 1px solid {border_color};
         border-right-width: 5px;
         border-right-style: solid;
@@ -402,37 +417,39 @@ st.markdown(f"""
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        min-height: 95px;
+        min-height: 68px !important;
     }}
     .kpi-title {{
         color: {kpi_title_color};
-        font-size: 13px;
-        font-weight: 800;
-        margin-bottom: 4px;
+        font-size: 18px !important;
+        font-weight: 900 !important;
+        margin-bottom: 2px !important;
+        line-height: 1.2 !important;
         text-align: center !important;
         width: 100%;
     }}
     .kpi-value {{
         color: {text_color};
-        font-size: 24px;
-        font-weight: 900;
-        margin-bottom: 2px;
-        line-height: 1.15;
+        font-size: 22px !important;
+        font-weight: 900 !important;
+        margin-bottom: 1px !important;
+        line-height: 1.1 !important;
         text-align: center !important;
         width: 100%;
     }}
     .kpi-sub {{
-        color: {kpi_title_color};
-        font-size: 11px;
-        font-weight: 700;
+        color: #586F8C;
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        margin-top: 0 !important;
         text-align: center !important;
         width: 100%;
     }}
     .kpi-icon {{
         position: absolute;
-        top: 12px;
-        left: 12px;
-        font-size: 22px;
+        top: 8px;
+        left: 10px;
+        font-size: 20px;
         opacity: 0.95;
         display: flex;
         align-items: center;
@@ -1217,7 +1234,7 @@ else:
         st.markdown(f"<p style='text-align:center; color:{sub_text_color}; font-weight: bold; margin-bottom: 30px;'>ملخص أداء محفظة الديون ونشاط المحصلين</p>", unsafe_allow_html=True)
         
         st.markdown(f"""
-        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 25px;">
+        <div class="kpi-grid-6">
             <div class="kpi-card" style="border-right-color: {border_color};">
                 <div class="kpi-icon">📋</div>
                 <div class="kpi-title">إجمالي الحسابات</div>
@@ -1469,12 +1486,12 @@ else:
                 top_calls = top_collector_series.values[0]
                 top_pct = (top_calls / total_activity * 100) if total_activity > 0 else 0
                 st.markdown(f"""
-                <div style="background-color: {card_color}; border-radius: 12px; padding: 16px 24px; border: 2px solid #586F8C; direction:rtl; text-align: right; margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="background-color: {card_color}; border-radius: 12px; padding: 14px 22px; border: 2px solid #586F8C; direction:rtl; text-align: right; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between;">
                     <div>
                         <h4 style="margin:0; color: #586F8C; font-weight:900;">🏆 بطل الشفت (الأكثر نشاطاً)</h4>
                         <p style="margin: 5px 0 0 0; color: {text_color}; font-size: 18px;">المحصل: <b style="color:#1F4373; font-size: 22px;">{top_name}</b></p>
                     </div>
-                    <div style="text-align: left; background-color: {ejada_navy_dark}; padding: 10px 20px; border-radius: 8px; border: 1px solid #586F8C;">
+                    <div style="text-align: left; background-color: {ejada_navy_dark}; padding: 8px 18px; border-radius: 8px; border: 1px solid #586F8C;">
                         <h3 style="margin:0; color: #FFFFFF; font-weight:900;">{top_calls:,} مكالمة</h3>
                         <p style="margin: 0; color: #E2E8F0; font-size: 14px; font-weight: bold;">استحوذ على <span style="color:#2CA549;">{top_pct:.1f}%</span> من إجمالي شغل الفترة</p>
                     </div>
@@ -1482,7 +1499,7 @@ else:
                 """, unsafe_allow_html=True)
 
         st.markdown(f"""
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; direction: rtl;">
+        <div class="kpi-grid-4">
             <div class="kpi-card" style="border-right-color: {border_color};">
                 <div class="kpi-icon">📞</div>
                 <div class="kpi-title">إجمالي المحاولات</div>
