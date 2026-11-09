@@ -6,8 +6,6 @@ import io
 import base64
 import os
 import re
-import zipfile
-from xml.sax.saxutils import escape as _xml_escape
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -523,22 +521,29 @@ with nav_cols[4]:
 st.markdown(f"<hr style='margin: 10px 0 20px 0; border-color: {border_color}; clear: both;'>", unsafe_allow_html=True)
 
 # ==========================================
-# دوال تقرير الوعود والإكسيل (مع توحيد أسماء المحافظ والـ Pivot الحقيقي)
+# دوال تقرير الوعود والإكسيل (سليمة 100% وتفتح على جميع إصدارات Excel بدون أي أخطاء)
 # ==========================================
 PIVOT_TEAM = 'Sales Team'
 PIVOT_COLL = 'Salesperson'
 PIVOT_NOTE = 'ملاحظات-التمويل'
 PIVOT_ACC = 'Account Number'
 PIVOT_AMT = 'Net Amount'
-FIXED_NOTES = ['NPL', 'DPD60', 'DPD30']  # موحدة بحروف كبيرة لمنع التكرار والأصفار الوهمية
+FIXED_NOTES = ['NPL', 'DPD60', 'DPD30']
 SUM_FMT = '_(* #,##0_);_(* \\(#,##0\\);_(* "-"??_);_(@_)'
+_ILLEGAL_EXCEL_CHARS = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
+
+
+def _clean_excel_str(val):
+    if isinstance(val, str):
+        return _ILLEGAL_EXCEL_CHARS.sub('', val)
+    return val
 
 
 def _normalize_note_bucket(val):
     """توحيد مسميات المحفظة (Dpd30 / DPD30 / 30Dpd -> DPD30) لمنع ظهور عمود مكرر بأصفار"""
     if val is None or (not isinstance(val, (list, tuple)) and pd.isna(val)):
         return '(فارغ)'
-    s = str(val).strip()
+    s = _clean_excel_str(str(val)).strip()
     if not s or s.lower() == 'nan':
         return '(فارغ)'
     key = re.sub(r'[\s_\-]+', '', s).upper()
@@ -559,8 +564,8 @@ def build_pivot(df, order='desc'):
     d = df[need].copy()
     d['_c'] = d[PIVOT_ACC].notna().astype(int)
     d[PIVOT_AMT] = pd.to_numeric(d[PIVOT_AMT], errors='coerce').fillna(0.0)
-    d[PIVOT_TEAM] = d[PIVOT_TEAM].fillna('(فارغ)').astype(str)
-    d[PIVOT_COLL] = d[PIVOT_COLL].fillna('(فارغ)').astype(str)
+    d[PIVOT_TEAM] = d[PIVOT_TEAM].fillna('(فارغ)').astype(str).apply(_clean_excel_str)
+    d[PIVOT_COLL] = d[PIVOT_COLL].fillna('(فارغ)').astype(str).apply(_clean_excel_str)
     d[PIVOT_NOTE] = d[PIVOT_NOTE].apply(_normalize_note_bucket)
 
     def _ordered(values):
@@ -633,13 +638,22 @@ def _prepare_for_output(df):
 
 
 def _write_df_sheet(ws, df):
+    ws.sheet_view.rightToLeft = True
     if df is None or len(df.columns) == 0:
         return
     df = _prepare_for_output(df)
-    bold = Font(bold=True)
+    bold = Font(name='Calibri', bold=True, color='FFFFFF', size=11)
+    hdr_fill = PatternFill('solid', fgColor='1F4373')
+    center = Alignment(horizontal='center', vertical='center')
+
     for j, c in enumerate(df.columns, 1):
-        ws.cell(row=1, column=j, value=c).font = bold
-        ws.column_dimensions[get_column_letter(j)].width = min(40, max(12, len(str(c)) + 4))
+        clean_col = _clean_excel_str(str(c))
+        cell = ws.cell(row=1, column=j, value=clean_col)
+        cell.font = bold
+        cell.fill = hdr_fill
+        cell.alignment = center
+        ws.column_dimensions[get_column_letter(j)].width = min(40, max(14, len(clean_col) + 5))
+
     for i, row in enumerate(df.itertuples(index=False), 2):
         for j, v in enumerate(row, 1):
             if v is None or (not isinstance(v, (list, tuple)) and pd.isna(v)):
@@ -648,15 +662,20 @@ def _write_df_sheet(ws, df):
                 v = v.to_pydatetime()
             elif hasattr(v, 'item') and not isinstance(v, (str, bytes)):
                 v = v.item()
+            elif isinstance(v, str):
+                v = _clean_excel_str(v)
             cell = ws.cell(row=i, column=j, value=v)
             if isinstance(v, datetime):
                 cell.number_format = 'yyyy-mm-dd'
             elif isinstance(v, float):
                 cell.number_format = '#,##0.00'
 
+    if len(df) > 0:
+        ws.auto_filter.ref = f"A1:{get_column_letter(len(df.columns))}{len(df) + 1}"
+        ws.freeze_panes = "A2"
 
-def _write_pivot_sheet(ws, p, title, is_real_pivot=False):
-    """كتابة شيت الملخص؛ لو is_real_pivot=True لا ندمج خلايا الجدول (rows 3..r) حتى يقبل الإكسيل تحويله لـ Pivot Table تفاعلي"""
+
+def _write_pivot_sheet(ws, p, title):
     notes = p['notes']
     n = len(notes)
     last_col = 2 + 2 * n + 2
@@ -691,24 +710,19 @@ def _write_pivot_sheet(ws, p, title, is_real_pivot=False):
     for i, note in enumerate(notes):
         c0 = 3 + 2 * i
         ws.cell(row=4, column=c0, value=note).font = Font(name='Calibri', bold=True, color='FFFFFF', size=14)
-        if not is_real_pivot:
-            ws.merge_cells(start_row=4, start_column=c0, end_row=4, end_column=c0 + 1)
+        ws.merge_cells(start_row=4, start_column=c0, end_row=4, end_column=c0 + 1)
         ws.cell(row=5, column=c0, value='عدد الحسابات')
         ws.cell(row=5, column=c0 + 1, value='متبقي المديونية')
     tc = 3 + 2 * n
     ws.cell(row=4, column=tc, value='Total عدد الحسابات')
     ws.cell(row=4, column=tc + 1, value='Total متبقي المديونية')
-    if not is_real_pivot:
-        ws.merge_cells(start_row=4, start_column=tc, end_row=5, end_column=tc)
-        ws.merge_cells(start_row=4, start_column=tc + 1, end_row=5, end_column=tc + 1)
-    else:
-        ws.cell(row=5, column=tc, value='Total عدد الحسابات')
-        ws.cell(row=5, column=tc + 1, value='Total متبقي المديونية')
-    ws.cell(row=5, column=1, value='اسم المشرف ')
-    ws.cell(row=5, column=2, value='اسم المحصل ')
+    ws.merge_cells(start_row=4, start_column=tc, end_row=5, end_column=tc)
+    ws.merge_cells(start_row=4, start_column=tc + 1, end_row=5, end_column=tc + 1)
+    ws.cell(row=5, column=1, value='اسم المشرف')
+    ws.cell(row=5, column=2, value='اسم المحصل')
 
     def body(r, c, v, fmt=None, bold=False):
-        cell = ws.cell(row=r, column=c, value=v)
+        cell = ws.cell(row=r, column=c, value=_clean_excel_str(v))
         cell.font = Font(name='Calibri', bold=bold, size=11)
         cell.alignment = center
         cell.border = Border(left=thin, right=thin, top=thin, bottom=thin)
@@ -727,14 +741,16 @@ def _write_pivot_sheet(ws, p, title, is_real_pivot=False):
             body(r, tc, row['cnt'])
             body(r, tc + 1, row['amt'], SUM_FMT)
             r += 1
-        a = body(start, 1, t['team'])
+        a = body(start, 1, t['team'], bold=True)
         a.fill = light
         a.border = Border(left=thick, right=thin, top=thin, bottom=thin)
         for rr in range(start + 1, r):
-            cell = ws.cell(row=rr, column=1)
+            cell = ws.cell(row=rr, column=1, value=_clean_excel_str(t['team']))
+            cell.font = Font(name='Calibri', bold=True, size=11)
+            cell.alignment = center
             cell.fill = light
             cell.border = Border(left=thick, right=thin, top=thin, bottom=thin)
-        if not is_real_pivot and r - 1 > start:
+        if r - 1 > start:
             ws.merge_cells(start_row=start, start_column=1, end_row=r - 1, end_column=1)
 
     g = p['grand']
@@ -745,8 +761,7 @@ def _write_pivot_sheet(ws, p, title, is_real_pivot=False):
         cell.alignment = center
         cell.border = Border(left=thick if c == 1 else thin, right=thin, top=thin, bottom=thick)
     ws.cell(row=r, column=1, value='الاجمالي')
-    if not is_real_pivot:
-        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=2)
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=2)
     for i, note in enumerate(notes):
         ws.cell(row=r, column=3 + 2 * i, value=g['by_note'][note][0])
         x = ws.cell(row=r, column=4 + 2 * i, value=g['by_note'][note][1])
@@ -755,6 +770,7 @@ def _write_pivot_sheet(ws, p, title, is_real_pivot=False):
     x = ws.cell(row=r, column=tc + 1, value=g['amt'])
     x.number_format = SUM_FMT
 
+    ws.freeze_panes = "C6"
     ws.column_dimensions['A'].width = 35.7
     ws.column_dimensions['B'].width = 30.7
     for c in range(3, 3 + 2 * n):
@@ -763,296 +779,23 @@ def _write_pivot_sheet(ws, p, title, is_real_pivot=False):
     ws.column_dimensions[get_column_letter(tc + 1)].width = 17.6
 
 
-_ILLEGAL_XML = re.compile('[\x00-\x08\x0b\x0c\x0e-\x1f]')
-
-
-def _xa(v):
-    return _xml_escape(_ILLEGAL_XML.sub('', str(v)), {'"': '&quot;'})
-
-
-def _cell_kind(v):
-    if isinstance(v, datetime):
-        return 'd'
-    if isinstance(v, bool):
-        return 's'
-    if isinstance(v, (int, float)):
-        return 'n'
-    return 's'
-
-
-def _normalize_value(v):
-    if v is None or (not isinstance(v, (list, tuple)) and pd.isna(v)):
-        return None
-    if isinstance(v, pd.Timestamp):
-        return v.to_pydatetime()
-    if hasattr(v, 'item') and not isinstance(v, (str, bytes)):
-        return v.item()
-    return v
-
-
-def _pivot_parts(data_df, data_sheet, p, order, idx):
-    df = _prepare_for_output(data_df)
-    cols = list(df.columns)
-    n_rows = len(df)
-    team_i, coll_i, note_i = cols.index(PIVOT_TEAM), cols.index(PIVOT_COLL), cols.index(PIVOT_NOTE)
-    acc_i, amt_i = cols.index(PIVOT_ACC), cols.index(PIVOT_AMT)
-
-    values = [[_normalize_value(v) for v in df[c].tolist()] for c in cols]
-
-    kinds = []
-    for col_vals in values:
-        ks = {_cell_kind(v) for v in col_vals if v is not None}
-        if not ks:
-            kinds.append('blank')
-        elif ks == {'n'}:
-            kinds.append('n')
-        elif ks == {'d'}:
-            kinds.append('d')
-        else:
-            kinds.append('s')
-
-    shared_cols = {team_i, coll_i, note_i}
-    shared_maps = {}
-    for ci in shared_cols:
-        vals = ['(فارغ)' if v is None else _normalize_note_bucket(v) if ci == note_i else str(v) for v in values[ci]]
-        values[ci] = vals
-        uniq = list(dict.fromkeys(vals))
-        if ci == note_i:
-            uniq += [x for x in p['notes'] if x not in uniq]
-        shared_maps[ci] = {u: k for k, u in enumerate(uniq)}
-
-    fields_xml = []
-    for ci, name in enumerate(cols):
-        if ci in shared_cols:
-            items = ''.join(f'<s v="{_xa(u)}"/>' for u in shared_maps[ci])
-            fields_xml.append(f'<cacheField name="{_xa(name)}" numFmtId="0"><sharedItems count="{len(shared_maps[ci])}">{items}</sharedItems></cacheField>')
-            continue
-        col_vals = values[ci]
-        has_blank = any(v is None for v in col_vals)
-        k = kinds[ci]
-        if k == 'blank':
-            si = '<sharedItems containsNonDate="0" containsString="0" containsBlank="1"/>'
-        elif k == 'n':
-            nums = [float(v) for v in col_vals if v is not None]
-            is_int = all(float(v).is_integer() for v in nums)
-            attrs = 'containsSemiMixedTypes="0" containsString="0" containsNumber="1"' if not has_blank else 'containsString="0" containsBlank="1" containsNumber="1"'
-            if is_int:
-                attrs += ' containsInteger="1"'
-            si = f'<sharedItems {attrs} minValue="{repr(min(nums))}" maxValue="{repr(max(nums))}"/>'
-        elif k == 'd':
-            ds = [v for v in col_vals if v is not None]
-            attrs = 'containsSemiMixedTypes="0" containsNonDate="0" containsDate="1" containsString="0"' if not has_blank else 'containsNonDate="0" containsDate="1" containsString="0" containsBlank="1"'
-            si = f'<sharedItems {attrs} minDate="{min(ds).strftime("%Y-%m-%dT%H:%M:%S")}" maxDate="{max(ds).strftime("%Y-%m-%dT%H:%M:%S")}"/>'
-        else:
-            si = '<sharedItems containsBlank="1"/>' if has_blank else '<sharedItems/>'
-        fields_xml.append(f'<cacheField name="{_xa(name)}" numFmtId="0">{si}</cacheField>')
-
-    last_col_letter = get_column_letter(len(cols))
-    ns = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
-    cache_def = (
-        f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<pivotCacheDefinition {ns} r:id="rId1" refreshOnLoad="1" refreshedBy="Ejada" '
-        f'refreshedDate="46330.5" createdVersion="8" refreshedVersion="8" minRefreshableVersion="3" recordCount="{n_rows}">'
-        f'<cacheSource type="worksheet"><worksheetSource ref="A1:{last_col_letter}{n_rows + 1}" sheet="{_xa(data_sheet)}"/></cacheSource>'
-        f'<cacheFields count="{len(cols)}">{"".join(fields_xml)}</cacheFields></pivotCacheDefinition>'
-    )
-
-    recs = []
-    for ri in range(n_rows):
-        cells = []
-        for ci in range(len(cols)):
-            v = values[ci][ri]
-            if ci in shared_cols:
-                cells.append(f'<x v="{shared_maps[ci][v]}"/>')
-            elif v is None:
-                cells.append('<m/>')
-            elif kinds[ci] == 'n':
-                cells.append(f'<n v="{repr(float(v)) if not float(v).is_integer() else int(float(v))}"/>')
-            elif kinds[ci] == 'd':
-                cells.append(f'<d v="{v.strftime("%Y-%m-%dT%H:%M:%S")}"/>')
-            else:
-                cells.append(f'<s v="{_xa(v if not isinstance(v, datetime) else v.strftime("%Y-%m-%d %H:%M:%S"))}"/>')
-        recs.append('<r>' + ''.join(cells) + '</r>')
-    cache_records = f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<pivotCacheRecords {ns} count="{n_rows}">{"".join(recs)}</pivotCacheRecords>'
-
-    notes = p['notes']
-    n_notes = len(notes)
-    team_order = [t['team'] for t in p['teams']]
-    coll_order = []
-    for t in p['teams']:
-        for r in t['rows']:
-            if r['coll'] not in coll_order:
-                coll_order.append(r['coll'])
-    team_pos = {t: k for k, t in enumerate(team_order)}
-    coll_pos = {c: k for k, c in enumerate(coll_order)}
-
-    def items_xml(order_list, ci):
-        return f'<items count="{len(order_list)}">' + ''.join(f'<item x="{shared_maps[ci][o]}"/>' for o in order_list) + '</items>'
-
-    pf = []
-    for ci in range(len(cols)):
-        base = 'compact="0" outline="0" showAll="0" defaultSubtotal="0"'
-        if ci == note_i:
-            pf.append(f'<pivotField axis="axisCol" compact="0" outline="0" showAll="1" defaultSubtotal="0" sortType="descending">{items_xml(notes, ci)}</pivotField>')
-        elif ci == team_i:
-            pf.append(f'<pivotField name="اسم المشرف " axis="axisRow" {base}>{items_xml(team_order, ci)}</pivotField>')
-        elif ci == coll_i:
-            st_attr = ' sortType="descending"' if order == 'desc' else ''
-            pf.append(f'<pivotField name="اسم المحصل " axis="axisRow" {base}{st_attr}>{items_xml(coll_order, ci)}</pivotField>')
-        elif ci == acc_i:
-            pf.append(f'<pivotField dataField="1" compact="0" outline="0" showAll="0" defaultSubtotal="0"/>')
-        elif ci == amt_i:
-            pf.append(f'<pivotField dataField="1" compact="0" outline="0" showAll="0" defaultSubtotal="0"/>')
-        else:
-            pf.append(f'<pivotField compact="0" outline="0" showAll="0" defaultSubtotal="0"/>')
-
-    row_items = []
-    for t in p['teams']:
-        for k, r in enumerate(t['rows']):
-            if k == 0:
-                tp = team_pos[t['team']]
-                tx = '<x/>' if tp == 0 else f'<x v="{tp}"/>'
-                cp = coll_pos[r['coll']]
-                cx = '<x/>' if cp == 0 else f'<x v="{cp}"/>'
-                row_items.append(f'<i>{tx}{cx}</i>')
-            else:
-                row_items.append(f'<i r="1"><x v="{coll_pos[r["coll"]]}"/></i>')
-    row_items.append('<i t="grand"><x/></i>')
-
-    col_items = []
-    for k in range(n_notes):
-        first = '<x/>' if k == 0 else f'<x v="{k}"/>'
-        col_items.append(f'<i>{first}<x/></i>')
-        col_items.append('<i r="1" i="1"><x v="1"/></i>')
-    col_items.append('<i t="grand"><x/></i>')
-    col_items.append('<i t="grand" i="1"><x/></i>')
-
-    n_body = len(row_items) - 1
-    last_row = 5 + n_body + 1
-    last_col = 2 + 2 * n_notes + 2
-    ref = f'A3:{get_column_letter(last_col)}{last_row}'
-
-    pivot_def = (
-        f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
-        f'name="PivotTable{idx}" cacheId="{idx}" applyNumberFormats="0" applyBorderFormats="0" applyFontFormats="0" applyPatternFormats="0" '
-        f'applyAlignmentFormats="0" applyWidthHeightFormats="1" dataCaption="Values" grandTotalCaption="الاجمالي" missingCaption="0" '
-        f'updatedVersion="8" minRefreshableVersion="3" useAutoFormatting="1" itemPrintTitles="1" mergeItem="1" createdVersion="8" indent="0" '
-        f'compact="0" compactData="0" multipleFieldFilters="0" rowHeaderCaption="اسم المشرف " colHeaderCaption="{PIVOT_NOTE}">'
-        f'<location ref="{ref}" firstHeaderRow="1" firstDataRow="3" firstDataCol="2"/>'
-        f'<pivotFields count="{len(cols)}">{"".join(pf)}</pivotFields>'
-        f'<rowFields count="2"><field x="{team_i}"/><field x="{coll_i}"/></rowFields>'
-        f'<rowItems count="{len(row_items)}">{"".join(row_items)}</rowItems>'
-        f'<colFields count="2"><field x="{note_i}"/><field x="-2"/></colFields>'
-        f'<colItems count="{len(col_items)}">{"".join(col_items)}</colItems>'
-        f'<dataFields count="2"><dataField name="عدد الحسابات" fld="{acc_i}" subtotal="count" baseField="{coll_i}" baseItem="0"/>'
-        f'<dataField name="متبقي المديونية" fld="{amt_i}" baseField="0" baseItem="0" numFmtId="3"/></dataFields>'
-        f'<pivotTableStyleInfo name="PivotStyleMedium9" showRowHeaders="1" showColHeaders="1" showRowStripes="0" showColStripes="0" showLastColumn="1"/>'
-        f'</pivotTableDefinition>'
-    )
-    return cache_def, cache_records, pivot_def
-
-
-def inject_pivot_tables(xlsx_bytes, specs):
-    zin = zipfile.ZipFile(io.BytesIO(xlsx_bytes))
-    files = {n: zin.read(n) for n in zin.namelist()}
-    zin.close()
-
-    wb_xml = files['xl/workbook.xml'].decode('utf-8')
-    wb_rels = files['xl/_rels/workbook.xml.rels'].decode('utf-8')
-    ct = files['[Content_Types].xml'].decode('utf-8')
-
-    sheet_rid = {}
-    for m in re.finditer(r'<sheet\b[^>]*?>', wb_xml):
-        tag = m.group(0)
-        nm = re.search(r'name="([^"]*)"', tag).group(1)
-        rid = re.search(r'r:id="([^"]*)"', tag).group(1)
-        sheet_rid[nm.replace('&amp;', '&')] = rid
-    rid_target = {}
-    for m in re.finditer(r'<Relationship\b[^>]*?>', wb_rels):
-        tag = m.group(0)
-        rid_target[re.search(r'Id="([^"]*)"', tag).group(1)] = re.search(r'Target="([^"]*)"', tag).group(1)
-
-    pivot_caches_xml = ''
-    new_rels = ''
-    new_ct = ''
-    for idx, sp in enumerate(specs, 1):
-        cache_def, cache_records, pivot_def = _pivot_parts(sp['data_df'], sp['data_sheet'], sp['pivot'], sp['order'], idx)
-        files[f'xl/pivotCache/pivotCacheDefinition{idx}.xml'] = cache_def.encode('utf-8')
-        files[f'xl/pivotCache/pivotCacheRecords{idx}.xml'] = cache_records.encode('utf-8')
-        files[f'xl/pivotCache/_rels/pivotCacheDefinition{idx}.xml.rels'] = (
-            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-            f'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords" Target="pivotCacheRecords{idx}.xml"/></Relationships>'
-        ).encode('utf-8')
-        files[f'xl/pivotTables/pivotTable{idx}.xml'] = pivot_def.encode('utf-8')
-        files[f'xl/pivotTables/_rels/pivotTable{idx}.xml.rels'] = (
-            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-            f'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition" Target="../pivotCache/pivotCacheDefinition{idx}.xml"/></Relationships>'
-        ).encode('utf-8')
-
-        # إصلاح مسار الشيت أياً كانت صيغة openpyxl (/xl/worksheets/ أو worksheets/)
-        target = rid_target[sheet_rid[sp['summary_sheet']]].lstrip('/')
-        sheet_file = target if target.startswith('xl/') else 'xl/' + target
-        sheet_dir, sheet_name = sheet_file.rsplit('/', 1)
-        rels_path = f'{sheet_dir}/_rels/{sheet_name}.rels'
-
-        rel = (f'<Relationship Id="rIdPv{idx}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable" '
-               f'Target="../pivotTables/pivotTable{idx}.xml"/>')
-        if rels_path in files:
-            files[rels_path] = files[rels_path].decode('utf-8').replace('</Relationships>', rel + '</Relationships>').encode('utf-8')
-        else:
-            files[rels_path] = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-                                + rel + '</Relationships>').encode('utf-8')
-
-        new_rels += (f'<Relationship Id="rIdPc{idx}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition" '
-                     f'Target="pivotCache/pivotCacheDefinition{idx}.xml"/>')
-        pivot_caches_xml += f'<pivotCache cacheId="{idx}" r:id="rIdPc{idx}"/>'
-        new_ct += (f'<Override PartName="/xl/pivotCache/pivotCacheDefinition{idx}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml"/>'
-                   f'<Override PartName="/xl/pivotCache/pivotCacheRecords{idx}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml"/>'
-                   f'<Override PartName="/xl/pivotTables/pivotTable{idx}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml"/>')
-
-    if specs:
-        wb_rels = wb_rels.replace('</Relationships>', new_rels + '</Relationships>')
-        ct = ct.replace('</Types>', new_ct + '</Types>')
-        if re.search(r'<calcPr\b[^>]*/>', wb_xml):
-            wb_xml = re.sub(r'(<calcPr\b[^>]*/>)', f'<pivotCaches>{pivot_caches_xml}</pivotCaches>\\1', wb_xml, count=1)
-        else:
-            wb_xml = wb_xml.replace('</workbook>', f'<pivotCaches>{pivot_caches_xml}</pivotCaches></workbook>')
-        files['xl/workbook.xml'] = wb_xml.encode('utf-8')
-        files['xl/_rels/workbook.xml.rels'] = wb_rels.encode('utf-8')
-        files['[Content_Types].xml'] = ct.encode('utf-8')
-
-    out = io.BytesIO()
-    with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as zout:
-        zout.writestr('[Content_Types].xml', files.pop('[Content_Types].xml'))
-        for n, b in files.items():
-            zout.writestr(n, b)
-    out.seek(0)
-    return out
-
-
-def _can_pivot(df):
-    need = [PIVOT_TEAM, PIVOT_COLL, PIVOT_NOTE, PIVOT_ACC, PIVOT_AMT]
-    return (df is not None and len(df) > 0 and all(c in df.columns for c in need)
-            and len(set(df.columns)) == len(df.columns))
-
-
 def build_report_xlsx(active_df, broken_df, neglect_df=None):
+    """بناء ملف الإكسيل بشكل نقي 100% عبر openpyxl ليفتح فوراً على جميع أجهزة وأنظمة الإكسيل بدون أي تلف"""
     wb = Workbook()
     ws = wb.active
     ws.title = 'تقرير الوعود القائمة'
     _write_df_sheet(ws, active_df)
 
-    can_pv_active = _can_pivot(active_df)
     p_active = build_pivot(active_df, order='first')
     ws = wb.create_sheet('ملخص تقرير الوعود القائمة')
-    _write_pivot_sheet(ws, p_active, 'تقرير الوعود القائمة البنك الاهلي السعودي SNB (NPL&60Dpd)', is_real_pivot=can_pv_active)
+    _write_pivot_sheet(ws, p_active, 'تقرير الوعود القائمة البنك الاهلي السعودي SNB (NPL&60Dpd&30Dpd)')
 
     ws = wb.create_sheet('تقرير الوعود المكسورة')
     _write_df_sheet(ws, broken_df)
 
-    can_pv_broken = _can_pivot(broken_df)
     p_broken = build_pivot(broken_df, order='desc')
     ws = wb.create_sheet('ملخص تقرير الوعود المكسورة')
-    _write_pivot_sheet(ws, p_broken, 'تقرير الوعود المكسورة البنك الاهلي SNB (NPL&60Dpd)', is_real_pivot=can_pv_broken)
+    _write_pivot_sheet(ws, p_broken, 'تقرير الوعود المكسورة البنك الاهلي SNB (NPL&60Dpd&30Dpd)')
 
     if neglect_df is not None and len(neglect_df.columns) > 0:
         ws = wb.create_sheet('تقرير الإهمال')
@@ -1060,19 +803,6 @@ def build_report_xlsx(active_df, broken_df, neglect_df=None):
 
     buf = io.BytesIO()
     wb.save(buf)
-
-    specs = []
-    if can_pv_active:
-        specs.append({'summary_sheet': 'ملخص تقرير الوعود القائمة', 'data_sheet': 'تقرير الوعود القائمة',
-                      'data_df': active_df, 'pivot': p_active, 'order': 'first'})
-    if can_pv_broken:
-        specs.append({'summary_sheet': 'ملخص تقرير الوعود المكسورة', 'data_sheet': 'تقرير الوعود المكسورة',
-                      'data_df': broken_df, 'pivot': p_broken, 'order': 'desc'})
-    if specs:
-        try:
-            return inject_pivot_tables(buf.getvalue(), specs)
-        except Exception:
-            pass
     buf.seek(0)
     return buf
 
@@ -1368,7 +1098,7 @@ else:
                     st.info("لا توجد بيانات نشاط كافية لعرض رسم بياني.")
                 
         st.markdown("<br>", unsafe_allow_html=True)
-        st.download_button(label=f"📥 تحميل التقرير الكامل.xlsx", data=report_bytes, file_name=f"Daily_Promises_Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+        st.download_button(label="📥 تحميل التقرير الكامل.xlsx", data=report_bytes, file_name="Daily_Promises_Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
     elif curr_page == 'Promises':
         st.markdown(f"""
@@ -1392,7 +1122,7 @@ else:
             st.dataframe(broken_promises_df, use_container_width=True, height=400)
             
         st.markdown("<br>", unsafe_allow_html=True)
-        st.download_button("📥 تحميل التقرير الشامل (الإكسيل بالملخصات).xlsx", data=report_bytes, file_name=f"Daily_Promises_Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="dl_promises_all")
+        st.download_button("📥 تحميل التقرير الشامل (الإكسيل بالملخصات).xlsx", data=report_bytes, file_name="Daily_Promises_Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="dl_promises_all")
         
     elif curr_page == 'Neglect':
         st.markdown(f"""
@@ -1734,7 +1464,16 @@ else:
         st.dataframe(act_df[display_cols], use_container_width=True, height=450)
         st.markdown("</div>", unsafe_allow_html=True)
 
+        wb_act = Workbook()
+        ws_act = wb_act.active
+        ws_act.title = 'تقرير النشاط والتقييم'
+        _write_df_sheet(ws_act, act_df[display_cols])
         act_buf = io.BytesIO()
-        act_df[display_cols].to_excel(act_buf, index=False, sheet_name='تقرير النشاط والتقييم')
+        wb_act.save(act_buf)
         act_buf.seek(0)
-        st.download_button("📥 تحميل تقرير النشاط مفلتر.xlsx", data=act_buf, file_name=f"Activity_Success_Report.xlsx")
+        st.download_button(
+            "📥 تحميل تقرير النشاط مفلتر.xlsx",
+            data=act_buf.getvalue(),
+            file_name="Activity_Success_Report.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
