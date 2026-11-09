@@ -570,6 +570,68 @@ st.markdown(f"""
         align-items: center;
         justify-content: center;
     }}
+    /* ===== صفحة النشاط: 3 مربعات في سطر واحد - أصغر - والعناوين في النص - والحدود على القد ===== */
+    html body .stApp div[class*="st-key-act_boxes_row"] {{
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: 12px !important;
+        width: 100% !important;
+        margin: 0 auto 14px auto !important;
+        align-items: stretch !important;
+        direction: rtl !important;
+    }}
+    html body .stApp div[class*="st-key-act_box_"] {{
+        border: 1px solid {border_color} !important;
+        border-radius: 8px !important;
+        padding: 6px 10px 8px 10px !important;
+        min-height: 118px !important;
+        height: auto !important;
+        box-sizing: border-box !important;
+        gap: 8px !important;
+        text-align: center !important;
+        height: 100% !important;
+    }}
+    html body .stApp div[class*="st-key-act_box_"] p {{
+        line-height: 1.6 !important;
+        margin: 0 0 4px 0 !important;
+        padding: 0 !important;
+        position: static !important;
+        transform: none !important;
+        text-align: center !important;
+    }}
+    html body .stApp div[class*="st-key-act_box_"] [data-testid="stElementContainer"],
+    html body .stApp div[class*="st-key-act_box_"] [data-testid="stMarkdownContainer"] {{
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+    }}
+    html body .stApp div[class*="st-key-act_box_"] [data-testid="stWidgetLabel"] {{
+        width: 100% !important;
+        display: flex !important;
+        justify-content: center !important;
+        margin-bottom: 4px !important;
+        height: auto !important;
+        min-height: 24px !important;
+        line-height: 1.6 !important;
+    }}
+    html body .stApp div[class*="st-key-act_box_"] [data-testid="stWidgetLabel"] p {{
+        width: 100% !important;
+        text-align: center !important;
+        margin: 0 !important;
+        color: {label_color} !important;
+    }}
+    html body .stApp div[class*="st-key-act_box_"] div[data-testid="stFileUploaderDropzone"] {{
+        height: 44px !important;
+        min-height: 44px !important;
+        padding: 2px 6px !important;
+    }}
+    html body .stApp div[class*="st-key-act_box_"] div[data-testid="stFileUploaderDropzone"] > div {{
+        min-height: 36px !important;
+    }}
+    html body .stApp div[class*="st-key-act_box_"] div[data-baseweb="select"] > div {{
+        min-height: 38px !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1379,11 +1441,15 @@ def render_activity_header():
     """, unsafe_allow_html=True)
 
 def render_activity_boxes(activity_base_df=None):
-    col_model, col_file, col_coll = st.columns([1, 1, 1], gap="medium")
+    """3 مربعات في سطر واحد (الترتيب من اليمين): ملف الموديل - ارفعي الملف هنا - اسم المحصل"""
+    cap_style = f"font-size: 12px; color: {label_color}; direction: rtl; text-align: center; margin: 0; font-weight: bold;"
+    collector_col_name = None
+    selected_collector = "الكل (جميع المحصلين)"
 
-    with col_model:
-        with st.container(border=True):
-            st.markdown(f"<p style='font-size: 13px; color: {input_text}; direction: rtl; text-align: right; margin: 0 0 2px 0; font-weight: bold;'>التقييم (1) يعني 'ناجحة'، والتقييم (0) يعني 'مغطاة'.</p>", unsafe_allow_html=True)
+    with st.container(key="act_boxes_row"):
+        # ---------- 1) شيت موديل النشاط ----------
+        with st.container(key="act_box_model"):
+            st.markdown(f"<p style='{cap_style}'>التقييم (1) يعني 'ناجحة'، والتقييم (0) يعني 'مغطاة'.</p>", unsafe_allow_html=True)
             activity_model_version = st.session_state.overview_uploader_versions[selected_bank]['ActivityModel']
             uploaded_mapping_file = st.file_uploader(
                 "شيت موديل النشاط",
@@ -1398,18 +1464,18 @@ def render_activity_boxes(activity_base_df=None):
                 else st.session_state.overview_uploads[selected_bank].get('ActivityModel')
             )
 
-    with col_file:
-        with st.container(border=True):
+        # ---------- 2) ارفعي الملف هنا يا رنا ----------
+        with st.container(key="act_box_file"):
             cur_files = bank_files.get('Activity') or []
             if cur_files:
                 cur_names = "، ".join(f.name for f in cur_files)
                 hdr_col1, hdr_col2 = st.columns([8.5, 1.5])
                 with hdr_col1:
-                    st.markdown(f"<p style='font-size: 13px; color: {input_text}; direction: rtl; text-align: right; margin: 0; font-weight: bold;'>الملف الحالي: {cur_names}</p>", unsafe_allow_html=True)
+                    st.markdown(f"<p style='{cap_style}'>الملف الحالي: {cur_names}</p>", unsafe_allow_html=True)
                 with hdr_col2:
                     st.button("✖", key="clear_act_files_btn", on_click=clear_activity_files, help="إزالة الملف المرفوع")
             else:
-                st.markdown(f"<p style='font-size: 13px; color: {input_text}; direction: rtl; text-align: right; margin: 0 0 2px 0; font-weight: bold;'>الملف الحالي: لسه ما اترفعش ملف</p>", unsafe_allow_html=True)
+                st.markdown(f"<p style='{cap_style}'>الملف الحالي: لسه ما اترفعش ملف</p>", unsafe_allow_html=True)
 
             uploader_key = f"uploader_inpage_{selected_bank}_Activity_{st.session_state.act_uploader_ver[selected_bank]}"
             new_files = st.file_uploader("ارفعي الملف هنا يا رنا", type=["xlsx", "csv"], accept_multiple_files=True, key=uploader_key)
@@ -1420,11 +1486,9 @@ def render_activity_boxes(activity_base_df=None):
                     bank_files['Activity'] = new_files
                     st.rerun()
 
-    collector_col_name = None
-    selected_collector = "الكل (جميع المحصلين)"
-    with col_coll:
-        with st.container(border=True):
-            st.markdown(f"<p style='font-size: 13px; color: {input_text}; direction: rtl; text-align: right; margin: 0 0 2px 0; font-weight: bold;'>فلترة حسب المحصل</p>", unsafe_allow_html=True)
+        # ---------- 3) اسم المحصل ----------
+        with st.container(key="act_box_coll"):
+            st.markdown(f"<p style='{cap_style}'>فلترة حسب المحصل</p>", unsafe_allow_html=True)
             collector_options = ["الكل (جميع المحصلين)"]
             if activity_base_df is not None:
                 collector_col_name = find_col_in(activity_base_df, ['collecter', 'collector', 'المحصل', 'اسم المحصل'])
