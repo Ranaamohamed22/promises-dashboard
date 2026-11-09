@@ -44,7 +44,12 @@ def set_bank(bank):
     st.session_state.selected_bank = bank
 
 if 'current_page' not in st.session_state:
-    st.session_state.current_page = 'Overview'
+    st.session_state.current_page = 'Home'
+
+# ترحيل جلسات التشغيل القديمة: الرئيسية أصبحت صفحة مستقلة عن Overview.
+if not st.session_state.get('_separate_home_overview_v1', False):
+    st.session_state.current_page = 'Home'
+    st.session_state['_separate_home_overview_v1'] = True
 if 'theme_choice' not in st.session_state:
     st.session_state.theme_choice = 'ثيم إجادة (Navy)'
 if 'act_uploader_ver' not in st.session_state:
@@ -570,68 +575,6 @@ st.markdown(f"""
         align-items: center;
         justify-content: center;
     }}
-    /* ===== صفحة النشاط: 3 مربعات في سطر واحد - أصغر - والعناوين في النص - والحدود على القد ===== */
-    html body .stApp div[class*="st-key-act_boxes_row"] {{
-        display: grid !important;
-        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-        gap: 12px !important;
-        width: 100% !important;
-        margin: 0 auto 14px auto !important;
-        align-items: stretch !important;
-        direction: rtl !important;
-    }}
-    html body .stApp div[class*="st-key-act_box_"] {{
-        border: 1px solid {border_color} !important;
-        border-radius: 8px !important;
-        padding: 6px 10px 8px 10px !important;
-        min-height: 118px !important;
-        height: auto !important;
-        box-sizing: border-box !important;
-        gap: 8px !important;
-        text-align: center !important;
-        height: 100% !important;
-    }}
-    html body .stApp div[class*="st-key-act_box_"] p {{
-        line-height: 1.6 !important;
-        margin: 0 0 4px 0 !important;
-        padding: 0 !important;
-        position: static !important;
-        transform: none !important;
-        text-align: center !important;
-    }}
-    html body .stApp div[class*="st-key-act_box_"] [data-testid="stElementContainer"],
-    html body .stApp div[class*="st-key-act_box_"] [data-testid="stMarkdownContainer"] {{
-        width: 100% !important;
-        height: auto !important;
-        min-height: 0 !important;
-        overflow: visible !important;
-    }}
-    html body .stApp div[class*="st-key-act_box_"] [data-testid="stWidgetLabel"] {{
-        width: 100% !important;
-        display: flex !important;
-        justify-content: center !important;
-        margin-bottom: 4px !important;
-        height: auto !important;
-        min-height: 24px !important;
-        line-height: 1.6 !important;
-    }}
-    html body .stApp div[class*="st-key-act_box_"] [data-testid="stWidgetLabel"] p {{
-        width: 100% !important;
-        text-align: center !important;
-        margin: 0 !important;
-        color: {label_color} !important;
-    }}
-    html body .stApp div[class*="st-key-act_box_"] div[data-testid="stFileUploaderDropzone"] {{
-        height: 44px !important;
-        min-height: 44px !important;
-        padding: 2px 6px !important;
-    }}
-    html body .stApp div[class*="st-key-act_box_"] div[data-testid="stFileUploaderDropzone"] > div {{
-        min-height: 36px !important;
-    }}
-    html body .stApp div[class*="st-key-act_box_"] div[data-baseweb="select"] > div {{
-        min-height: 38px !important;
-    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -667,7 +610,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-if st.session_state.current_page != 'Overview':
+if st.session_state.current_page not in ('Overview', 'Home'):
     bank_col1, bank_col2, _bank_spacer = st.columns([1.3, 1.3, 7.4], gap='small')
     with bank_col1:
         st.button('🏦 SNB | البنك الأهلي السعودي', key='bank_SNB',
@@ -685,7 +628,7 @@ if st.session_state.current_page != 'Overview':
 nav_cols = st.columns([0.9, 1.5, 1.05, 0.85, 5.7], gap="small") 
 
 with nav_cols[0]:
-    st.button("🏠 الرئيسية", key="nav_home_btn", type="primary" if st.session_state.current_page == 'Overview' else "secondary", use_container_width=True, on_click=set_page, args=('Overview',))
+    st.button("🏠 الرئيسية", key="nav_home_btn", type="primary" if st.session_state.current_page == 'Home' else "secondary", use_container_width=True, on_click=set_page, args=('Home',))
 
 with nav_cols[1]:
     st.button("🤝 الوعود القائمة والمكسورة", key="nav_prom_btn", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=True, on_click=set_page, args=('Promises',))
@@ -709,8 +652,9 @@ PIVOT_COLL = 'Salesperson'
 PIVOT_NOTE = 'ملاحظات-التمويل'
 PIVOT_ACC = 'Account Number'
 PIVOT_AMT = 'Net Amount'
-FIXED_NOTES = ['NPL', 'DPD60', 'DPD30']
+FIXED_NOTES = ['NPL', 'Dpd60', 'Dpd30']
 SUM_FMT = '_(* #,##0_);_(* \\(#,##0\\);_(* "-"??_);_(@_)'
+COUNT_FMT = '#,##0'
 _ILLEGAL_XML = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
 
 
@@ -735,9 +679,9 @@ def _normalize_note_bucket(val):
     if key == 'NPL':
         return 'NPL'
     if key in ('DPD60', '60DPD'):
-        return 'DPD60'
+        return 'Dpd60'
     if key in ('DPD30', '30DPD'):
-        return 'DPD30'
+        return 'Dpd30'
     return s
 
 
@@ -814,7 +758,31 @@ def pivot_to_frame(p):
     return pd.DataFrame(out, columns=cols)
 
 
+def style_pivot_frame(frame):
+    """Center and bold Pivot column headings; show numbers with commas and no decimals."""
+    numeric_cols = frame.select_dtypes(include='number').columns.tolist()
+    number_formats = {col: '{:,.0f}' for col in numeric_cols}
+    return (
+        frame.style
+        .format(number_formats, na_rep='')
+        .set_table_styles([
+            {'selector': 'th', 'props': [
+                ('text-align', 'center'),
+                ('font-weight', 'bold'),
+                ('vertical-align', 'middle'),
+            ]},
+            {'selector': 'th.col_heading', 'props': [
+                ('text-align', 'center'),
+                ('font-weight', 'bold'),
+            ]},
+            {'selector': 'td', 'props': [('vertical-align', 'middle')]},
+        ])
+        .set_properties(subset=numeric_cols, **{'text-align': 'center'})
+    )
+
+
 def _prepare_for_output(df):
+
     d = df.copy()
     if PIVOT_NOTE in d.columns:
         d[PIVOT_NOTE] = d[PIVOT_NOTE].apply(_normalize_note_bucket)
@@ -828,7 +796,7 @@ def _prepare_for_output(df):
 
 
 def _write_df_sheet(ws, df):
-    ws.sheet_view.rightToLeft = True
+    ws.sheet_view.rightToLeft = False
     if df is None or len(df.columns) == 0:
         return
     df = _prepare_for_output(df)
@@ -836,7 +804,12 @@ def _write_df_sheet(ws, df):
     for j, c in enumerate(df.columns, 1):
         clean_col = _clean_excel_str(str(c))
         ws.cell(row=1, column=j, value=clean_col).font = bold
-        ws.column_dimensions[get_column_letter(j)].width = min(40, max(12, len(clean_col) + 4))
+        sample_lengths = [
+            len(str(v)) for v in df[c].head(500).tolist()
+            if v is not None and not (isinstance(v, float) and pd.isna(v))
+        ]
+        content_width = max([len(clean_col)] + sample_lengths)
+        ws.column_dimensions[get_column_letter(j)].width = min(44, max(9, content_width + 2))
     for i, row in enumerate(df.itertuples(index=False), 2):
         for j, v in enumerate(row, 1):
             if v is None or (not isinstance(v, (list, tuple)) and pd.isna(v)):
@@ -859,7 +832,17 @@ def _write_pivot_sheet(ws, p, title, is_real_pivot=False):
     notes = p['notes']
     n = len(notes)
     last_col = 2 + 2 * n + 2
+    # فتح الملخص من أعلى الشيت وبمقياس مناسب حتى تظهر مجموعات الـ Pivot كاملة.
     ws.sheet_view.rightToLeft = True
+    ws.sheet_view.zoomScale = 80
+    ws.sheet_view.zoomScaleNormal = 80
+    ws.sheet_view.showGridLines = False
+    ws.sheet_view.topLeftCell = 'A1'
+    if ws.sheet_view.selection:
+        ws.sheet_view.selection[0].activeCell = 'A1'
+        ws.sheet_view.selection[0].sqref = 'A1'
+    ws.row_dimensions[1].height = 27
+    ws.row_dimensions[2].height = 10
 
     dark = PatternFill('solid', fgColor='244062')
     light = PatternFill('solid', fgColor='C5D9F1')
@@ -881,6 +864,17 @@ def _write_pivot_sheet(ws, p, title, is_real_pivot=False):
     ws.cell(row=1, column=1, value=title).font = Font(name='Calibri', bold=True, color='FFFFFF', size=18)
     ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=last_col)
 
+    if not is_real_pivot:
+        msg = ws.cell(
+            row=4, column=1,
+            value='لا توجد بيانات كافية أو أن أعمدة الـ Pivot المطلوبة غير متاحة.'
+        )
+        msg.font = Font(name='Calibri', bold=True, color='244062', size=12)
+        msg.alignment = Alignment(horizontal='center', vertical='center')
+        ws.merge_cells(start_row=4, start_column=1, end_row=5, end_column=last_col)
+        ws.column_dimensions['A'].width = 35.7
+        return
+
     for c in range(1, last_col + 1):
         hdr(3, c)
         hdr(4, c)
@@ -890,19 +884,14 @@ def _write_pivot_sheet(ws, p, title, is_real_pivot=False):
     for i, note in enumerate(notes):
         c0 = 3 + 2 * i
         ws.cell(row=4, column=c0, value=note).font = Font(name='Calibri', bold=True, color='FFFFFF', size=14)
-        if not is_real_pivot:
-            ws.merge_cells(start_row=4, start_column=c0, end_row=4, end_column=c0 + 1)
+        ws.merge_cells(start_row=4, start_column=c0, end_row=4, end_column=c0 + 1)
         ws.cell(row=5, column=c0, value='عدد الحسابات')
         ws.cell(row=5, column=c0 + 1, value='متبقي المديونية')
     tc = 3 + 2 * n
     ws.cell(row=4, column=tc, value='Total عدد الحسابات')
     ws.cell(row=4, column=tc + 1, value='Total متبقي المديونية')
-    if not is_real_pivot:
-        ws.merge_cells(start_row=4, start_column=tc, end_row=5, end_column=tc)
-        ws.merge_cells(start_row=4, start_column=tc + 1, end_row=5, end_column=tc + 1)
-    else:
-        ws.cell(row=5, column=tc, value='Total عدد الحسابات')
-        ws.cell(row=5, column=tc + 1, value='Total متبقي المديونية')
+    ws.merge_cells(start_row=4, start_column=tc, end_row=5, end_column=tc)
+    ws.merge_cells(start_row=4, start_column=tc + 1, end_row=5, end_column=tc + 1)
     ws.cell(row=5, column=1, value='اسم المشرف ')
     ws.cell(row=5, column=2, value='اسم المحصل ')
 
@@ -921,9 +910,9 @@ def _write_pivot_sheet(ws, p, title, is_real_pivot=False):
         for row in t['rows']:
             body(r, 2, row['coll'])
             for i, note in enumerate(notes):
-                body(r, 3 + 2 * i, row['by_note'][note][0])
+                body(r, 3 + 2 * i, row['by_note'][note][0], COUNT_FMT)
                 body(r, 4 + 2 * i, row['by_note'][note][1], SUM_FMT)
-            body(r, tc, row['cnt'])
+            body(r, tc, row['cnt'], COUNT_FMT)
             body(r, tc + 1, row['amt'], SUM_FMT)
             r += 1
         a = body(start, 1, t['team'])
@@ -933,7 +922,7 @@ def _write_pivot_sheet(ws, p, title, is_real_pivot=False):
             cell = ws.cell(row=rr, column=1)
             cell.fill = light
             cell.border = Border(left=thick, right=thin, top=thin, bottom=thin)
-        if not is_real_pivot and r - 1 > start:
+        if r - 1 > start:
             ws.merge_cells(start_row=start, start_column=1, end_row=r - 1, end_column=1)
 
     g = p['grand']
@@ -944,22 +933,22 @@ def _write_pivot_sheet(ws, p, title, is_real_pivot=False):
         cell.alignment = center
         cell.border = Border(left=thick if c == 1 else thin, right=thin, top=thin, bottom=thick)
     ws.cell(row=r, column=1, value='الاجمالي')
-    if not is_real_pivot:
-        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=2)
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=2)
     for i, note in enumerate(notes):
-        ws.cell(row=r, column=3 + 2 * i, value=g['by_note'][note][0])
+        ws.cell(row=r, column=3 + 2 * i, value=g['by_note'][note][0]).number_format = COUNT_FMT
         x = ws.cell(row=r, column=4 + 2 * i, value=g['by_note'][note][1])
         x.number_format = SUM_FMT
-    ws.cell(row=r, column=tc, value=g['cnt'])
+    ws.cell(row=r, column=tc, value=g['cnt']).number_format = COUNT_FMT
     x = ws.cell(row=r, column=tc + 1, value=g['amt'])
     x.number_format = SUM_FMT
 
-    ws.column_dimensions['A'].width = 35.7
-    ws.column_dimensions['B'].width = 30.7
+    # أعمدة مضغوطة لتظهر كل مجموعات الملاحظات والإجماليات على شاشة واحدة.
+    ws.column_dimensions['A'].width = 30
+    ws.column_dimensions['B'].width = 32
     for c in range(3, 3 + 2 * n):
-        ws.column_dimensions[get_column_letter(c)].width = 18.9
-    ws.column_dimensions[get_column_letter(tc)].width = 16.7
-    ws.column_dimensions[get_column_letter(tc + 1)].width = 17.6
+        ws.column_dimensions[get_column_letter(c)].width = 15.5
+    ws.column_dimensions[get_column_letter(tc)].width = 15.5
+    ws.column_dimensions[get_column_letter(tc + 1)].width = 16
 
 
 def _cell_kind(v):
@@ -1045,8 +1034,8 @@ def _pivot_parts(data_df, data_sheet, p, order, idx):
     last_col_letter = get_column_letter(len(cols))
     ns = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
     cache_def = (
-        f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<pivotCacheDefinition {ns} r:id="rId1" refreshOnLoad="1" refreshedBy="Ejada" '
-        f'refreshedDate="46330.5" createdVersion="3" refreshedVersion="3" minRefreshableVersion="3" recordCount="{n_rows}">'
+        f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<pivotCacheDefinition {ns} r:id="rId1" refreshedBy="Ejada" '
+        f'refreshedDate="46330.5" createdVersion="8" refreshedVersion="8" minRefreshableVersion="3" recordCount="{n_rows}">'
         f'<cacheSource type="worksheet"><worksheetSource ref="A1:{last_col_letter}{n_rows + 1}" sheet="{_xa(data_sheet)}"/></cacheSource>'
         f'<cacheFields count="{len(cols)}">{"".join(fields_xml)}</cacheFields></pivotCacheDefinition>'
     )
@@ -1123,10 +1112,11 @@ def _pivot_parts(data_df, data_sheet, p, order, idx):
 
     pivot_def = (
         f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
-        f'name="PivotTable{idx}" cacheId="{idx}" dataOnRows="0" applyNumberFormats="0" applyBorderFormats="0" applyFontFormats="0" applyPatternFormats="0" '
+        f'name="PivotTable{idx}" cacheId="{idx}" dataOnRows="0" applyNumberFormats="1" applyBorderFormats="0" applyFontFormats="0" applyPatternFormats="0" '
         f'applyAlignmentFormats="0" applyWidthHeightFormats="1" dataCaption="Values" grandTotalCaption="الاجمالي" '
-        f'updatedVersion="3" minRefreshableVersion="3" useAutoFormatting="1" itemPrintTitles="1" createdVersion="3" indent="0" '
-        f'compact="0" compactData="0" gridDropZones="1">'
+        f'missingCaption="0" updatedVersion="8" minRefreshableVersion="3" useAutoFormatting="1" itemPrintTitles="1" '
+        f'mergeItem="1" createdVersion="8" indent="0" compact="0" compactData="0" multipleFieldFilters="0" '
+        f'rowHeaderCaption="المحصل" colHeaderCaption="الفرع">'
         f'<location ref="{ref}" firstHeaderRow="1" firstDataRow="3" firstDataCol="2"/>'
         f'<pivotFields count="{len(cols)}">{"".join(pf)}</pivotFields>'
         f'<rowFields count="2"><field x="{team_i}"/><field x="{coll_i}"/></rowFields>'
@@ -1134,10 +1124,10 @@ def _pivot_parts(data_df, data_sheet, p, order, idx):
         f'<colFields count="2"><field x="{note_i}"/><field x="-2"/></colFields>'
         f'<colItems count="{len(col_items)}">{"".join(col_items)}</colItems>'
         f'<dataFields count="2">'
-        f'<dataField name="عدد الحسابات" fld="{acc_i}" subtotal="count"/>'
+        f'<dataField name="عدد الحسابات" fld="{acc_i}" subtotal="count" numFmtId="3"/>'
         f'<dataField name="متبقي المديونية" fld="{amt_i}" subtotal="sum" numFmtId="3"/>'
         f'</dataFields>'
-        f'<pivotTableStyleInfo name="PivotStyleMedium9" showRowHeaders="1" showColHeaders="1" showRowStripes="0" showColStripes="0" showLastColumn="1"/>'
+        f'<pivotTableStyleInfo name="PivotStyleLight16" showRowHeaders="1" showColHeaders="1" showRowStripes="0" showColStripes="0" showLastColumn="1"/>'
         f'</pivotTableDefinition>'
     )
     return cache_def, cache_records, pivot_def
@@ -1203,12 +1193,11 @@ def inject_pivot_tables(xlsx_bytes, specs):
     if specs:
         wb_rels = wb_rels.replace('</Relationships>', new_rels + '</Relationships>')
         ct = ct.replace('</Types>', new_ct + '</Types>')
-        if 'xmlns:r=' not in wb_xml:
-            wb_xml = wb_xml.replace(
-                '<workbook ',
-                '<workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ',
-                1
-            )
+        root_match = re.search(r'<workbook\b[^>]*>', wb_xml)
+        if root_match and not re.search(r'\bxmlns:r=', root_match.group(0)):
+            root_tag = root_match.group(0)
+            updated_root = root_tag[:-1] + ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            wb_xml = wb_xml.replace(root_tag, updated_root, 1)
         wb_xml = wb_xml.replace('</workbook>', f'<pivotCaches>{pivot_caches_xml}</pivotCaches></workbook>')
         files['xl/workbook.xml'] = wb_xml.encode('utf-8')
         files['xl/_rels/workbook.xml.rels'] = wb_rels.encode('utf-8')
@@ -1238,7 +1227,13 @@ def build_report_xlsx(active_df, broken_df, neglect_df=None, bank="SNB"):
     can_pv_active = _can_pivot(active_df)
     p_active = build_pivot(active_df, order='first')
     ws = wb.create_sheet('ملخص تقرير الوعود القائمة')
-    _write_pivot_sheet(ws, p_active, f'تقرير الوعود القائمة {BANKS[bank]} {bank}', is_real_pivot=can_pv_active)
+    if bank == 'SNB':
+        active_title = 'تقرير الوعود القائمة البنك الاهلي السعودي SNB (NPL&60Dpd)'
+        broken_title = 'تقرير الوعود المكسورة البنك الاهلي SNB (NPL&60Dpd)'
+    else:
+        active_title = f'تقرير الوعود القائمة {BANKS[bank]} {bank}'
+        broken_title = f'تقرير الوعود المكسورة {BANKS[bank]} {bank}'
+    _write_pivot_sheet(ws, p_active, active_title, is_real_pivot=can_pv_active)
 
     ws = wb.create_sheet('تقرير الوعود المكسورة')
     _write_df_sheet(ws, broken_df)
@@ -1246,11 +1241,7 @@ def build_report_xlsx(active_df, broken_df, neglect_df=None, bank="SNB"):
     can_pv_broken = _can_pivot(broken_df)
     p_broken = build_pivot(broken_df, order='desc')
     ws = wb.create_sheet('ملخص تقرير الوعود المكسورة')
-    _write_pivot_sheet(ws, p_broken, f'تقرير الوعود المكسورة {BANKS[bank]} {bank}', is_real_pivot=can_pv_broken)
-
-    if neglect_df is not None and len(neglect_df.columns) > 0:
-        ws = wb.create_sheet('تقرير الإهمال')
-        _write_df_sheet(ws, neglect_df)
+    _write_pivot_sheet(ws, p_broken, broken_title, is_real_pivot=can_pv_broken)
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -1276,9 +1267,13 @@ if 'page_files' not in st.session_state or not all(
     old_files = st.session_state.get('page_files', {})
     st.session_state.page_files = {
         b: {page: (old_files.get(page) if b == 'SNB' and not isinstance(old_files.get('SNB'), dict) else None)
-            for page in ('Overview', 'Promises', 'Neglect', 'Activity')}
+            for page in ('Home', 'Overview', 'Promises', 'Neglect', 'Activity')}
         for b in BANKS
     }
+
+# إضافة صفحة Home للجلسات القديمة دون التأثير على ملفات التقارير المرفوعة.
+for _bank in BANKS:
+    st.session_state.page_files[_bank].setdefault('Home', None)
 
 # ملفات لوحة Overview مستقلة لكل بنك ولكل نوع تقرير.
 if 'overview_uploads' not in st.session_state:
@@ -1441,15 +1436,11 @@ def render_activity_header():
     """, unsafe_allow_html=True)
 
 def render_activity_boxes(activity_base_df=None):
-    """3 مربعات في سطر واحد (الترتيب من اليمين): ملف الموديل - ارفعي الملف هنا - اسم المحصل"""
-    cap_style = f"font-size: 12px; color: {label_color}; direction: rtl; text-align: center; margin: 0; font-weight: bold;"
-    collector_col_name = None
-    selected_collector = "الكل (جميع المحصلين)"
+    col_model, col_file, col_coll = st.columns([1, 1, 1], gap="medium")
 
-    with st.container(key="act_boxes_row"):
-        # ---------- 1) شيت موديل النشاط ----------
-        with st.container(key="act_box_model"):
-            st.markdown(f"<p style='{cap_style}'>التقييم (1) يعني 'ناجحة'، والتقييم (0) يعني 'مغطاة'.</p>", unsafe_allow_html=True)
+    with col_model:
+        with st.container(border=True):
+            st.markdown(f"<p style='font-size: 13px; color: {input_text}; direction: rtl; text-align: right; margin: 0 0 2px 0; font-weight: bold;'>التقييم (1) يعني 'ناجحة'، والتقييم (0) يعني 'مغطاة'.</p>", unsafe_allow_html=True)
             activity_model_version = st.session_state.overview_uploader_versions[selected_bank]['ActivityModel']
             uploaded_mapping_file = st.file_uploader(
                 "شيت موديل النشاط",
@@ -1464,18 +1455,18 @@ def render_activity_boxes(activity_base_df=None):
                 else st.session_state.overview_uploads[selected_bank].get('ActivityModel')
             )
 
-        # ---------- 2) ارفعي الملف هنا يا رنا ----------
-        with st.container(key="act_box_file"):
+    with col_file:
+        with st.container(border=True):
             cur_files = bank_files.get('Activity') or []
             if cur_files:
                 cur_names = "، ".join(f.name for f in cur_files)
                 hdr_col1, hdr_col2 = st.columns([8.5, 1.5])
                 with hdr_col1:
-                    st.markdown(f"<p style='{cap_style}'>الملف الحالي: {cur_names}</p>", unsafe_allow_html=True)
+                    st.markdown(f"<p style='font-size: 13px; color: {input_text}; direction: rtl; text-align: right; margin: 0; font-weight: bold;'>الملف الحالي: {cur_names}</p>", unsafe_allow_html=True)
                 with hdr_col2:
                     st.button("✖", key="clear_act_files_btn", on_click=clear_activity_files, help="إزالة الملف المرفوع")
             else:
-                st.markdown(f"<p style='{cap_style}'>الملف الحالي: لسه ما اترفعش ملف</p>", unsafe_allow_html=True)
+                st.markdown(f"<p style='font-size: 13px; color: {input_text}; direction: rtl; text-align: right; margin: 0 0 2px 0; font-weight: bold;'>الملف الحالي: لسه ما اترفعش ملف</p>", unsafe_allow_html=True)
 
             uploader_key = f"uploader_inpage_{selected_bank}_Activity_{st.session_state.act_uploader_ver[selected_bank]}"
             new_files = st.file_uploader("ارفعي الملف هنا يا رنا", type=["xlsx", "csv"], accept_multiple_files=True, key=uploader_key)
@@ -1486,9 +1477,11 @@ def render_activity_boxes(activity_base_df=None):
                     bank_files['Activity'] = new_files
                     st.rerun()
 
-        # ---------- 3) اسم المحصل ----------
-        with st.container(key="act_box_coll"):
-            st.markdown(f"<p style='{cap_style}'>فلترة حسب المحصل</p>", unsafe_allow_html=True)
+    collector_col_name = None
+    selected_collector = "الكل (جميع المحصلين)"
+    with col_coll:
+        with st.container(border=True):
+            st.markdown(f"<p style='font-size: 13px; color: {input_text}; direction: rtl; text-align: right; margin: 0 0 2px 0; font-weight: bold;'>فلترة حسب المحصل</p>", unsafe_allow_html=True)
             collector_options = ["الكل (جميع المحصلين)"]
             if activity_base_df is not None:
                 collector_col_name = find_col_in(activity_base_df, ['collecter', 'collector', 'المحصل', 'اسم المحصل'])
@@ -1499,7 +1492,8 @@ def render_activity_boxes(activity_base_df=None):
 
     return selected_collector, mapping_file, collector_col_name
 
-st.markdown(f"<div style='text-align:right; color:{label_color}; font-weight:900; font-size:18px; margin-bottom:12px'>🏦 تقارير {'البنك الأهلي السعودي SNB' if selected_bank == 'SNB' else 'STC'}</div>", unsafe_allow_html=True)
+if curr_page != 'Home':
+    st.markdown(f"<div style='text-align:right; color:{label_color}; font-weight:900; font-size:18px; margin-bottom:12px'>🏦 تقارير {'البنك الأهلي السعودي SNB' if selected_bank == 'SNB' else 'STC'}</div>")
 
 if curr_page == 'Overview':
     st.markdown(f"<h3 style='text-align:center;color:{label_color};font-weight:900;margin:6px 0 12px;'>اختاري البنك</h3>", unsafe_allow_html=True)
@@ -1621,7 +1615,13 @@ if curr_page == 'Overview':
 page_uploaded = bank_files[curr_page]
 
 if page_uploaded is None:
-    if curr_page == 'Overview':
+    if curr_page == 'Home':
+        st.markdown(f"""
+        <div style="background-color:{card_color};border:1px solid {border_color};border-radius:15px;padding:42px 24px;margin:28px 0 18px;text-align:center;direction:rtl;box-shadow:0 4px 14px rgba(0,0,0,0.08);">
+            <h2 style="color:{text_color};margin:0;font-weight:900;font-size:30px;">أهلاً بيكي يا رنا في تقارير شركة إجادة لتحصيل الديون</h2>
+        </div>
+        """, unsafe_allow_html=True)
+    elif curr_page == 'Overview':
         st.markdown(f"""
         <div style="background-color:{card_color};border:1px solid {border_color};border-radius:15px;padding:22px 18px;margin:8px 0 18px;text-align:center;direction:rtl;">
             <h2 style="color:{text_color};margin:0 0 8px;font-weight:900;">📊 لوحة التحكم الرئيسية | EJADA Overview</h2>
@@ -1816,13 +1816,13 @@ else:
         
         with tab_active:
             st.markdown(f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900;'>📊 ملخص تقرير الوعود القائمة (Pivot)</h4>", unsafe_allow_html=True)
-            st.dataframe(pivot_to_frame(build_pivot(active_promises_df, order='first')), use_container_width=True, hide_index=True)
+            st.dataframe(style_pivot_frame(pivot_to_frame(build_pivot(active_promises_df, order='first'))), use_container_width=True, hide_index=True)
             st.markdown(f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900; margin-top:20px;'>📋 تفاصيل شيت الوعود القائمة</h4>", unsafe_allow_html=True)
             st.dataframe(active_promises_df, use_container_width=True, height=400)
             
         with tab_broken:
             st.markdown(f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900;'>📊 ملخص تقرير الوعود المكسورة (Pivot)</h4>", unsafe_allow_html=True)
-            st.dataframe(pivot_to_frame(build_pivot(broken_promises_df, order='desc')), use_container_width=True, hide_index=True)
+            st.dataframe(style_pivot_frame(pivot_to_frame(build_pivot(broken_promises_df, order='desc'))), use_container_width=True, hide_index=True)
             st.markdown(f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900; margin-top:20px;'>📋 تفاصيل شيت الوعود المكسورة</h4>", unsafe_allow_html=True)
             st.dataframe(broken_promises_df, use_container_width=True, height=400)
             
