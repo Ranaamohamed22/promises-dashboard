@@ -1363,21 +1363,89 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
     else:
         df_act_raw = pd.DataFrame() if explicit_sources else df_all.copy()
 
-    created_col = find_col_in(df_act_raw, ['created on', 'created_on', 'createdon', 'تاريخ الإنشاء', 'وقت المعالجة', 'date', 'التاريخ'])
+    # ==========================================
+    # تجهيز أعمدة تقرير النشاط
+    # ==========================================
+    created_col = find_col_in(
+        df_act_raw,
+        ['created on', 'created_on', 'createdon', 'تاريخ الإنشاء', 'وقت المعالجة', 'date', 'التاريخ']
+    )
     if created_col:
         df_act_raw['Created_DateTime'] = pd.to_datetime(df_act_raw[created_col], errors='coerce')
-        df_act_raw['Date'] = df_act_raw['Created_DateTime'].dt.date
-        df_act_raw['Time'] = df_act_raw['Created_DateTime'].dt.time
 
-    collector_col = find_col_in(df_act_raw, ['collecter', 'collector', 'المحصل', 'اسم المحصل', 'الموظف', 'user', 'agent'])
+        # في تقرير SNB: فصل التاريخ والوقت، وعرض الوقت بصيغة AM / PM.
+        if bank == "SNB":
+            df_act_raw['Date'] = df_act_raw['Created_DateTime'].dt.strftime('%Y-%m-%d')
+            df_act_raw['Time'] = df_act_raw['Created_DateTime'].dt.strftime('%I:%M %p')
+        else:
+            # الإبقاء على طريقة العرض القديمة لبنك STC دون تغيير.
+            df_act_raw['Date'] = df_act_raw['Created_DateTime'].dt.date
+            df_act_raw['Time'] = df_act_raw['Created_DateTime'].dt.time
+
+    collector_col = find_col_in(
+        df_act_raw,
+        ['collecter', 'collector', 'المحصل', 'اسم المحصل', 'الموظف', 'user', 'agent']
+    )
     if not collector_col and not explicit_sources:
-        collector_col = find_col_in(df_all, ['collecter', 'collector', 'المحصل', 'اسم المحصل', 'الموظف', 'user', 'agent'])
+        collector_col = find_col_in(
+            df_all,
+            ['collecter', 'collector', 'المحصل', 'اسم المحصل', 'الموظف', 'user', 'agent']
+        )
 
-    id_col = find_col_in(df_act_raw, ['id numer', 'id number', 'id_number', 'id', 'رقم الهوية', 'رقم العميل', 'account id'])
     notes_col = find_col_in(df_act_raw, ['notes', 'note', 'الملاحظات', 'ملاحظات', 'feedback'])
 
-    dedup_cols = [c for c in [collector_col, id_col, notes_col] if c is not None and c in df_act_raw.columns]
-    activity_base_df = df_act_raw.drop_duplicates(subset=dedup_cols).copy() if len(dedup_cols) == 3 else df_act_raw.copy()
+    # في SNB نزيل التكرار عند تطابق Debtor + Notes + Collector معاً.
+    # نستخدم Debtor / Debitor حسب اسم العمود الموجود في ملف النشاط.
+    if bank == "SNB":
+        debtor_col = find_col_in(
+            df_act_raw,
+            [
+                'debtor', 'debitor', 'debtor number', 'debitor number',
+                'debtor id', 'debitor id', 'رقم المدين', 'رقم المدين/العميل'
+            ]
+        )
+        dedup_cols = [
+            c for c in [debtor_col, notes_col, collector_col]
+            if c is not None and c in df_act_raw.columns
+        ]
+
+        # توحيد المسافات قبل إزالة التكرار، مع الاحتفاظ بالقيم الأصلية كما هي تقريباً.
+        for _dedup_col in dedup_cols:
+            df_act_raw[_dedup_col] = df_act_raw[_dedup_col].apply(
+                lambda _v: _v.strip() if isinstance(_v, str) else _v
+            )
+
+        # دمج CC و PF في فئة واحدة مكتوبة بالضبط CC+PF، مع إبقاء بقية الأنواع كما هي.
+        product_type_col = find_col_in(
+            df_act_raw,
+            [
+                'Claim/نوع المتنج-التمويل', 'Claim/نوع المنتج-التمويل',
+                'نوع المنتج', 'product type', 'product_type', 'product'
+            ]
+        )
+        if product_type_col:
+            _product_values = df_act_raw[product_type_col].astype('string').str.strip()
+            _product_upper = _product_values.str.upper()
+            df_act_raw[product_type_col] = _product_values.mask(
+                _product_upper.isin(['CC', 'PF']), 'CC+PF'
+            )
+
+    else:
+        # الحفاظ على قاعدة إزالة التكرار السابقة لبنك STC.
+        id_col = find_col_in(
+            df_act_raw,
+            ['id numer', 'id number', 'id_number', 'id', 'رقم الهوية', 'رقم العميل', 'account id']
+        )
+        dedup_cols = [
+            c for c in [collector_col, id_col, notes_col]
+            if c is not None and c in df_act_raw.columns
+        ]
+
+    activity_base_df = (
+        df_act_raw.drop_duplicates(subset=dedup_cols).copy()
+        if len(dedup_cols) == 3
+        else df_act_raw.copy()
+    )
 
     active_promises_df = pd.DataFrame()
     broken_promises_df = pd.DataFrame()
@@ -1951,6 +2019,14 @@ else:
             else:
                 act_df['Call_Status'] = 'غير مصنف'
 
+        # وضع عمود حالة المكالمة مباشرة بعد عمود Notes.
+        if notes_col_name and notes_col_name in act_df.columns and 'Call_Status' in act_df.columns:
+            _activity_columns = list(act_df.columns)
+            _activity_columns.remove('Call_Status')
+            _notes_position = _activity_columns.index(notes_col_name) + 1
+            _activity_columns.insert(_notes_position, 'Call_Status')
+            act_df = act_df[_activity_columns]
+
         total_activity = len(act_df)
         success_count = len(act_df[act_df['Call_Status'] == 'ناجحة'])
         covered_count = len(act_df[act_df['Call_Status'] == 'مغطاة'])
@@ -2407,8 +2483,12 @@ else:
                 st.dataframe(pivot_summary, use_container_width=True)
 
         st.markdown("<div style='text-align: right; direction: rtl;'>", unsafe_allow_html=True)
-        extra_time_cols = [c for c in ['Date', 'Time', 'Call_Status'] if c in act_df.columns]
-        display_cols = extra_time_cols + [c for c in act_df.columns if c not in ['Created_DateTime', 'Date', 'Time', 'Call_Status']]
+        # عرض Date و Time أولاً، مع إبقاء Call_Status بجوار Notes مباشرة.
+        extra_time_cols = [c for c in ['Date', 'Time'] if c in act_df.columns]
+        display_cols = extra_time_cols + [
+            c for c in act_df.columns
+            if c not in ['Created_DateTime', 'Date', 'Time']
+        ]
         st.dataframe(act_df[display_cols], use_container_width=True, height=450)
         st.markdown("</div>", unsafe_allow_html=True)
 
