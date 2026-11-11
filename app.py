@@ -821,7 +821,15 @@ def _write_df_sheet(ws, df):
             elif isinstance(v, str):
                 v = _clean_excel_str(v)
             cell = ws.cell(row=i, column=j, value=v)
+            column_name = str(df.columns[j - 1]).strip()
             if isinstance(v, datetime):
+                if column_name in ['Next_Call_DateTime', 'Created_DateTime', 'وقت المكالمة التالية لنفس المحصل']:
+                    cell.number_format = 'yyyy-mm-dd hh:mm:ss AM/PM'
+                else:
+                    cell.number_format = 'yyyy-mm-dd'
+            elif isinstance(v, time):
+                cell.number_format = 'hh:mm:ss AM/PM'
+            elif isinstance(v, date):
                 cell.number_format = 'yyyy-mm-dd'
             elif isinstance(v, float):
                 cell.number_format = '#,##0.00'
@@ -1363,89 +1371,21 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
     else:
         df_act_raw = pd.DataFrame() if explicit_sources else df_all.copy()
 
-    # ==========================================
-    # تجهيز أعمدة تقرير النشاط
-    # ==========================================
-    created_col = find_col_in(
-        df_act_raw,
-        ['created on', 'created_on', 'createdon', 'تاريخ الإنشاء', 'وقت المعالجة', 'date', 'التاريخ']
-    )
+    created_col = find_col_in(df_act_raw, ['created on', 'created_on', 'createdon', 'تاريخ الإنشاء', 'وقت المعالجة', 'date', 'التاريخ'])
     if created_col:
         df_act_raw['Created_DateTime'] = pd.to_datetime(df_act_raw[created_col], errors='coerce')
+        df_act_raw['Date'] = df_act_raw['Created_DateTime'].dt.date
+        df_act_raw['Time'] = df_act_raw['Created_DateTime'].dt.time
 
-        # في تقرير SNB: فصل التاريخ والوقت، وعرض الوقت بصيغة AM / PM.
-        if bank == "SNB":
-            df_act_raw['Date'] = df_act_raw['Created_DateTime'].dt.strftime('%Y-%m-%d')
-            df_act_raw['Time'] = df_act_raw['Created_DateTime'].dt.strftime('%I:%M %p')
-        else:
-            # الإبقاء على طريقة العرض القديمة لبنك STC دون تغيير.
-            df_act_raw['Date'] = df_act_raw['Created_DateTime'].dt.date
-            df_act_raw['Time'] = df_act_raw['Created_DateTime'].dt.time
-
-    collector_col = find_col_in(
-        df_act_raw,
-        ['collecter', 'collector', 'المحصل', 'اسم المحصل', 'الموظف', 'user', 'agent']
-    )
+    collector_col = find_col_in(df_act_raw, ['collecter', 'collector', 'المحصل', 'اسم المحصل', 'الموظف', 'user', 'agent'])
     if not collector_col and not explicit_sources:
-        collector_col = find_col_in(
-            df_all,
-            ['collecter', 'collector', 'المحصل', 'اسم المحصل', 'الموظف', 'user', 'agent']
-        )
+        collector_col = find_col_in(df_all, ['collecter', 'collector', 'المحصل', 'اسم المحصل', 'الموظف', 'user', 'agent'])
 
+    id_col = find_col_in(df_act_raw, ['id numer', 'id number', 'id_number', 'id', 'رقم الهوية', 'رقم العميل', 'account id'])
     notes_col = find_col_in(df_act_raw, ['notes', 'note', 'الملاحظات', 'ملاحظات', 'feedback'])
 
-    # في SNB نزيل التكرار عند تطابق Debtor + Notes + Collector معاً.
-    # نستخدم Debtor / Debitor حسب اسم العمود الموجود في ملف النشاط.
-    if bank == "SNB":
-        debtor_col = find_col_in(
-            df_act_raw,
-            [
-                'debtor', 'debitor', 'debtor number', 'debitor number',
-                'debtor id', 'debitor id', 'رقم المدين', 'رقم المدين/العميل'
-            ]
-        )
-        dedup_cols = [
-            c for c in [debtor_col, notes_col, collector_col]
-            if c is not None and c in df_act_raw.columns
-        ]
-
-        # توحيد المسافات قبل إزالة التكرار، مع الاحتفاظ بالقيم الأصلية كما هي تقريباً.
-        for _dedup_col in dedup_cols:
-            df_act_raw[_dedup_col] = df_act_raw[_dedup_col].apply(
-                lambda _v: _v.strip() if isinstance(_v, str) else _v
-            )
-
-        # دمج CC و PF في فئة واحدة مكتوبة بالضبط CC+PF، مع إبقاء بقية الأنواع كما هي.
-        product_type_col = find_col_in(
-            df_act_raw,
-            [
-                'Claim/نوع المتنج-التمويل', 'Claim/نوع المنتج-التمويل',
-                'نوع المنتج', 'product type', 'product_type', 'product'
-            ]
-        )
-        if product_type_col:
-            _product_values = df_act_raw[product_type_col].astype('string').str.strip()
-            _product_upper = _product_values.str.upper()
-            df_act_raw[product_type_col] = _product_values.mask(
-                _product_upper.isin(['CC', 'PF']), 'CC+PF'
-            )
-
-    else:
-        # الحفاظ على قاعدة إزالة التكرار السابقة لبنك STC.
-        id_col = find_col_in(
-            df_act_raw,
-            ['id numer', 'id number', 'id_number', 'id', 'رقم الهوية', 'رقم العميل', 'account id']
-        )
-        dedup_cols = [
-            c for c in [collector_col, id_col, notes_col]
-            if c is not None and c in df_act_raw.columns
-        ]
-
-    activity_base_df = (
-        df_act_raw.drop_duplicates(subset=dedup_cols).copy()
-        if len(dedup_cols) == 3
-        else df_act_raw.copy()
-    )
+    dedup_cols = [c for c in [collector_col, id_col, notes_col] if c is not None and c in df_act_raw.columns]
+    activity_base_df = df_act_raw.drop_duplicates(subset=dedup_cols).copy() if len(dedup_cols) == 3 else df_act_raw.copy()
 
     active_promises_df = pd.DataFrame()
     broken_promises_df = pd.DataFrame()
@@ -1508,7 +1448,7 @@ def render_activity_boxes(activity_base_df=None):
 
     with col_model:
         with st.container(border=True):
-            st.markdown(f"<p style='font-size: 13px; color: {input_text}; direction: rtl; text-align: right; margin: 0 0 2px 0; font-weight: bold;'>التقييم (1) يعني 'ناجحة'، والتقييم (0) يعني 'مغطاة'.</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size: 13px; color: {input_text}; direction: rtl; text-align: right; margin: 0 0 2px 0; font-weight: bold;'>التقييم (1) يعني 'مكالمة ناجحة'، والتقييم (0) يعني 'مكالمة غير ناجحة'.</p>", unsafe_allow_html=True)
             activity_model_version = st.session_state.overview_uploader_versions[selected_bank]['ActivityModel']
             uploaded_mapping_file = st.file_uploader(
                 "شيت موديل النشاط",
@@ -1986,19 +1926,19 @@ else:
                         for un_note in unmapped_notes:
                             eval_choice = st.radio(
                                 f"كيف تحسبين الملاحظة الآتية من عمود [Notes]: **({un_note})**؟",
-                                options=["ناجحة (1)", "مغطاة (0)"],
+                                options=["مكالمة ناجحة (1)", "مكالمة غير ناجحة (0)"],
                                 key=f"eval_radio_{selected_bank}_{un_note}",
                                 horizontal=True
                             )
-                            st.session_state.custom_note_evals[selected_bank][un_note] = 1 if "ناجحة" in eval_choice else 0
+                            st.session_state.custom_note_evals[selected_bank][un_note] = 1 if eval_choice.startswith("مكالمة ناجحة") else 0
                         
                 def classify_with_model(val):
                     v_str = str(val).strip()
                     if v_str in mapping_dict:
                         val_eval = str(mapping_dict[v_str]).strip()
-                        return 'ناجحة' if val_eval in ['1', '1.0', '1,0', 'true'] else 'مغطاة'
+                        return 'مكالمة ناجحة' if val_eval in ['1', '1.0', '1,0', 'true'] else 'مكالمة غير ناجحة'
                     elif v_str in st.session_state.get('custom_note_evals', {}).get(selected_bank, {}):
-                        return 'ناجحة' if st.session_state.custom_note_evals[selected_bank][v_str] == 1 else 'مغطاة'
+                        return 'مكالمة ناجحة' if st.session_state.custom_note_evals[selected_bank][v_str] == 1 else 'مكالمة غير ناجحة'
                     else:
                         return 'غير مصنف'
                         
@@ -2015,21 +1955,13 @@ else:
                         options=available_vals,
                         default=[v for v in available_vals if str(v).strip() in ['1', '1.0', 'ناجح', 'وعد', 'سداد', 'تم']], key=f"success_vals_{selected_bank}"
                     )
-                act_df['Call_Status'] = act_df[target_col].astype(str).apply(lambda x: 'ناجحة' if x in selected_success_vals else 'مغطاة')
+                act_df['Call_Status'] = act_df[target_col].astype(str).apply(lambda x: 'مكالمة ناجحة' if x in selected_success_vals else 'مكالمة غير ناجحة')
             else:
                 act_df['Call_Status'] = 'غير مصنف'
 
-        # وضع عمود حالة المكالمة مباشرة بعد عمود Notes.
-        if notes_col_name and notes_col_name in act_df.columns and 'Call_Status' in act_df.columns:
-            _activity_columns = list(act_df.columns)
-            _activity_columns.remove('Call_Status')
-            _notes_position = _activity_columns.index(notes_col_name) + 1
-            _activity_columns.insert(_notes_position, 'Call_Status')
-            act_df = act_df[_activity_columns]
-
         total_activity = len(act_df)
-        success_count = len(act_df[act_df['Call_Status'] == 'ناجحة'])
-        covered_count = len(act_df[act_df['Call_Status'] == 'مغطاة'])
+        success_count = len(act_df[act_df['Call_Status'] == 'مكالمة ناجحة'])
+        unsuccessful_count = len(act_df[act_df['Call_Status'] == 'مكالمة غير ناجحة'])
         success_rate = (success_count / total_activity * 100) if total_activity > 0 else 0
 
         collector_col = collector_col_name
@@ -2049,9 +1981,9 @@ else:
             </div>
             <div class="kpi-card" style="border-right-color: {snb_green};">
                 <div class="kpi-icon">{GREEN_PHONE_X_SVG}</div>
-                <div class="kpi-title">المكالمات المغطاة</div>
-                <div class="kpi-value">{covered_count:,}</div>
-                <div class="kpi-sub">تقييم مغطاة</div>
+                <div class="kpi-title">المكالمات غير الناجحة</div>
+                <div class="kpi-value">{unsuccessful_count:,}</div>
+                <div class="kpi-sub">تقييم غير ناجح</div>
             </div>
             <div class="kpi-card" style="border-right-color: #586F8C;">
                 <div class="kpi-icon">🎯</div>
@@ -2101,8 +2033,101 @@ else:
                 return total_overlap
 
             # ------------------------------------------
-            # تجهيز بيانات النشاط
+            # تجهيز بيانات النشاط وحساب الفاصل بين مكالمات كل محصل
             # ------------------------------------------
+            def _gap_threshold(status_value):
+                status = str(status_value).strip().lower()
+
+                # المكالمة غير الناجحة (بما فيها التسمية القديمة: مغطاة) حدها 5 دقائق.
+                if (
+                    'غير ناجح' in status
+                    or 'مغط' in status
+                    or status in ['unsuccessful', 'covered', '0', '0.0']
+                ):
+                    return 5.0, 'مكالمة غير ناجحة'
+
+                # المكالمة الناجحة حدها 20 دقيقة.
+                if (
+                    status == 'ناجحة'
+                    or status == 'مكالمة ناجحة'
+                    or status == 'successful'
+                    or status == 'success'
+                    or status == '1'
+                    or status == '1.0'
+                ):
+                    return 20.0, 'مكالمة ناجحة'
+
+                return None, 'غير مصنفة'
+
+            # الحساب يتم باستخدام اسم المحصل الأصلي، وليس الاسم المنظف للشارت،
+            # حتى لا يتم دمج محصلين مختلفين بعد إزالة SNB / NPL من الاسم المعروض.
+            act_df = act_df.copy()
+            if 'Created_DateTime' not in act_df.columns:
+                act_df['Created_DateTime'] = pd.NaT
+            act_df['Next_Call_DateTime'] = pd.NaT
+
+            gap_source = act_df[
+                act_df[collector_col].notna()
+                & act_df['Created_DateTime'].notna()
+            ].copy()
+
+            if not gap_source.empty:
+                gap_source['_stable_order'] = range(len(gap_source))
+                gap_source = gap_source.sort_values(
+                    [collector_col, 'Created_DateTime', '_stable_order'],
+                    kind='mergesort'
+                )
+                next_call_series = gap_source.groupby(
+                    collector_col, sort=False
+                )['Created_DateTime'].shift(-1)
+
+                act_df.loc[gap_source.index, 'Next_Call_DateTime'] = next_call_series.values
+
+            gap_calculation_rows = []
+            for row_idx, row_data in act_df.iterrows():
+                current_dt = row_data.get('Created_DateTime')
+                next_dt = row_data.get('Next_Call_DateTime')
+                threshold, status_label = _gap_threshold(row_data.get('Call_Status', ''))
+
+                if pd.isna(current_dt) or pd.isna(next_dt):
+                    gap_calculation_rows.append({
+                        'Gap_Minutes': None,
+                        'Break_Excluded_Minutes': 0.0,
+                        'Effective_Gap_Minutes': None,
+                        'Allowed_Minutes': threshold,
+                        'Wasted_Minutes': None,
+                        'Wasted_Status': 'لا توجد مكالمة تالية'
+                    })
+                    continue
+
+                raw_gap = max(0.0, (next_dt - current_dt).total_seconds() / 60.0)
+                break_minutes = _break_overlap_minutes(current_dt, next_dt)
+                effective_gap = max(0.0, raw_gap - break_minutes)
+
+                if threshold is None:
+                    wasted_minutes = None
+                    wasted_status = 'غير مصنفة - لم يُحتسب الوقت'
+                else:
+                    # الوقت المهدر هو الجزء الزائد عن الحد المسموح فقط.
+                    wasted_minutes = max(0.0, effective_gap - threshold)
+                    wasted_status = 'وقت مهدر' if wasted_minutes > 0 else 'ضمن المسموح'
+
+                gap_calculation_rows.append({
+                    'Gap_Minutes': round(raw_gap, 2),
+                    'Break_Excluded_Minutes': round(break_minutes, 2),
+                    'Effective_Gap_Minutes': round(effective_gap, 2),
+                    'Allowed_Minutes': threshold,
+                    'Wasted_Minutes': round(wasted_minutes, 2) if wasted_minutes is not None else None,
+                    'Wasted_Status': wasted_status
+                })
+
+            gap_calculation_df = pd.DataFrame(
+                gap_calculation_rows,
+                index=act_df.index
+            )
+            for calc_col in gap_calculation_df.columns:
+                act_df[calc_col] = gap_calculation_df[calc_col]
+
             activity_chart_df = act_df.copy()
             activity_chart_df = activity_chart_df.dropna(subset=[collector_col]).copy()
             activity_chart_df['_collector_name'] = activity_chart_df[collector_col].astype(str).apply(_clean_collector_name)
@@ -2119,19 +2144,19 @@ else:
                 .size()
                 .unstack(fill_value=0)
             )
-            if 'ناجحة' not in quality_table.columns:
-                quality_table['ناجحة'] = 0
-            if 'مغطاة' not in quality_table.columns:
-                quality_table['مغطاة'] = 0
+            if 'مكالمة ناجحة' not in quality_table.columns:
+                quality_table['مكالمة ناجحة'] = 0
+            if 'مكالمة غير ناجحة' not in quality_table.columns:
+                quality_table['مكالمة غير ناجحة'] = 0
 
             # تضمين جميع المحصلين، وليس أعلى 10 فقط.
-            quality_table['إجمالي'] = quality_table['ناجحة'] + quality_table['مغطاة']
+            quality_table['إجمالي'] = quality_table['مكالمة ناجحة'] + quality_table['مكالمة غير ناجحة']
             quality_table = quality_table.sort_values('إجمالي', ascending=False)
 
             if not quality_table.empty:
                 quality_names = quality_table.index.tolist()
-                quality_success = quality_table['ناجحة'].astype(int).tolist()
-                quality_covered = quality_table['مغطاة'].astype(int).tolist()
+                quality_success = quality_table['مكالمة ناجحة'].astype(int).tolist()
+                quality_unsuccessful = quality_table['مكالمة غير ناجحة'].astype(int).tolist()
 
                 # حجز مساحة بجانب الشارت لمخطط توزيع العملاء الفعالين وغير الفعالين.
                 quality_col, customer_pie_col = st.columns([2.15, 1], gap='small')
@@ -2150,17 +2175,17 @@ else:
                     ))
                     fig_quality.add_trace(go.Bar(
                         x=quality_names,
-                        y=quality_covered,
-                        name='المكالمات المغطاة',
+                        y=quality_unsuccessful,
+                        name='المكالمات غير الناجحة',
                         marker=dict(color='#99AABF', line=dict(width=0)),
-                        text=quality_covered,
+                        text=quality_unsuccessful,
                         textposition='inside',
                         insidetextanchor='middle',
-                        hovertemplate='<b>%{x}</b><br>مغطاة: %{y}<extra></extra>'
+                        hovertemplate='<b>%{x}</b><br>غير ناجحة: %{y}<extra></extra>'
                     ))
                     fig_quality.update_layout(
                         title=dict(
-                            text='<b>جودة المكالمات: ناجحة مقابل مغطاة لكل محصل</b>',
+                            text='<b>جودة المكالمات: ناجحة مقابل غير ناجحة لكل محصل</b>',
                             x=0.5, xanchor='center',
                             font=dict(size=17, color='#1F4373', family='Tahoma')
                         ),
@@ -2383,112 +2408,172 @@ else:
                 st.info('عمود Created_DateTime غير متوفر لعرض منحنى النشاط خلال ساعات اليوم.')
 
             # ------------------------------------------
-            # الشارت الثالثة: تحليل الوقت الضائع
+            # الشارت الثالثة: تحليل الوقت المهدر لكل محصل
             # ------------------------------------------
-            if 'Created_DateTime' in activity_chart_df.columns:
-                gap_df = activity_chart_df.dropna(subset=['Created_DateTime']).copy()
-                gap_df = gap_df.sort_values([collector_col, 'Created_DateTime']).copy()
+            gap_df = activity_chart_df[
+                activity_chart_df['Next_Call_DateTime'].notna()
+                & activity_chart_df['Allowed_Minutes'].notna()
+            ].copy()
 
+            if not gap_df.empty:
                 lost_time_rows = []
-                for collector_name, grp in gap_df.groupby('_collector_name'):
-                    grp = grp.sort_values('Created_DateTime').reset_index(drop=True)
-                    total_lost = 0.0
-                    longest_gap = 0.0
 
-                    for idx in range(len(grp) - 1):
-                        current_dt = grp.loc[idx, 'Created_DateTime']
-                        next_dt = grp.loc[idx + 1, 'Created_DateTime']
-                        current_status = str(grp.loc[idx, '_call_status']).strip()
+                # التجميع بالمفتاح الأصلي للمحصل لضمان عدم خلط محصلين مختلفين.
+                for raw_collector, all_collector_rows in activity_chart_df.groupby(collector_col, sort=False):
+                    collector_gaps = gap_df[gap_df[collector_col] == raw_collector].copy()
 
-                        raw_gap = (next_dt - current_dt).total_seconds() / 60.0
-                        if raw_gap <= 0:
-                            continue
-
-                        adjusted_gap = max(0.0, raw_gap - _break_overlap_minutes(current_dt, next_dt))
-                        if adjusted_gap <= 0:
-                            continue
-
-                        threshold = 20.0 if current_status == 'ناجحة' else 5.0 if current_status == 'مغطاة' else 5.0
-                        lost_minutes = max(0.0, adjusted_gap - threshold)
-
-                        total_lost += lost_minutes
-                        longest_gap = max(longest_gap, adjusted_gap)
+                    if collector_gaps.empty:
+                        total_lost = 0.0
+                        longest_gap = 0.0
+                        wasted_intervals = 0
+                        valid_intervals = 0
+                    else:
+                        total_lost = float(collector_gaps['Wasted_Minutes'].fillna(0).sum())
+                        longest_gap = float(collector_gaps['Effective_Gap_Minutes'].fillna(0).max())
+                        wasted_intervals = int((collector_gaps['Wasted_Minutes'].fillna(0) > 0).sum())
+                        valid_intervals = len(collector_gaps)
 
                     lost_time_rows.append({
-                        'المحصل': collector_name,
+                        'المحصل': _clean_collector_name(raw_collector),
                         'إجمالي الدقائق الضائعة': round(total_lost, 1),
-                        'أطول فجوة توقف': round(longest_gap, 1),
+                        'عدد فترات الوقت المهدر': wasted_intervals,
+                        'عدد الفواصل المحسوبة': valid_intervals,
+                        'أطول فجوة توقف (دقيقة)': round(longest_gap, 1)
                     })
 
-                lost_summary = pd.DataFrame(lost_time_rows)
-                lost_summary = lost_summary.sort_values(
-                    by=['إجمالي الدقائق الضائعة', 'أطول فجوة توقف'],
+                lost_summary = pd.DataFrame(lost_time_rows).sort_values(
+                    by=['إجمالي الدقائق الضائعة', 'أطول فجوة توقف (دقيقة)'],
                     ascending=False
-                ).head(10)
+                ).reset_index(drop=True)
 
-                if not lost_summary.empty:
-                    fig_lost = go.Figure()
-                    fig_lost.add_trace(go.Bar(
-                        y=lost_summary['المحصل'],
-                        x=lost_summary['إجمالي الدقائق الضائعة'],
-                        name='إجمالي الدقائق الضائعة',
-                        orientation='h',
-                        marker=dict(color='#1F4373', line=dict(width=0)),
-                        text=[f"{v:.0f}" for v in lost_summary['إجمالي الدقائق الضائعة']],
-                        textposition='outside',
-                        hovertemplate='<b>%{y}</b><br>إجمالي الدقائق الضائعة: %{x:.1f}<extra></extra>'
-                    ))
-                    fig_lost.add_trace(go.Bar(
-                        y=lost_summary['المحصل'],
-                        x=lost_summary['أطول فجوة توقف'],
-                        name='أطول فجوة توقف',
-                        orientation='h',
-                        marker=dict(color='#99AABF', line=dict(width=0)),
-                        text=[f"{v:.0f}" for v in lost_summary['أطول فجوة توقف']],
-                        textposition='outside',
-                        hovertemplate='<b>%{y}</b><br>أطول فجوة توقف: %{x:.1f} دقيقة<extra></extra>'
-                    ))
-                    fig_lost.update_layout(
-                        title=dict(
-                            text='<b>تحليل الوقت الضائع للمحصلين بالدقائق</b>',
-                            x=0.5, xanchor='center',
-                            font=dict(size=21, color='#1F4373', family='Tahoma')
-                        ),
-                        barmode='group',
-                        height=max(420, len(lost_summary) * 36 + 140),
-                        paper_bgcolor='#FFFFFF',
-                        plot_bgcolor='#FFFFFF',
-                        font=dict(family='Tahoma', color='#1F4373', size=13),
-                        margin=dict(l=20, r=45, t=70, b=35),
-                        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='center', x=0.5),
-                        xaxis=dict(title='الدقائق', gridcolor='#E7EDF4', zeroline=False),
-                        yaxis=dict(title='', autorange='reversed')
+                total_wasted_minutes = float(gap_df['Wasted_Minutes'].fillna(0).sum())
+                total_wasted_intervals = int((gap_df['Wasted_Minutes'].fillna(0) > 0).sum())
+                longest_single_gap = float(gap_df['Effective_Gap_Minutes'].fillna(0).max())
+
+                lost_kpi1, lost_kpi2, lost_kpi3 = st.columns(3)
+                with lost_kpi1:
+                    st.metric('إجمالي الوقت المهدر', f'{total_wasted_minutes:,.1f} دقيقة')
+                with lost_kpi2:
+                    st.metric('عدد فترات الوقت المهدر', f'{total_wasted_intervals:,}')
+                with lost_kpi3:
+                    st.metric('أطول فجوة توقف', f'{longest_single_gap:,.1f} دقيقة')
+
+                fig_lost = go.Figure()
+                fig_lost.add_trace(go.Bar(
+                    y=lost_summary['المحصل'],
+                    x=lost_summary['إجمالي الدقائق الضائعة'],
+                    name='إجمالي الدقائق الضائعة',
+                    orientation='h',
+                    marker=dict(color='#1F4373', line=dict(width=0)),
+                    text=[f'{v:.0f}' for v in lost_summary['إجمالي الدقائق الضائعة']],
+                    textposition='outside',
+                    hovertemplate='<b>%{y}</b><br>إجمالي الدقائق الضائعة: %{x:.1f} دقيقة<extra></extra>'
+                ))
+                fig_lost.add_trace(go.Bar(
+                    y=lost_summary['المحصل'],
+                    x=lost_summary['أطول فجوة توقف (دقيقة)'],
+                    name='أطول فجوة توقف',
+                    orientation='h',
+                    marker=dict(color='#99AABF', line=dict(width=0)),
+                    text=[f'{v:.0f}' for v in lost_summary['أطول فجوة توقف (دقيقة)']],
+                    textposition='outside',
+                    hovertemplate='<b>%{y}</b><br>أطول فجوة توقف: %{x:.1f} دقيقة<extra></extra>'
+                ))
+                fig_lost.update_layout(
+                    title=dict(
+                        text='<b>تحليل الوقت المهدر للمحصلين بالدقائق</b>',
+                        x=0.5, xanchor='center',
+                        font=dict(size=21, color='#1F4373', family='Tahoma')
+                    ),
+                    barmode='group',
+                    height=max(430, len(lost_summary) * 36 + 150),
+                    paper_bgcolor='#FFFFFF',
+                    plot_bgcolor='#FFFFFF',
+                    font=dict(family='Tahoma', color='#1F4373', size=13),
+                    margin=dict(l=20, r=50, t=75, b=35),
+                    legend=dict(
+                        orientation='h', yanchor='bottom', y=1.02,
+                        xanchor='center', x=0.5
+                    ),
+                    xaxis=dict(title='الدقائق', gridcolor='#E7EDF4', zeroline=False),
+                    yaxis=dict(title='', autorange='reversed')
+                )
+                with st.container(border=True):
+                    st.plotly_chart(
+                        fig_lost,
+                        use_container_width=True,
+                        config={'displayModeBar': False}
                     )
-                    with st.container(border=True):
-                        st.plotly_chart(fig_lost, use_container_width=True, config={'displayModeBar': False})
-                else:
-                    st.info('لا توجد بيانات كافية لحساب الوقت الضائع للمحصلين.')
+
+                with st.expander('📋 ملخص الوقت المهدر لكل المحصلين', expanded=True):
+                    st.dataframe(
+                        lost_summary,
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                detail_cols = [
+                    collector_col, 'Created_DateTime', 'Next_Call_DateTime',
+                    'Call_Status', 'Gap_Minutes', 'Break_Excluded_Minutes',
+                    'Effective_Gap_Minutes', 'Allowed_Minutes',
+                    'Wasted_Minutes', 'Wasted_Status'
+                ]
+                lost_details = gap_df[detail_cols].copy()
+                lost_details[collector_col] = lost_details[collector_col].astype(str).apply(_clean_collector_name)
+                lost_details['Call_Status'] = lost_details['Call_Status'].astype(str).apply(
+                    lambda value: 'مكالمة ناجحة' if _gap_threshold(value)[0] == 20
+                    else 'مكالمة غير ناجحة' if _gap_threshold(value)[0] == 5
+                    else 'غير مصنفة'
+                )
+                lost_details = lost_details.rename(columns={
+                    collector_col: 'المحصل',
+                    'Created_DateTime': 'وقت المكالمة الحالية',
+                    'Next_Call_DateTime': 'وقت المكالمة التالية لنفس المحصل',
+                    'Call_Status': 'تصنيف المكالمة الحالية',
+                    'Gap_Minutes': 'الفاصل قبل خصم البريك (دقيقة)',
+                    'Break_Excluded_Minutes': 'البريك المستبعد (دقيقة)',
+                    'Effective_Gap_Minutes': 'الفاصل بعد خصم البريك (دقيقة)',
+                    'Allowed_Minutes': 'الحد المسموح (دقيقة)',
+                    'Wasted_Minutes': 'الوقت المهدر (دقيقة)',
+                    'Wasted_Status': 'حالة الوقت'
+                }).sort_values(
+                    by=['المحصل', 'وقت المكالمة الحالية'],
+                    ascending=[True, True]
+                )
+
+                with st.expander('🔎 تفاصيل كل فاصل بين مكالمتين لنفس المحصل', expanded=False):
+                    st.dataframe(
+                        lost_details,
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config={
+                            'الفاصل قبل خصم البريك (دقيقة)': st.column_config.NumberColumn(format='%.1f'),
+                            'البريك المستبعد (دقيقة)': st.column_config.NumberColumn(format='%.1f'),
+                            'الفاصل بعد خصم البريك (دقيقة)': st.column_config.NumberColumn(format='%.1f'),
+                            'الحد المسموح (دقيقة)': st.column_config.NumberColumn(format='%.0f'),
+                            'الوقت المهدر (دقيقة)': st.column_config.NumberColumn(format='%.1f')
+                        }
+                    )
             else:
-                st.info('عمود Created_DateTime غير متوفر لحساب الوقت الضائع للمحصلين.')
+                st.info(
+                    'لا توجد فواصل متتالية صالحة بين مكالمات المحصلين لحساب الوقت المهدر. '
+                    'يجب توفر مكالمتين على الأقل لنفس المحصل.'
+                )
 
         if collector_col and collector_col in act_df.columns:
             pivot_summary = act_df.groupby([collector_col, 'Call_Status']).size().unstack(fill_value=0)
-            if 'ناجحة' not in pivot_summary.columns: pivot_summary['ناجحة'] = 0
-            if 'مغطاة' not in pivot_summary.columns: pivot_summary['مغطاة'] = 0
-            pivot_summary['إجمالي المحاولات'] = pivot_summary['ناجحة'] + pivot_summary['مغطاة']
-            pivot_summary['نسبة النجاح %'] = (pivot_summary['ناجحة'] / pivot_summary['إجمالي المحاولات'] * 100).round(1).astype(str) + '%'
+            if 'مكالمة ناجحة' not in pivot_summary.columns: pivot_summary['مكالمة ناجحة'] = 0
+            if 'مكالمة غير ناجحة' not in pivot_summary.columns: pivot_summary['مكالمة غير ناجحة'] = 0
+            pivot_summary['إجمالي المحاولات'] = pivot_summary['مكالمة ناجحة'] + pivot_summary['مكالمة غير ناجحة']
+            pivot_summary['نسبة النجاح %'] = (pivot_summary['مكالمة ناجحة'] / pivot_summary['إجمالي المحاولات'] * 100).round(1).astype(str) + '%'
             pivot_summary = pivot_summary.sort_values(by='إجمالي المحاولات', ascending=False).reset_index()
 
-            with st.expander("📊 تفصيل أداء المحصلين (ناجحة مقابل مغطاة)", expanded=True):
+            with st.expander("📊 تفصيل أداء المحصلين (ناجحة مقابل غير ناجحة)", expanded=True):
                 st.dataframe(pivot_summary, use_container_width=True)
 
         st.markdown("<div style='text-align: right; direction: rtl;'>", unsafe_allow_html=True)
-        # عرض Date و Time أولاً، مع إبقاء Call_Status بجوار Notes مباشرة.
-        extra_time_cols = [c for c in ['Date', 'Time'] if c in act_df.columns]
-        display_cols = extra_time_cols + [
-            c for c in act_df.columns
-            if c not in ['Created_DateTime', 'Date', 'Time']
-        ]
+        extra_time_cols = [c for c in ['Date', 'Time', 'Call_Status'] if c in act_df.columns]
+        display_cols = extra_time_cols + [c for c in act_df.columns if c not in ['Created_DateTime', 'Date', 'Time', 'Call_Status']]
         st.dataframe(act_df[display_cols], use_container_width=True, height=450)
         st.markdown("</div>", unsafe_allow_html=True)
 
