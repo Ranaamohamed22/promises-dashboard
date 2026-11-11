@@ -8,7 +8,8 @@ import os
 import re
 import zipfile
 from xml.sax.saxutils import escape as _xml_escape
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
+from copy import copy
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
@@ -833,6 +834,377 @@ def _write_df_sheet(ws, df):
                 cell.number_format = 'yyyy-mm-dd'
             elif isinstance(v, float):
                 cell.number_format = '#,##0.00'
+
+
+
+def _break_overlap_minutes_for_report(start_dt, end_dt):
+    """Subtract only the overlap with the daily 12:00–12:30 break."""
+    if pd.isna(start_dt) or pd.isna(end_dt) or end_dt <= start_dt:
+        return 0.0
+    total_overlap = 0.0
+    current_day = start_dt.normalize()
+    end_day = end_dt.normalize()
+    while current_day <= end_day:
+        break_start = current_day + pd.Timedelta(hours=12)
+        break_end = current_day + pd.Timedelta(hours=12, minutes=30)
+        overlap_start = max(start_dt, break_start)
+        overlap_end = min(end_dt, break_end)
+        if overlap_end > overlap_start:
+            total_overlap += (overlap_end - overlap_start).total_seconds() / 60.0
+        current_day += pd.Timedelta(days=1)
+    return total_overlap
+
+
+def _attach_wasted_time_metrics(activity_df, collector_col, datetime_col='Created_DateTime',
+                                status_col='Call_Status'):
+    """
+    Calculate the gap and wasted time on the CURRENT call row, matching the
+    reference Excel report:
+      successful call -> 20 minutes allowed
+      unsuccessful/covered call -> 5 minutes allowed
+      subtract the 12:00–12:30 break overlap before calculating waste.
+    """
+    result = activity_df.copy()
+    if collector_col not in result.columns or datetime_col not in result.columns:
+        result['فرق التوقيت (دقائق)'] = 0.0
+        result['فرق_التوقيت_المعدّل (دقائق)'] = 0.0
+        result['الوقت المهدر (دقائق)'] = 0.0
+        return result
+
+    result[datetime_col] = pd.to_datetime(result[datetime_col], errors='coerce')
+    result = result.dropna(subset=[datetime_col]).copy()
+    result = result.sort_values([collector_col, datetime_col], kind='mergesort').copy()
+
+    previous_dt = result.groupby(collector_col)[datetime_col].shift(1)
+    raw_gap = (result[datetime_col] - previous_dt).dt.total_seconds() / 60.0
+    raw_gap = raw_gap.fillna(0).clip(lower=0)
+
+    break_overlap = pd.Series(
+        [
+            _break_overlap_minutes_for_report(prev_dt, curr_dt)
+            for prev_dt, curr_dt in zip(previous_dt.tolist(), result[datetime_col].tolist())
+        ],
+        index=result.index,
+        dtype='float64'
+    )
+    adjusted_gap = (raw_gap - break_overlap).clip(lower=0)
+
+    if status_col in result.columns:
+        thresholds = result[status_col].astype(str).str.strip().map(
+            lambda status: 20.0 if status == 'ناجحة' else 5.0
+        )
+    else:
+        thresholds = pd.Series(5.0, index=result.index)
+
+    # Round the gap first, matching the supplied Excel sample calculations.
+    result['فرق التوقيت (دقائق)'] = raw_gap.round(2)
+    result['فرق_التوقيت_المعدّل (دقائق)'] = adjusted_gap.round(2)
+    result['الوقت المهدر (دقائق)'] = (
+        (adjusted_gap.round(2) - thresholds).clip(lower=0).round(2)
+    )
+    result['التوقيت'] = result[datetime_col].dt.strftime('%H:%M:%S')
+    return result
+
+
+def _build_reference_activity_frames(processed_df):
+    """Build the report tabs that match the supplied SNB Excel workbook."""
+    df = processed_df.copy()
+    if df.empty:
+        empty = pd.DataFrame()
+        return {
+            'Productivity_Report': empty,
+            'Calls_Over_30_Min': empty,
+            'Calls_Under_1_Min': empty,
+            'First_Call_Per_Collector': empty,
+            'Last_Call_Per_Collector': empty,
+            'Wasted_Time_Per_Collector': empty,
+            'Main State_Distribution': empty,
+        }
+
+    collector_col = 'Collector'
+    gap_col = 'فرق التوقيت (دقائق)'
+    waste_col = 'الوقت المهدر (دقائق)'
+    adjusted_col = 'فرق_التوقيت_المعدّل (دقائق)'
+    status_col = 'التصنيف'
+    time_col = 'التوقيت'
+    notes_col = 'Notes'
+    created_col = 'Created on'
+
+    df[created_col] = pd.to_datetime(df[created_col], errors='coerce')
+    df[gap_col] = pd.to_numeric(df[gap_col], errors='coerce').fillna(0).round(2)
+    df[waste_col] = pd.to_numeric(df[waste_col], errors='coerce').fillna(0).round(2)
+    df[adjusted_col] = pd.to_numeric(df[adjusted_col], errors='coerce').fillna(0).round(2)
+    df[status_col] = pd.to_numeric(df[status_col], errors='coerce').fillna(0).astype(int)
+    df = df.sort_values([collector_col, created_col], kind='mergesort').copy()
+
+    # Productivity report: KPI score/classification are left blank because
+    # their calculation rule is not present in the supplied source workbook.
+    productivity_rows = []
+    for collector_name, group in df.groupby(collector_col, sort=True):
+        total = len(group)
+        successful = int((group[status_col] == 1).sum())
+        unsuccessful = total - successful
+        avg_gap = round(float(group[gap_col].mean()), 2) if total else 0.0
+        success_rate = round((successful / total * 100), 2) if total else 0.0
+        productivity_rows.append({
+            'Collector': collector_name,
+            'إجمالي_المكالمات': total,
+            'عدد_الناجحة': successful,
+            'عدد_غير_الناجحة': unsuccessful,
+            'متوسط_فرق_التوقيت_بالدقائق': avg_gap,
+            'نسبة_النجاح_%': success_rate,
+            'مؤشر_الأداء_%': None,
+            'تصنيف_KPI': None,
+        })
+    productivity = pd.DataFrame(productivity_rows)
+
+    def _short_calls_frame(subset):
+        if subset.empty:
+            return pd.DataFrame(columns=['المحصل', 'التوقيت', 'فرق التوقيت (دقائق)', 'الإفادة'])
+        return pd.DataFrame({
+            'المحصل': subset[collector_col].astype(str).tolist(),
+            'التوقيت': subset[time_col].astype(str).tolist(),
+            'فرق التوقيت (دقائق)': subset[gap_col].astype(float).tolist(),
+            'الإفادة': subset[notes_col].tolist() if notes_col in subset.columns else [None] * len(subset),
+        })
+
+    over_30 = _short_calls_frame(df[df[gap_col] > 30].copy())
+    under_1 = _short_calls_frame(df[(df[gap_col] > 0) & (df[gap_col] < 1)].copy())
+
+    first_rows, last_rows = [], []
+    for collector_name, group in df.groupby(collector_col, sort=True):
+        group = group.sort_values(created_col, kind='mergesort')
+        first_call = group.iloc[0]
+        last_call = group.iloc[-1]
+        first_rows.append({
+            'المحصل': collector_name,
+            'توقيت أول إفادة': str(first_call[time_col]),
+            'حالة النجاح': 'ناجحة' if int(first_call[status_col]) == 1 else 'غير ناجحة',
+        })
+        last_rows.append({
+            'المحصل': collector_name,
+            'توقيت آخر إفادة': str(last_call[time_col]),
+            'حالة النجاح': 'ناجحة' if int(last_call[status_col]) == 1 else 'غير ناجحة',
+        })
+
+    wasted_rows = []
+    for collector_name, group in df.groupby(collector_col, sort=True):
+        positive = group.loc[group[waste_col] > 0, waste_col]
+        wasted_rows.append({
+            'المحصل': collector_name,
+            'إجمالي_الوقت_المهدر (دق)': round(float(group[waste_col].sum()), 2),
+            'عدد_المكالمات_المهدرة': int((group[waste_col] > 0).sum()),
+            'متوسط_الوقت_المهدر (دق)': round(float(positive.mean()), 2) if len(positive) else 0.0,
+            'أعلى_وقت_مهدر (دق)': round(float(positive.max()), 2) if len(positive) else 0.0,
+        })
+    wasted_summary = pd.DataFrame(wasted_rows).sort_values(
+        'إجمالي_الوقت_المهدر (دق)', ascending=False
+    ).reset_index(drop=True)
+
+    if 'Main State' in df.columns:
+        state_counts = df['Main State'].fillna('غير محدد').astype(str).value_counts()
+        state_rows = [{'الحالة': state, 'عدد_الحسابات': int(count)}
+                      for state, count in state_counts.items()]
+        state_rows.append({'الحالة': 'الإجمالي', 'عدد_الحسابات': int(len(df))})
+        state_distribution = pd.DataFrame(state_rows)
+    else:
+        state_distribution = pd.DataFrame(columns=['الحالة', 'عدد_الحسابات'])
+
+    return {
+        'Productivity_Report': productivity,
+        'Calls_Over_30_Min': over_30,
+        'Calls_Under_1_Min': under_1,
+        'First_Call_Per_Collector': pd.DataFrame(first_rows),
+        'Last_Call_Per_Collector': pd.DataFrame(last_rows),
+        'Wasted_Time_Per_Collector': wasted_summary,
+        'Main State_Distribution': state_distribution,
+    }
+
+
+def _write_df_to_template_sheet(ws, frame):
+    """Replace worksheet data while retaining the template's formatting."""
+    frame = frame.copy() if frame is not None else pd.DataFrame()
+    headers = list(frame.columns)
+
+    # Keep the original header styling, but update header text to the frame schema.
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.value = header
+        cell.alignment = copy(cell.alignment)
+        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+    # Clear old values, preserving the sample workbook's row styles and widths.
+    old_max_row = ws.max_row
+    max_col = max(ws.max_column, len(headers))
+    for row_idx in range(2, old_max_row + 1):
+        for col_idx in range(1, max_col + 1):
+            ws.cell(row=row_idx, column=col_idx).value = None
+
+    # Extend the alternating row style if the new report is longer than the template.
+    for row_idx, values in enumerate(frame.itertuples(index=False, name=None), start=2):
+        if row_idx > old_max_row:
+            style_source_row = 2 if row_idx % 2 == 0 else 3
+            for col_idx in range(1, max_col + 1):
+                source_cell = ws.cell(row=style_source_row, column=col_idx)
+                target_cell = ws.cell(row=row_idx, column=col_idx)
+                if source_cell.has_style:
+                    target_cell._style = copy(source_cell._style)
+                if source_cell.number_format:
+                    target_cell.number_format = source_cell.number_format
+        for col_idx, value in enumerate(values, 1):
+            if value is None or (not isinstance(value, (list, tuple)) and pd.isna(value)):
+                continue
+            if isinstance(value, pd.Timestamp):
+                value = value.to_pydatetime()
+            elif hasattr(value, 'item') and not isinstance(value, (str, bytes)):
+                value = value.item()
+            elif isinstance(value, str):
+                value = _clean_excel_str(value)
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            header = str(headers[col_idx - 1]).strip()
+            if isinstance(value, datetime):
+                cell.number_format = 'yyyy-mm-dd hh:mm:ss'
+            elif isinstance(value, time):
+                cell.number_format = 'hh:mm:ss'
+            elif isinstance(value, (float, int)) and not isinstance(value, bool):
+                if any(token in header for token in ['دقائق', 'الوقت', 'النسبة', '%']):
+                    cell.number_format = '#,##0.00'
+
+    # Remove unused trailing rows so the sheet opens at the actual report size.
+    final_row = max(1, len(frame) + 1)
+    if ws.max_row > final_row:
+        ws.delete_rows(final_row + 1, ws.max_row - final_row)
+    if ws.title == 'Processed_Data':
+        ws.auto_filter.ref = f"A1:{get_column_letter(max(1, len(headers)))}{final_row}"
+
+
+def _build_processed_activity_export(activity_df, template_headers, collector_col,
+                                     created_col, notes_col):
+    base = activity_df.copy()
+    if 'Created_DateTime' not in base.columns and created_col and created_col in base.columns:
+        base['Created_DateTime'] = pd.to_datetime(base[created_col], errors='coerce')
+    elif 'Created_DateTime' in base.columns:
+        base['Created_DateTime'] = pd.to_datetime(base['Created_DateTime'], errors='coerce')
+
+    if collector_col and collector_col in base.columns:
+        sort_cols = [collector_col]
+        if 'Created_DateTime' in base.columns:
+            sort_cols.append('Created_DateTime')
+        base = base.sort_values(sort_cols, kind='mergesort').copy()
+
+    def _source_series(header):
+        col = find_col_in(base, [header])
+        return base[col] if col else pd.Series([None] * len(base), index=base.index)
+
+    output = pd.DataFrame(index=base.index)
+    for header in template_headers:
+        if header == 'Collector':
+            output[header] = base[collector_col] if collector_col in base.columns else None
+        elif header == 'Created on':
+            if created_col and created_col in base.columns:
+                output[header] = base[created_col]
+            elif 'Created_DateTime' in base.columns:
+                output[header] = base['Created_DateTime']
+            else:
+                output[header] = None
+        elif header == 'التوقيت':
+            output[header] = (
+                base['Created_DateTime'].dt.strftime('%H:%M:%S')
+                if 'Created_DateTime' in base.columns else None
+            )
+        elif header == 'فرق التوقيت (دقائق)':
+            metric = base['Gap_Minutes'] if 'Gap_Minutes' in base.columns else (
+                base[header] if header in base.columns else pd.Series(0.0, index=base.index)
+            )
+            output[header] = pd.to_numeric(metric, errors='coerce').fillna(0).round(2)
+        elif header == 'الوقت المهدر (دقائق)':
+            metric = base['Wasted_Minutes'] if 'Wasted_Minutes' in base.columns else (
+                base[header] if header in base.columns else pd.Series(0.0, index=base.index)
+            )
+            output[header] = pd.to_numeric(metric, errors='coerce').fillna(0).round(2)
+        elif header == 'فرق_التوقيت_المعدّل (دقائق)':
+            metric = base['Effective_Gap_Minutes'] if 'Effective_Gap_Minutes' in base.columns else (
+                base[header] if header in base.columns else pd.Series(0.0, index=base.index)
+            )
+            output[header] = pd.to_numeric(metric, errors='coerce').fillna(0).round(2)
+        elif header == 'التصنيف':
+            if 'Call_Status' in base.columns:
+                output[header] = base['Call_Status'].astype(str).apply(
+                    lambda value: 1 if 'ناجحة' in value and 'غير' not in value else 0
+                )
+            else:
+                output[header] = _source_series(header)
+        elif header == 'Notes':
+            output[header] = base[notes_col] if notes_col and notes_col in base.columns else _source_series(header)
+        else:
+            output[header] = _source_series(header)
+
+    output = output.reset_index(drop=True)
+    return output
+
+
+def _build_full_activity_excel_bytes(activity_df, collector_col, created_col, notes_col,
+                                     selected_bank, template_path):
+    if os.path.exists(template_path):
+        report_wb = load_workbook(template_path)
+    else:
+        report_wb = Workbook()
+        report_wb.active.title = 'Dashboard'
+        for sheet_name in [
+            'Processed_Data', 'Productivity_Report', 'Calls_Over_30_Min',
+            'Calls_Under_1_Min', 'First_Call_Per_Collector',
+            'Last_Call_Per_Collector', 'Wasted_Time_Per_Collector',
+            'Main State_Distribution'
+        ]:
+            report_wb.create_sheet(sheet_name)
+
+    processed_ws = report_wb['Processed_Data']
+    template_headers = [cell.value for cell in processed_ws[1] if cell.value is not None]
+    processed_df = _build_processed_activity_export(
+        activity_df, template_headers, collector_col, created_col, notes_col
+    )
+
+    report_frames = _build_reference_activity_frames(processed_df)
+
+    # Keep the reference KPI index only when the collector's key productivity
+    # figures still match the template. Otherwise leave the unknown KPI formula blank.
+    if 'Productivity_Report' in report_wb.sheetnames:
+        old_kpi = {}
+        old_ws = report_wb['Productivity_Report']
+        for row in old_ws.iter_rows(min_row=2, values_only=True):
+            if row and row[0] is not None:
+                old_kpi[str(row[0])] = {
+                    'calls': row[1],
+                    'success': row[2],
+                    'avg_gap': row[4],
+                    'score': row[6],
+                    'class': row[7],
+                }
+        prod = report_frames['Productivity_Report']
+        for idx, row in prod.iterrows():
+            previous = old_kpi.get(str(row['Collector']))
+            if previous:
+                same_calls = previous['calls'] == row['إجمالي_المكالمات']
+                same_success = previous['success'] == row['عدد_الناجحة']
+                try:
+                    same_avg = abs(float(previous['avg_gap']) - float(row['متوسط_فرق_التوقيت_بالدقائق'])) < 0.01
+                except (TypeError, ValueError):
+                    same_avg = False
+                if same_calls and same_success and same_avg:
+                    prod.at[idx, 'مؤشر_الأداء_%'] = previous['score']
+                    prod.at[idx, 'تصنيف_KPI'] = previous['class']
+
+    _write_df_to_template_sheet(processed_ws, processed_df)
+    for sheet_name, frame in report_frames.items():
+        if sheet_name in report_wb.sheetnames:
+            _write_df_to_template_sheet(report_wb[sheet_name], frame)
+
+    # Keep the dashboard artwork from the supplied template; all detailed
+    # data tabs above are rebuilt from the newly uploaded activity file.
+    report_buffer = io.BytesIO()
+    report_wb.save(report_buffer)
+    report_buffer.seek(0)
+    return report_buffer.getvalue(), processed_df, report_frames
 
 
 def _write_pivot_sheet(ws, p, title, is_real_pivot=False):
@@ -2064,7 +2436,7 @@ else:
             act_df = act_df.copy()
             if 'Created_DateTime' not in act_df.columns:
                 act_df['Created_DateTime'] = pd.NaT
-            act_df['Next_Call_DateTime'] = pd.NaT
+            act_df['Previous_Call_DateTime'] = pd.NaT
 
             gap_source = act_df[
                 act_df[collector_col].notna()
@@ -2077,39 +2449,44 @@ else:
                     [collector_col, 'Created_DateTime', '_stable_order'],
                     kind='mergesort'
                 )
-                next_call_series = gap_source.groupby(
+                previous_call_series = gap_source.groupby(
                     collector_col, sort=False
-                )['Created_DateTime'].shift(-1)
+                )['Created_DateTime'].shift(1)
 
-                act_df.loc[gap_source.index, 'Next_Call_DateTime'] = next_call_series.values
+                act_df.loc[gap_source.index, 'Previous_Call_DateTime'] = previous_call_series.values
 
             gap_calculation_rows = []
             for row_idx, row_data in act_df.iterrows():
+                previous_dt = row_data.get('Previous_Call_DateTime')
                 current_dt = row_data.get('Created_DateTime')
-                next_dt = row_data.get('Next_Call_DateTime')
+                # The interval belongs to the CURRENT call row, exactly like
+                # the supplied Excel reference (فرق التوقيت / الوقت المهدر).
                 threshold, status_label = _gap_threshold(row_data.get('Call_Status', ''))
 
-                if pd.isna(current_dt) or pd.isna(next_dt):
+                if pd.isna(current_dt) or pd.isna(previous_dt):
                     gap_calculation_rows.append({
-                        'Gap_Minutes': None,
+                        'Gap_Minutes': 0.0,
                         'Break_Excluded_Minutes': 0.0,
-                        'Effective_Gap_Minutes': None,
+                        'Effective_Gap_Minutes': 0.0,
                         'Allowed_Minutes': threshold,
-                        'Wasted_Minutes': None,
-                        'Wasted_Status': 'لا توجد مكالمة تالية'
+                        'Wasted_Minutes': 0.0,
+                        'Wasted_Status': 'أول مكالمة للمحصل أو وقت غير متاح'
                     })
                     continue
 
-                raw_gap = max(0.0, (next_dt - current_dt).total_seconds() / 60.0)
-                break_minutes = _break_overlap_minutes(current_dt, next_dt)
+                raw_gap = max(0.0, (current_dt - previous_dt).total_seconds() / 60.0)
+                break_minutes = _break_overlap_minutes(previous_dt, current_dt)
                 effective_gap = max(0.0, raw_gap - break_minutes)
 
                 if threshold is None:
-                    wasted_minutes = None
+                    wasted_minutes = 0.0
                     wasted_status = 'غير مصنفة - لم يُحتسب الوقت'
                 else:
-                    # الوقت المهدر هو الجزء الزائد عن الحد المسموح فقط.
+                    # Round the adjusted interval before subtracting the allowance,
+                    # matching the calculations in the supplied Excel workbook.
+                    effective_gap = round(effective_gap, 2)
                     wasted_minutes = max(0.0, effective_gap - threshold)
+                    wasted_minutes = round(wasted_minutes, 2)
                     wasted_status = 'وقت مهدر' if wasted_minutes > 0 else 'ضمن المسموح'
 
                 gap_calculation_rows.append({
@@ -2117,7 +2494,7 @@ else:
                     'Break_Excluded_Minutes': round(break_minutes, 2),
                     'Effective_Gap_Minutes': round(effective_gap, 2),
                     'Allowed_Minutes': threshold,
-                    'Wasted_Minutes': round(wasted_minutes, 2) if wasted_minutes is not None else None,
+                    'Wasted_Minutes': wasted_minutes,
                     'Wasted_Status': wasted_status
                 })
 
@@ -2127,6 +2504,12 @@ else:
             )
             for calc_col in gap_calculation_df.columns:
                 act_df[calc_col] = gap_calculation_df[calc_col]
+
+            # Columns that will also appear in the exported Excel report.
+            act_df['فرق التوقيت (دقائق)'] = act_df['Gap_Minutes'].fillna(0).round(2)
+            act_df['فرق_التوقيت_المعدّل (دقائق)'] = act_df['Effective_Gap_Minutes'].fillna(0).round(2)
+            act_df['الوقت المهدر (دقائق)'] = act_df['Wasted_Minutes'].fillna(0).round(2)
+            act_df['التوقيت'] = act_df['Created_DateTime'].dt.strftime('%H:%M:%S')
 
             activity_chart_df = act_df.copy()
             activity_chart_df = activity_chart_df.dropna(subset=[collector_col]).copy()
@@ -2408,55 +2791,44 @@ else:
                 st.info('عمود Created_DateTime غير متوفر لعرض منحنى النشاط خلال ساعات اليوم.')
 
             # ------------------------------------------
+            # ------------------------------------------
             # الشارت الثالثة: تحليل الوقت المهدر لكل محصل
             # ------------------------------------------
+            # Each gap is assigned to the CURRENT call row, matching the
+            # reference Excel file and the per-call wasted-time columns.
             gap_df = activity_chart_df[
-                activity_chart_df['Next_Call_DateTime'].notna()
+                activity_chart_df['Previous_Call_DateTime'].notna()
                 & activity_chart_df['Allowed_Minutes'].notna()
             ].copy()
 
             if not gap_df.empty:
                 lost_time_rows = []
-
-                # التجميع بالمفتاح الأصلي للمحصل لضمان عدم خلط محصلين مختلفين.
-                for raw_collector, all_collector_rows in activity_chart_df.groupby(collector_col, sort=False):
-                    collector_gaps = gap_df[gap_df[collector_col] == raw_collector].copy()
-
-                    if collector_gaps.empty:
-                        total_lost = 0.0
-                        longest_gap = 0.0
-                        wasted_intervals = 0
-                        valid_intervals = 0
-                    else:
-                        total_lost = float(collector_gaps['Wasted_Minutes'].fillna(0).sum())
-                        longest_gap = float(collector_gaps['Effective_Gap_Minutes'].fillna(0).max())
-                        wasted_intervals = int((collector_gaps['Wasted_Minutes'].fillna(0) > 0).sum())
-                        valid_intervals = len(collector_gaps)
-
+                for raw_collector, collector_gaps in gap_df.groupby(collector_col, sort=False):
+                    wasted_series = collector_gaps['Wasted_Minutes'].fillna(0).astype(float)
                     lost_time_rows.append({
                         'المحصل': _clean_collector_name(raw_collector),
-                        'إجمالي الدقائق الضائعة': round(total_lost, 1),
-                        'عدد فترات الوقت المهدر': wasted_intervals,
-                        'عدد الفواصل المحسوبة': valid_intervals,
-                        'أطول فجوة توقف (دقيقة)': round(longest_gap, 1)
+                        'إجمالي الدقائق الضائعة': round(float(wasted_series.sum()), 2),
+                        'عدد فترات الوقت المهدر': int((wasted_series > 0).sum()),
+                        'عدد الفواصل المحسوبة': int(len(collector_gaps)),
+                        'أعلى وقت مهدر (دقيقة)': round(float(wasted_series.max()), 2)
                     })
 
                 lost_summary = pd.DataFrame(lost_time_rows).sort_values(
-                    by=['إجمالي الدقائق الضائعة', 'أطول فجوة توقف (دقيقة)'],
+                    by=['إجمالي الدقائق الضائعة', 'أعلى وقت مهدر (دقيقة)'],
                     ascending=False
                 ).reset_index(drop=True)
 
-                total_wasted_minutes = float(gap_df['Wasted_Minutes'].fillna(0).sum())
+                total_wasted_minutes = round(float(gap_df['Wasted_Minutes'].fillna(0).sum()), 2)
                 total_wasted_intervals = int((gap_df['Wasted_Minutes'].fillna(0) > 0).sum())
-                longest_single_gap = float(gap_df['Effective_Gap_Minutes'].fillna(0).max())
+                highest_single_waste = round(float(gap_df['Wasted_Minutes'].fillna(0).max()), 2)
 
                 lost_kpi1, lost_kpi2, lost_kpi3 = st.columns(3)
                 with lost_kpi1:
-                    st.metric('إجمالي الوقت المهدر', f'{total_wasted_minutes:,.1f} دقيقة')
+                    st.metric('إجمالي الوقت المهدر', f'{total_wasted_minutes:,.2f} دقيقة')
                 with lost_kpi2:
                     st.metric('عدد فترات الوقت المهدر', f'{total_wasted_intervals:,}')
                 with lost_kpi3:
-                    st.metric('أطول فجوة توقف', f'{longest_single_gap:,.1f} دقيقة')
+                    st.metric('أعلى وقت مهدر', f'{highest_single_waste:,.2f} دقيقة')
 
                 fig_lost = go.Figure()
                 fig_lost.add_trace(go.Bar(
@@ -2465,19 +2837,19 @@ else:
                     name='إجمالي الدقائق الضائعة',
                     orientation='h',
                     marker=dict(color='#1F4373', line=dict(width=0)),
-                    text=[f'{v:.0f}' for v in lost_summary['إجمالي الدقائق الضائعة']],
+                    text=[f'{v:.2f}' for v in lost_summary['إجمالي الدقائق الضائعة']],
                     textposition='outside',
-                    hovertemplate='<b>%{y}</b><br>إجمالي الدقائق الضائعة: %{x:.1f} دقيقة<extra></extra>'
+                    hovertemplate='<b>%{y}</b><br>إجمالي الوقت المهدر: %{x:.2f} دقيقة<extra></extra>'
                 ))
                 fig_lost.add_trace(go.Bar(
                     y=lost_summary['المحصل'],
-                    x=lost_summary['أطول فجوة توقف (دقيقة)'],
-                    name='أطول فجوة توقف',
+                    x=lost_summary['أعلى وقت مهدر (دقيقة)'],
+                    name='أعلى وقت مهدر',
                     orientation='h',
                     marker=dict(color='#99AABF', line=dict(width=0)),
-                    text=[f'{v:.0f}' for v in lost_summary['أطول فجوة توقف (دقيقة)']],
+                    text=[f'{v:.2f}' for v in lost_summary['أعلى وقت مهدر (دقيقة)']],
                     textposition='outside',
-                    hovertemplate='<b>%{y}</b><br>أطول فجوة توقف: %{x:.1f} دقيقة<extra></extra>'
+                    hovertemplate='<b>%{y}</b><br>أعلى وقت مهدر: %{x:.2f} دقيقة<extra></extra>'
                 ))
                 fig_lost.update_layout(
                     title=dict(
@@ -2513,7 +2885,7 @@ else:
                     )
 
                 detail_cols = [
-                    collector_col, 'Created_DateTime', 'Next_Call_DateTime',
+                    collector_col, 'Previous_Call_DateTime', 'Created_DateTime',
                     'Call_Status', 'Gap_Minutes', 'Break_Excluded_Minutes',
                     'Effective_Gap_Minutes', 'Allowed_Minutes',
                     'Wasted_Minutes', 'Wasted_Status'
@@ -2527,8 +2899,8 @@ else:
                 )
                 lost_details = lost_details.rename(columns={
                     collector_col: 'المحصل',
+                    'Previous_Call_DateTime': 'وقت المكالمة السابقة لنفس المحصل',
                     'Created_DateTime': 'وقت المكالمة الحالية',
-                    'Next_Call_DateTime': 'وقت المكالمة التالية لنفس المحصل',
                     'Call_Status': 'تصنيف المكالمة الحالية',
                     'Gap_Minutes': 'الفاصل قبل خصم البريك (دقيقة)',
                     'Break_Excluded_Minutes': 'البريك المستبعد (دقيقة)',
@@ -2547,11 +2919,11 @@ else:
                         use_container_width=True,
                         hide_index=True,
                         column_config={
-                            'الفاصل قبل خصم البريك (دقيقة)': st.column_config.NumberColumn(format='%.1f'),
-                            'البريك المستبعد (دقيقة)': st.column_config.NumberColumn(format='%.1f'),
-                            'الفاصل بعد خصم البريك (دقيقة)': st.column_config.NumberColumn(format='%.1f'),
+                            'الفاصل قبل خصم البريك (دقيقة)': st.column_config.NumberColumn(format='%.2f'),
+                            'البريك المستبعد (دقيقة)': st.column_config.NumberColumn(format='%.2f'),
+                            'الفاصل بعد خصم البريك (دقيقة)': st.column_config.NumberColumn(format='%.2f'),
                             'الحد المسموح (دقيقة)': st.column_config.NumberColumn(format='%.0f'),
-                            'الوقت المهدر (دقيقة)': st.column_config.NumberColumn(format='%.1f')
+                            'الوقت المهدر (دقيقة)': st.column_config.NumberColumn(format='%.2f')
                         }
                     )
             else:
@@ -2572,21 +2944,47 @@ else:
                 st.dataframe(pivot_summary, use_container_width=True)
 
         st.markdown("<div style='text-align: right; direction: rtl;'>", unsafe_allow_html=True)
-        extra_time_cols = [c for c in ['Date', 'Time', 'Call_Status'] if c in act_df.columns]
-        display_cols = extra_time_cols + [c for c in act_df.columns if c not in ['Created_DateTime', 'Date', 'Time', 'Call_Status']]
+        report_time_cols = [
+            'Date', 'Time', 'Call_Status',
+            'فرق التوقيت (دقائق)', 'فرق_التوقيت_المعدّل (دقائق)',
+            'الوقت المهدر (دقائق)'
+        ]
+        extra_time_cols = [c for c in report_time_cols if c in act_df.columns]
+        display_cols = extra_time_cols + [
+            c for c in act_df.columns
+            if c not in ['Created_DateTime', 'Date', 'Time', 'Call_Status',
+                         'Previous_Call_DateTime', 'Next_Call_DateTime',
+                         'Gap_Minutes', 'Break_Excluded_Minutes',
+                         'Effective_Gap_Minutes', 'Allowed_Minutes',
+                         'Wasted_Minutes', 'Wasted_Status']
+            and c not in extra_time_cols
+        ]
         st.dataframe(act_df[display_cols], use_container_width=True, height=450)
         st.markdown("</div>", unsafe_allow_html=True)
 
-        wb_act = Workbook()
-        ws_act = wb_act.active
-        ws_act.title = 'تقرير النشاط والتقييم'
-        _write_df_sheet(ws_act, act_df[display_cols])
-        act_buf = io.BytesIO()
-        wb_act.save(act_buf)
-        act_buf.seek(0)
+        # Full Excel report matching the uploaded reference workbook.
+        template_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "Activity_Excel_Template.xlsx"
+        )
+        if not os.path.exists(template_path):
+            st.warning(
+                "ملف Activity_Excel_Template.xlsx غير موجود بجانب app.py. "
+                "ضعي ملف القالب في نفس المجلد للحفاظ على نفس تنسيق تقرير Excel."
+            )
+
+        excel_bytes, processed_export_df, activity_report_frames = _build_full_activity_excel_bytes(
+            activity_df=act_df,
+            collector_col=collector_col,
+            created_col=created_col,
+            notes_col=notes_col_name,
+            selected_bank=selected_bank,
+            template_path=template_path
+        )
+
         st.download_button(
-            "📥 تحميل تقرير النشاط مفلتر.xlsx",
-            data=act_buf.getvalue(),
-            file_name=f"{selected_bank}_Activity_Success_Report.xlsx",
+            "📥 تحميل تقرير النشاط الكامل Excel (بنفس تنسيق النموذج)",
+            data=excel_bytes,
+            file_name=f"{selected_bank}_Activity_Full_Report.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
