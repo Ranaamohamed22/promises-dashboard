@@ -1465,65 +1465,142 @@ st.markdown(f"""
         min-height: 50px !important;
         border-radius: 8px !important;
     }}
-    /* SNB Activity: compact cards, visible filenames and an X beside each name. */
+
+    /* SNB Activity: the native navy X remains; + and the uploaded file sit on ONE line. */
     div[class*="st-key-activity_model_upload_card"],
     div[class*="st-key-activity_file_upload_card"] {{
         max-width: 288px !important;
+        min-width: 0 !important;
+        margin: 0 auto !important;
     }}
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-activity_model_upload_card),
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-activity_file_upload_card) {{
         max-width: 288px !important;
-        padding: 7px 8px 6px !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        height: auto !important;
         min-height: 0 !important;
+        padding: 6px 8px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
     }}
+    /* Both cards: use Streamlit's real file deletion X, not an extra custom X. */
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploader"],
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploader"] {{
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 5px !important;
+        direction: ltr !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }}
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploader"] > label,
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploader"] > label {{
+        display: none !important;
+    }}
+    /* Turn the browse area into a compact functional + button. */
     div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderDropzone"],
     div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderDropzone"] {{
-        height: 46px !important;
-        min-height: 46px !important;
-        padding: 3px 6px !important;
+        order: 0 !important;
+        flex: 0 0 36px !important;
+        width: 36px !important;
+        min-width: 36px !important;
+        max-width: 36px !important;
+        height: 36px !important;
+        min-height: 36px !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: #FFFFFF !important;
+        border: 1px solid #1F4373 !important;
+        border-radius: 7px !important;
+        overflow: hidden !important;
     }}
     div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderDropzone"] > div,
     div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderDropzone"] > div {{
-        min-height: 38px !important;
+        display: flex !important;
+        align-items: center !important;
         justify-content: center !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
     }}
-    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderFileList"],
-    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderFileList"],
-    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderFile"],
-    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderFile"] {{
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderDropzoneInstructions"],
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderDropzoneInstructions"],
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderDropzone"] small,
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderDropzone"] small {{
         display: none !important;
     }}
-    div[class*="st-key-activity_model_upload_card"] .ejada-activity-file-name,
-    div[class*="st-key-activity_file_upload_card"] .ejada-activity-file-name {{
-        direction: rtl !important;
-        text-align: right !important;
-        white-space: nowrap !important;
-        text-overflow: ellipsis !important;
-        overflow: hidden !important;
-        width: 100% !important;
-        font-size: 13px !important;
-        font-weight: 800 !important;
-        color: {label_color} !important;
-        line-height: 30px !important;
-    }}
-    div[class*="st-key-clear_activity_model_"] button,
-    div[class*="st-key-clear_activity_data_"] button {{
-        width: 28px !important;
-        height: 28px !important;
-        min-height: 28px !important;
-        min-width: 28px !important;
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderDropzone"] button,
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderDropzone"] button {{
+        position: relative !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 34px !important;
+        min-width: 34px !important;
+        height: 34px !important;
+        min-height: 34px !important;
         padding: 0 !important;
-        border-radius: 50% !important;
-        background-color: #C5393B !important;
-        color: #FFFFFF !important;
+        margin: 0 !important;
         border: 0 !important;
+        border-radius: 7px !important;
+        box-shadow: none !important;
+        background: #FFFFFF !important;
+        color: transparent !important;
+        font-size: 0 !important;
+        cursor: pointer !important;
     }}
-    div[class*="st-key-clear_activity_model_"] button p,
-    div[class*="st-key-clear_activity_data_"] button p {{
-        color: #FFFFFF !important;
-        font-size: 18px !important;
-        font-weight: 900 !important;
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderDropzone"] button *,
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderDropzone"] button * {{
+        font-size: 0 !important;
+        visibility: hidden !important;
+    }}
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderDropzone"] button::after,
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderDropzone"] button::after {{
+        content: "+" !important;
+        position: absolute !important;
+        inset: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 25px !important;
+        font-weight: 500 !important;
         line-height: 1 !important;
+        color: #1F4373 !important;
+        visibility: visible !important;
+    }}
+    /* Native file row takes the remaining space, with its original navy X. */
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderFileList"],
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderFileList"] {{
+        display: block !important;
+        order: 1 !important;
+        flex: 1 1 auto !important;
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }}
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderFile"],
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderFile"] {{
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        min-height: 36px !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 2px 4px !important;
+        overflow: hidden !important;
+    }}
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderFile"] > *,
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderFile"] > * {{
+        min-width: 0 !important;
     }}
     /* Bank buttons and report navigation now share a single parent row. */
     .stApp [data-testid="stHorizontalBlock"]:has(.st-key-bank_SNB) > [data-testid="stColumn"]:last-child {{
@@ -6508,7 +6585,7 @@ def _snb_add_call_duration(frame, collector):
     return output
 
 
-def render_snb_activity_report(model_upload, activity_upload):
+def render_snb_activity_report(model_upload, activity_upload, error_slot=None):
     """Report screen opens with both upload boxes still visible above."""
     if model_upload is None or activity_upload is None:
         return
@@ -6526,7 +6603,11 @@ def render_snb_activity_report(model_upload, activity_upload):
                 _snb_model_evaluations(model_upload)
             )
         except Exception as exc:
-            st.error(f"تعذر تجهيز التقرير: {exc}")
+            message = f"تعذر تجهيز التقرير: {exc}"
+            if error_slot is not None:
+                error_slot.error(message)
+            else:
+                st.error(message)
             return
 
         period = "full"
@@ -7464,7 +7545,8 @@ if page_uploaded is None:
         </div>
         """, unsafe_allow_html=True)
     elif curr_page == 'Activity':
-        # New Activity page: title + two upload boxes only (no old report widgets).
+        # Reserve an error slot ABOVE the title/uploaders, even when report rendering happens below.
+        activity_error_slot = st.empty()
         st.markdown(f"""
         <div style="display:flex;justify-content:center;align-items:center;
                     direction:rtl;width:100%;margin:0 0 20px;padding:0;">
@@ -7506,24 +7588,6 @@ if page_uploaded is None:
                 saved_model = st.session_state.activity_page_uploads[
                     selected_bank
                 ]["model"]
-                if saved_model is not None:
-                    remove_col, filename_col = st.columns(
-                        [0.18, 0.82], gap="small", vertical_alignment="center"
-                    )
-                    with remove_col:
-                        st.button(
-                            "×", key=f"clear_activity_model_{selected_bank}",
-                            on_click=clear_activity_page_upload,
-                            args=(selected_bank, "model"),
-                            help="حذف موديل النشاط",
-                        )
-                    with filename_col:
-                        st.markdown(
-                            f'<div class="ejada-activity-file-name" '
-                            f'title="{_xml_escape(saved_model.name)}">'
-                            f'{_xml_escape(saved_model.name)}</div>',
-                            unsafe_allow_html=True,
-                        )
 
         with activity_col:
             with st.container(border=True, key="activity_file_upload_card"):
@@ -7549,24 +7613,6 @@ if page_uploaded is None:
                 saved_activity = st.session_state.activity_page_uploads[
                     selected_bank
                 ]["activity"]
-                if saved_activity is not None:
-                    remove_col, filename_col = st.columns(
-                        [0.18, 0.82], gap="small", vertical_alignment="center"
-                    )
-                    with remove_col:
-                        st.button(
-                            "×", key=f"clear_activity_data_{selected_bank}",
-                            on_click=clear_activity_page_upload,
-                            args=(selected_bank, "activity"),
-                            help="حذف ملف النشاط",
-                        )
-                    with filename_col:
-                        st.markdown(
-                            f'<div class="ejada-activity-file-name" '
-                            f'title="{_xml_escape(saved_activity.name)}">'
-                            f'{_xml_escape(saved_activity.name)}</div>',
-                            unsafe_allow_html=True,
-                        )
 
         # Auto-switch to the report screen when BOTH files have been uploaded.
         # Same two upload controls remain visible above in the report screen.
@@ -7579,7 +7625,8 @@ if page_uploaded is None:
                 st.session_state.snb_activity_screen = 'report'
             if st.session_state.get('snb_activity_screen') == 'report':
                 render_snb_activity_report(
-                    _uploaded['model'], _uploaded['activity']
+                    _uploaded['model'], _uploaded['activity'],
+                    error_slot=activity_error_slot
                 )
     else:
         st.markdown(f"<p style='color:{label_color};font-weight:800;font-size:15px;text-align:right;direction:rtl;margin-top:8px;'>ارفعي الملف من الخانة اللي فوق لعرض التقرير.</p>", unsafe_allow_html=True)
