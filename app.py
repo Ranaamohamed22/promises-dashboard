@@ -8,10 +8,12 @@ import os
 import re
 import zipfile
 import hashlib
+import gzip
 import hmac
 import json
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+from cryptography.fernet import Fernet, InvalidToken
 from difflib import SequenceMatcher, get_close_matches
 from xml.sax.saxutils import escape as _xml_escape
 from openpyxl import Workbook, load_workbook
@@ -6175,10 +6177,10 @@ def _snb_normalize_note(value):
 
 # ---------------------------------------------------------------------------
 # Persistent user-approved SNB note evaluations.
-# Only the JSON reference file is editable from Streamlit. The app.py source,
+# Only an ENCRYPTED reference file is editable from Streamlit. The app.py source,
 # passwords, uploaded portfolios and individual debtor rows are never saved.
 # ---------------------------------------------------------------------------
-_SNB_MODEL_OVERRIDES_PATH = "data/snb_activity_model_overrides.json"
+_SNB_MODEL_OVERRIDES_PATH = "data/snb_activity_model_overrides.enc"
 
 
 def _snb_secret(name, default=""):
@@ -6244,6 +6246,62 @@ def _snb_github_model_request(settings, method="GET", payload=None):
         raise RuntimeError("تعذّر الاتصال بخدمة حفظ موديل النشاط على GitHub.") from exc
 
 
+
+def _snb_get_fernet():
+    """Require private encryption key; never place the key in a public repository."""
+    secret = _snb_secret("MODEL_ENCRYPTION_KEY")
+    if not secret:
+        raise ValueError(
+            "لازم إضافة MODEL_ENCRYPTION_KEY إلى Streamlit Secrets لتشغيل الموديل المشفر."
+        )
+    try:
+        return Fernet(secret.encode("ascii"))
+    except (ValueError, UnicodeError) as exc:
+        raise ValueError(
+            "مفتاح MODEL_ENCRYPTION_KEY غير صالح؛ استخدمي السطر الموجود في ملف الإعداد."
+        ) from exc
+
+
+def _snb_secret_model_evaluations():
+    """Load the encrypted 777-row baseline model from Streamlit private Secrets.
+
+    No customer Notes appear in public code or GitHub history.
+    """
+    ciphertext = _snb_secret("SNB_MODEL_ENCRYPTED")
+    if not ciphertext:
+        raise ValueError(
+            "الموديل الثابت لم يتم تفعيله؛ أضيفي SNB_MODEL_ENCRYPTED إلى Streamlit Secrets."
+        )
+    try:
+        compressed = _snb_get_fernet().decrypt(ciphertext.encode("ascii"))
+        source = json.loads(gzip.decompress(compressed).decode("utf-8"))
+    except (InvalidToken, OSError, ValueError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(
+            "تعذر فك تشفير موديل النشاط الثابت؛ راجعي سطري SNB_MODEL_ENCRYPTED "
+            "وMODEL_ENCRYPTION_KEY في Secrets."
+        ) from exc
+    entries = source.get("entries", [])
+    if not isinstance(entries, list):
+        raise ValueError("ملف موديل النشاط الثابت غير صالح.")
+    mapping, conflicts, invalid = {}, set(), 0
+    for entry in entries:
+        if not isinstance(entry, dict):
+            invalid += 1
+            continue
+        key = _snb_normalize_note(entry.get("notes"))
+        rating = entry.get("evaluation")
+        if not key or type(rating) is not int or rating not in (0, 1):
+            invalid += 1
+            continue
+        if key in mapping and mapping[key] != rating:
+            conflicts.add(key)
+        else:
+            mapping[key] = rating
+    for key in conflicts:
+        mapping.pop(key, None)
+    return mapping, len(conflicts), invalid
+
+
 def _snb_load_saved_model_notes(settings):
     """Return normalized mapping, original labels, and current file SHA."""
     if not settings["token"]:
@@ -6256,8 +6314,14 @@ def _snb_load_saved_model_notes(settings):
     encoded = response.get("content", "")
     if not encoded:
         raise ValueError("ملف الموديل المحفوظ لا يحتوي على بيانات قابلة للقراءة.")
-    raw = base64.b64decode(encoded).decode("utf-8")
-    document = json.loads(raw)
+    try:
+        encrypted = base64.b64decode(encoded).strip()
+        decrypted = _snb_get_fernet().decrypt(encrypted)
+        document = json.loads(decrypted.decode("utf-8"))
+    except (InvalidToken, ValueError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(
+            "تعذّر فتح موديل الإضافات المشفّر. راجعي MODEL_ENCRYPTION_KEY."
+        ) from exc
     if not isinstance(document, dict) or not isinstance(document.get("entries", []), list):
         raise ValueError("صيغة ملف الموديل المحفوظ غير صحيحة.")
     ratings, labels = {}, {}
@@ -6301,7 +6365,9 @@ def _snb_save_model_notes(settings, additions):
     payload = {
         "message": "Update approved EJADA SNB activity note evaluations",
         "branch": settings["branch"],
-        "content": base64.b64encode(raw).decode("ascii"),
+        "content": base64.b64encode(
+            _snb_get_fernet().encrypt(raw)
+        ).decode("ascii"),
     }
     if sha:
         payload["sha"] = sha
@@ -6326,6 +6392,9 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
         return
     if not settings["admin_password"]:
         st.warning("أضيفي MODEL_ADMIN_PASSWORD إلى Streamlit Secrets قبل السماح بتعديل الموديل.")
+        return
+    if not _snb_secret("MODEL_ENCRYPTION_KEY"):
+        st.warning("أضيفي MODEL_ENCRYPTION_KEY إلى Streamlit Secrets لتشفير الإفادات قبل حفظها.")
         return
 
     if not st.session_state.get("snb_model_manager_is_admin", False):
@@ -6765,7 +6834,11 @@ def _snb_model_similarity(note_key, model_keys):
 
 def _snb_manual_evaluations(model_upload):
     """Decisions persist across reruns, but NEVER across a changed model."""
-    model_digest = hashlib.sha256(model_upload.getvalue()).hexdigest()
+    if model_upload is None:
+        model_bytes = _snb_secret("SNB_MODEL_ENCRYPTED").encode("ascii")
+    else:
+        model_bytes = model_upload.getvalue()
+    model_digest = hashlib.sha256(model_bytes).hexdigest()
     storage = st.session_state.get("snb_activity_manual_evaluations")
     if not isinstance(storage, dict) or storage.get("model_digest") != model_digest:
         storage = {"model_digest": model_digest, "ratings": {}}
@@ -7038,7 +7111,9 @@ def _snb_add_call_duration(frame, collector):
 
 def render_snb_activity_report(model_upload, activity_upload, error_slot=None):
     """Report screen opens with both upload boxes still visible above."""
-    if model_upload is None or activity_upload is None:
+    if activity_upload is None:
+        return
+    if model_upload is None and not _snb_secret("SNB_MODEL_ENCRYPTED"):
         return
 
     with st.container(key="snb_activity_work_area"):
@@ -7050,9 +7125,14 @@ def render_snb_activity_report(model_upload, activity_upload, error_slot=None):
         )
         try:
             prepared, stats = _prepare_snb_activity_file(activity_upload)
-            model_mapping, conflicted_notes, invalid_model = (
-                _snb_model_evaluations(model_upload)
-            )
+            if _snb_secret("SNB_MODEL_ENCRYPTED"):
+                model_mapping, conflicted_notes, invalid_model = (
+                    _snb_secret_model_evaluations()
+                )
+            else:
+                model_mapping, conflicted_notes, invalid_model = (
+                    _snb_model_evaluations(model_upload)
+                )
         except Exception as exc:
             message = f"تعذر تجهيز التقرير: {exc}"
             if error_slot is not None:
@@ -7070,7 +7150,7 @@ def render_snb_activity_report(model_upload, activity_upload, error_slot=None):
         except Exception as exc:
             st.warning(
                 "تعذر تحميل إضافات موديل النشاط المحفوظة على GitHub؛ "
-                "التقرير سيعتمد مؤقتًا على الموديل المرفوع فقط. "
+                "التقرير سيعتمد مؤقتًا على الموديل الأساسي فقط. "
                 f"التفاصيل: {exc}"
             )
 
@@ -8051,33 +8131,43 @@ if page_uploaded is None:
         </div>
         """, unsafe_allow_html=True)
 
-        model_col, activity_col, _left_space = st.columns(
-            [1.0, 1.0, 3.7], gap="small", vertical_alignment="top"
+        # The encrypted model is private and auto-loaded: upload only Activity.
+        _snb_secret_model_ready = (
+            selected_bank == "SNB" and bool(_snb_secret("SNB_MODEL_ENCRYPTED"))
         )
-        with model_col:
-            with st.container(border=True, key="activity_model_upload_card"):
-                st.markdown(
-                    f'<div style="color:{label_color};direction:rtl;text-align:center;'
-                    'font-size:18px;font-weight:900;margin-bottom:8px;">'
-                    'خانة رفع موديل النشاط</div>',
-                    unsafe_allow_html=True
-                )
-                model_key = (
-                    f"activity_model_file_{selected_bank}_"
-                    f"{st.session_state.activity_upload_versions[selected_bank]['model']}"
-                )
-                model_file = st.file_uploader(
-                    "خانة رفع موديل النشاط",
-                    type=["xlsx"],
-                    accept_multiple_files=False,
-                    label_visibility="collapsed",
-                    key=model_key,
-                    on_change=save_activity_page_upload,
-                    args=(selected_bank, "model", model_key)
-                )
-                saved_model = st.session_state.activity_page_uploads[
-                    selected_bank
-                ]["model"]
+        if _snb_secret_model_ready:
+            activity_col, _left_space = st.columns(
+                [1.0, 4.7], gap="small", vertical_alignment="top"
+            )
+            st.caption("موديل النشاط الأساسي: محفوظ تلقائيًا بشكل مشفّر.")
+        else:
+            model_col, activity_col, _left_space = st.columns(
+                [1.0, 1.0, 3.7], gap="small", vertical_alignment="top"
+            )
+            with model_col:
+                with st.container(border=True, key="activity_model_upload_card"):
+                    st.markdown(
+                        f'<div style="color:{label_color};direction:rtl;text-align:center;'
+                        'font-size:18px;font-weight:900;margin-bottom:8px;">'
+                        'خانة رفع موديل النشاط</div>',
+                        unsafe_allow_html=True
+                    )
+                    model_key = (
+                        f"activity_model_file_{selected_bank}_"
+                        f"{st.session_state.activity_upload_versions[selected_bank]['model']}"
+                    )
+                    model_file = st.file_uploader(
+                        "خانة رفع موديل النشاط",
+                        type=["xlsx"],
+                        accept_multiple_files=False,
+                        label_visibility="collapsed",
+                        key=model_key,
+                        on_change=save_activity_page_upload,
+                        args=(selected_bank, "model", model_key)
+                    )
+                    saved_model = st.session_state.activity_page_uploads[
+                        selected_bank
+                    ]["model"]
 
         with activity_col:
             with st.container(border=True, key="activity_file_upload_card"):
@@ -8109,7 +8199,7 @@ if page_uploaded is None:
         if selected_bank == 'SNB':
             _uploaded = st.session_state.activity_page_uploads['SNB']
             if (
-                _uploaded['model'] is not None
+                (_snb_secret_model_ready or _uploaded['model'] is not None)
                 and _uploaded['activity'] is not None
             ):
                 st.session_state.snb_activity_screen = 'report'
