@@ -1465,6 +1465,77 @@ st.markdown(f"""
         min-height: 50px !important;
         border-radius: 8px !important;
     }}
+    /* SNB Activity: compact cards, visible filenames and an X beside each name. */
+    div[class*="st-key-activity_model_upload_card"],
+    div[class*="st-key-activity_file_upload_card"] {{
+        max-width: 288px !important;
+    }}
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-activity_model_upload_card),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-activity_file_upload_card) {{
+        max-width: 288px !important;
+        padding: 7px 8px 6px !important;
+        min-height: 0 !important;
+    }}
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderDropzone"],
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderDropzone"] {{
+        height: 46px !important;
+        min-height: 46px !important;
+        padding: 3px 6px !important;
+    }}
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderDropzone"] > div,
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderDropzone"] > div {{
+        min-height: 38px !important;
+        justify-content: center !important;
+    }}
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderFileList"],
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderFileList"],
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderFile"],
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderFile"] {{
+        display: none !important;
+    }}
+    div[class*="st-key-activity_model_upload_card"] .ejada-activity-file-name,
+    div[class*="st-key-activity_file_upload_card"] .ejada-activity-file-name {{
+        direction: rtl !important;
+        text-align: right !important;
+        white-space: nowrap !important;
+        text-overflow: ellipsis !important;
+        overflow: hidden !important;
+        width: 100% !important;
+        font-size: 13px !important;
+        font-weight: 800 !important;
+        color: {label_color} !important;
+        line-height: 30px !important;
+    }}
+    div[class*="st-key-clear_activity_model_"] button,
+    div[class*="st-key-clear_activity_data_"] button {{
+        width: 28px !important;
+        height: 28px !important;
+        min-height: 28px !important;
+        min-width: 28px !important;
+        padding: 0 !important;
+        border-radius: 50% !important;
+        background-color: #C5393B !important;
+        color: #FFFFFF !important;
+        border: 0 !important;
+    }}
+    div[class*="st-key-clear_activity_model_"] button p,
+    div[class*="st-key-clear_activity_data_"] button p {{
+        color: #FFFFFF !important;
+        font-size: 18px !important;
+        font-weight: 900 !important;
+        line-height: 1 !important;
+    }}
+    /* Bank buttons and report navigation now share a single parent row. */
+    .stApp [data-testid="stHorizontalBlock"]:has(.st-key-bank_SNB) > [data-testid="stColumn"]:last-child {{
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+    }}
+    .stApp [data-testid="stHorizontalBlock"]:has(.st-key-bank_SNB) div.st-key-report_nav_group {{
+        margin-top: 4px !important;
+        min-width: 0 !important;
+        overflow-x: auto !important;
+    }}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -1495,8 +1566,16 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+# Keep report navigation in the SAME row as SNB/STC, aligned to the top right.
+def _render_ejada_main_navigation():
+    with st.container(key="report_nav_group"):
+        st.button("🏠", key="nav_home_btn", type="primary" if st.session_state.current_page == 'Home' else "secondary", use_container_width=False, on_click=set_page, args=('Home',), help="الرئيسية")
+        st.button("🤝 الوعود القائمة والمكسورة", key="nav_prom_btn", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=False, on_click=set_page, args=('Promises',))
+        st.button("🚨 تقرير الإهمال", key="nav_neg_btn", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=False, on_click=set_page, args=('Neglect',))
+        st.button("📈 النشاط", key="nav_act_btn", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=False, on_click=set_page, args=('Activity',))
+
 if st.session_state.current_page not in ('Overview', 'Home'):
-    bank_snb_col, bank_stc_col, _bank_spacer = st.columns([0.82, 0.82, 8.36], gap='small')
+    bank_snb_col, bank_stc_col, nav_col = st.columns([0.82, 0.82, 8.36], gap='small', vertical_alignment='top')
     with bank_snb_col:
         st.button('🏦 SNB', key='bank_SNB',
                   type='primary' if st.session_state.selected_bank == 'SNB' else 'secondary',
@@ -1513,16 +1592,10 @@ if st.session_state.current_page not in ('Overview', 'Home'):
                   type='primary' if st.session_state.selected_bank == 'STC' else 'secondary',
                   use_container_width=False, on_click=set_bank, args=('STC',))
 
-
-# ==========================================
-# 2. شريط التنقل
-# ==========================================
-# أزرار مباشرة داخل صف Flex واحد لتجنب أعمدة Streamlit التي تسببت في التداخل.
-with st.container(key="report_nav_group"):
-    st.button("🏠", key="nav_home_btn", type="primary" if st.session_state.current_page == 'Home' else "secondary", use_container_width=False, on_click=set_page, args=('Home',), help="الرئيسية")
-    st.button("🤝 الوعود القائمة والمكسورة", key="nav_prom_btn", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=False, on_click=set_page, args=('Promises',))
-    st.button("🚨 تقرير الإهمال", key="nav_neg_btn", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=False, on_click=set_page, args=('Neglect',))
-    st.button("📈 النشاط", key="nav_act_btn", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=False, on_click=set_page, args=('Activity',))
+    with nav_col:
+        _render_ejada_main_navigation()
+else:
+    _render_ejada_main_navigation()
 
 st.markdown(
     f"<hr style='margin: 10px 0 20px 0; border-color: {border_color}; clear: both;'>",
@@ -5856,6 +5929,25 @@ def save_activity_page_upload(bank, kind, widget_key):
         )
 
 
+
+# Upload keys are versioned so removing a file clears the native uploader too.
+if "activity_upload_versions" not in st.session_state:
+    st.session_state.activity_upload_versions = {
+        bank: {"model": 0, "activity": 0} for bank in BANKS
+    }
+else:
+    for bank in BANKS:
+        versions = st.session_state.activity_upload_versions.setdefault(bank, {})
+        versions.setdefault("model", 0)
+        versions.setdefault("activity", 0)
+
+
+def clear_activity_page_upload(bank, kind):
+    st.session_state.activity_page_uploads[bank][kind] = None
+    st.session_state.activity_upload_versions[bank][kind] += 1
+    if bank == "SNB":
+        st.session_state.snb_activity_screen = "upload"
+
 def _snb_header_key(value):
     """Normalize labels for robust English/Arabic column lookup."""
     return re.sub(
@@ -6422,12 +6514,7 @@ def render_snb_activity_report(model_upload, activity_upload):
         return
 
     with st.container(key="snb_activity_work_area"):
-        st.markdown(
-            f'<h3 style="text-align:center;color:{label_color};'
-            'font-size:22px;font-weight:900;">'
-            'تقرير نشاط المحصلين | SNB</h3>',
-            unsafe_allow_html=True
-        )
+        # The report title now lives in the phone header above the upload cards.
         activity_kind = st.selectbox(
             "نوع النشاط",
             options=["يومي", "أسبوعي", "شهري"],
@@ -7387,13 +7474,13 @@ if page_uploaded is None:
                         border-radius:10px;color:{text_color};font-weight:900;
                         font-size:26px;text-align:center;">
                 {PHONE_HEADER_SVG}
-                <span>تقرير نشاط المحصلين</span>
+                <span>تقرير نشاط المحصلين | {selected_bank}</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
         _left_space, model_col, activity_col, _right_space = st.columns(
-            [1.5, 1.15, 1.15, 1.5], gap="small", vertical_alignment="top"
+            [2.0, 1.0, 1.0, 2.0], gap="small", vertical_alignment="top"
         )
         with model_col:
             with st.container(border=True, key="activity_model_upload_card"):
@@ -7403,7 +7490,10 @@ if page_uploaded is None:
                     'خانة رفع موديل النشاط</div>',
                     unsafe_allow_html=True
                 )
-                model_key = f"activity_model_file_{selected_bank}"
+                model_key = (
+                    f"activity_model_file_{selected_bank}_"
+                    f"{st.session_state.activity_upload_versions[selected_bank]['model']}"
+                )
                 model_file = st.file_uploader(
                     "خانة رفع موديل النشاط",
                     type=["xlsx"],
@@ -7416,8 +7506,24 @@ if page_uploaded is None:
                 saved_model = st.session_state.activity_page_uploads[
                     selected_bank
                 ]["model"]
-                if model_file is None and saved_model is not None:
-                    st.caption(f"الملف المحفوظ: {saved_model.name}")
+                if saved_model is not None:
+                    remove_col, filename_col = st.columns(
+                        [0.18, 0.82], gap="small", vertical_alignment="center"
+                    )
+                    with remove_col:
+                        st.button(
+                            "×", key=f"clear_activity_model_{selected_bank}",
+                            on_click=clear_activity_page_upload,
+                            args=(selected_bank, "model"),
+                            help="حذف موديل النشاط",
+                        )
+                    with filename_col:
+                        st.markdown(
+                            f'<div class="ejada-activity-file-name" '
+                            f'title="{_xml_escape(saved_model.name)}">'
+                            f'{_xml_escape(saved_model.name)}</div>',
+                            unsafe_allow_html=True,
+                        )
 
         with activity_col:
             with st.container(border=True, key="activity_file_upload_card"):
@@ -7427,7 +7533,10 @@ if page_uploaded is None:
                     'رفع ملف النشاط</div>',
                     unsafe_allow_html=True
                 )
-                activity_key = f"activity_data_file_{selected_bank}"
+                activity_key = (
+                    f"activity_data_file_{selected_bank}_"
+                    f"{st.session_state.activity_upload_versions[selected_bank]['activity']}"
+                )
                 activity_file = st.file_uploader(
                     "رفع ملف النشاط",
                     type=["xlsx", "csv"],
@@ -7440,8 +7549,24 @@ if page_uploaded is None:
                 saved_activity = st.session_state.activity_page_uploads[
                     selected_bank
                 ]["activity"]
-                if activity_file is None and saved_activity is not None:
-                    st.caption(f"الملف المحفوظ: {saved_activity.name}")
+                if saved_activity is not None:
+                    remove_col, filename_col = st.columns(
+                        [0.18, 0.82], gap="small", vertical_alignment="center"
+                    )
+                    with remove_col:
+                        st.button(
+                            "×", key=f"clear_activity_data_{selected_bank}",
+                            on_click=clear_activity_page_upload,
+                            args=(selected_bank, "activity"),
+                            help="حذف ملف النشاط",
+                        )
+                    with filename_col:
+                        st.markdown(
+                            f'<div class="ejada-activity-file-name" '
+                            f'title="{_xml_escape(saved_activity.name)}">'
+                            f'{_xml_escape(saved_activity.name)}</div>',
+                            unsafe_allow_html=True,
+                        )
 
         # Auto-switch to the report screen when BOTH files have been uploaded.
         # Same two upload controls remain visible above in the report screen.
