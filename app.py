@@ -4945,6 +4945,7 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
 
         if all([stc_processing_col, stc_classification_col, stc_expected_col, stc_due_col, stc_last_col]):
             stc_promises = df_promises.copy()
+            stc_debug_source = stc_promises.copy()
 
             def _normalize_stc_filter_text(value):
                 text = '' if pd.isna(value) else str(value).strip()
@@ -4997,6 +4998,54 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
                 _normalize_stc_filter_text('وعود سداد قيد التنفيذ'),
                 _normalize_stc_filter_text('وعود السداد قيد التنفيذ'),
                 _normalize_stc_filter_text('وعد سداد قيد التنفيذ'),
+            }
+
+            # Diagnostic trace for STC active promises. This does not change
+            # the result; it only shows how many rows survive each filter.
+            _dbg = stc_debug_source.copy()
+            _dbg_processing = _dbg[stc_processing_col].apply(_normalize_stc_filter_text)
+            _dbg_classification = _dbg[stc_classification_col].apply(_normalize_stc_filter_text)
+
+            _dbg_expected_blank = _stc_blank_mask(_dbg[stc_expected_col])
+            _dbg_expected_filled = _dbg[stc_expected_col].copy()
+            _dbg_expected_filled.loc[_dbg_expected_blank] = _dbg.loc[_dbg_expected_blank, stc_due_col]
+            _dbg_expected_date = pd.to_datetime(_dbg_expected_filled, errors='coerce').dt.normalize()
+
+            _dbg_last_blank = _stc_blank_mask(_dbg[stc_last_col])
+            _dbg_last_date = pd.to_datetime(_dbg[stc_last_col], errors='coerce').dt.normalize()
+
+            _dbg_not_processed = _dbg_processing != _normalize_stc_filter_text('معالج')
+            _dbg_allowed_class = _dbg_classification.isin(stc_allowed_classifications)
+            _dbg_after_processing = _dbg_not_processed
+            _dbg_after_classification = _dbg_after_processing & _dbg_allowed_class
+            _dbg_after_last_not_blank = _dbg_after_classification & (~_dbg_last_blank)
+            _dbg_after_expected_today = _dbg_after_last_not_blank & (_dbg_expected_date == today)
+            _dbg_final = _dbg_after_expected_today & (_dbg_last_date != today)
+
+            _dbg_steps = [
+                {'الخطوة': 'إجمالي الصفوف الأصلية', 'العدد': int(len(_dbg))},
+                {'الخطوة': 'بعد استبعاد حالة المعالجة = معالج', 'العدد': int(_dbg_after_processing.sum())},
+                {'الخطوة': 'بعد فلتر Classification', 'العدد': int(_dbg_after_classification.sum())},
+                {'الخطوة': 'Expected Closing blank تم ملؤه من Due Date', 'العدد': int((_dbg_after_classification & _dbg_expected_blank).sum())},
+                {'الخطوة': 'بعد استبعاد Follow up Last Date الـ blank', 'العدد': int(_dbg_after_last_not_blank.sum())},
+                {'الخطوة': 'بعد Expected Closing = اليوم', 'العدد': int(_dbg_after_expected_today.sum())},
+                {'الخطوة': 'بعد استبعاد Follow up Last Date = اليوم', 'العدد': int(_dbg_final.sum())},
+            ]
+
+            _dbg_class_counts = (
+                _dbg.loc[_dbg_after_processing, stc_classification_col]
+                .fillna('(blank)')
+                .astype(str)
+                .str.strip()
+                .replace('', '(blank)')
+                .value_counts(dropna=False)
+                .rename_axis('Classification')
+                .reset_index(name='العدد')
+            )
+
+            st.session_state['stc_active_promises_debug'] = {
+                'steps': _dbg_steps,
+                'classification_counts': _dbg_class_counts.to_dict('records'),
             }
 
             stc_base_condition = (
@@ -5415,6 +5464,25 @@ else:
         tab_active, tab_broken = st.tabs([f"✅ الوعود القائمة ({active_count:,})", f"⚠️ الوعود المكسورة ({broken_count:,})"])
         
         with tab_active:
+            if selected_bank == 'STC':
+                _stc_debug = st.session_state.get('stc_active_promises_debug')
+                if _stc_debug:
+                    with st.expander("🔎 تشخيص فلترة الوعود القائمة STC", expanded=True):
+                        st.caption("الأرقام دي للتشخيص فقط ولا تغيّر نتيجة التقرير.")
+                        st.dataframe(
+                            pd.DataFrame(_stc_debug.get('steps', [])),
+                            use_container_width=True,
+                            hide_index=True
+                        )
+                        _class_debug_df = pd.DataFrame(_stc_debug.get('classification_counts', []))
+                        if not _class_debug_df.empty:
+                            st.markdown("**القيم الموجودة فعليًا في Classification بعد استبعاد معالج:**")
+                            st.dataframe(
+                                _class_debug_df,
+                                use_container_width=True,
+                                hide_index=True
+                            )
+
             st.markdown(f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900;'>📊 ملخص تقرير الوعود القائمة (Pivot)</h4>", unsafe_allow_html=True)
             st.dataframe(style_pivot_frame(pivot_to_frame(build_pivot(active_promises_df, order='first'))), use_container_width=True, hide_index=True)
             st.markdown(f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900; margin-top:20px;'>📋 تفاصيل شيت الوعود القائمة</h4>", unsafe_allow_html=True)
