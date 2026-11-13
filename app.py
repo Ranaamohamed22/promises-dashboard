@@ -5784,6 +5784,28 @@ def clear_report_page_file(bank, page):
     st.session_state.page_files[bank][page] = None
     st.session_state.report_uploader_versions[bank][page] += 1
 
+# Independent Activity-page uploads: one model and one activity file per bank.
+# Files are kept in Streamlit session state across bank/page navigation.
+if 'activity_page_uploads' not in st.session_state:
+    st.session_state.activity_page_uploads = {
+        bank: {'model': None, 'activity': None} for bank in BANKS
+    }
+else:
+    for bank in BANKS:
+        st.session_state.activity_page_uploads.setdefault(
+            bank, {'model': None, 'activity': None}
+        )
+        st.session_state.activity_page_uploads[bank].setdefault('model', None)
+        st.session_state.activity_page_uploads[bank].setdefault('activity', None)
+
+
+def save_activity_page_upload(bank, kind, widget_key):
+    """Persist only the uploaded file; don't run the old Activity analytics."""
+    st.session_state.activity_page_uploads[bank][kind] = st.session_state.get(
+        widget_key
+    )
+
+
 selected_bank = st.session_state.selected_bank
 bank_files = st.session_state.page_files[selected_bank]
 
@@ -6574,10 +6596,10 @@ if page_uploaded is None:
         </div>
         """, unsafe_allow_html=True)
     elif curr_page == 'Activity':
-        # Keep the activity title and its phone icon BELOW the divider.
+        # New Activity page: title + two upload boxes only (no old report widgets).
         st.markdown(f"""
         <div style="display:flex;justify-content:center;align-items:center;
-                    direction:rtl;width:100%;margin:0;padding:0;">
+                    direction:rtl;width:100%;margin:0 0 20px;padding:0;">
             <div style="display:inline-flex;align-items:center;justify-content:center;
                         gap:12px;padding:12px 24px;width:fit-content;max-width:100%;
                         background:{card_color};border:1px solid {border_color};
@@ -6588,6 +6610,57 @@ if page_uploaded is None:
             </div>
         </div>
         """, unsafe_allow_html=True)
+
+        _left_space, model_col, activity_col, _right_space = st.columns(
+            [1, 2, 2, 1], gap="medium", vertical_alignment="top"
+        )
+        with model_col:
+            with st.container(border=True):
+                st.markdown(
+                    f'<div style="color:{text_color};direction:rtl;text-align:center;'
+                    'font-size:18px;font-weight:900;margin-bottom:8px;">'
+                    'خانة رفع موديل النشاط</div>',
+                    unsafe_allow_html=True
+                )
+                model_key = f"activity_model_file_{selected_bank}"
+                model_file = st.file_uploader(
+                    "خانة رفع موديل النشاط",
+                    type=["xlsx"],
+                    accept_multiple_files=False,
+                    label_visibility="collapsed",
+                    key=model_key,
+                    on_change=save_activity_page_upload,
+                    args=(selected_bank, "model", model_key)
+                )
+                saved_model = st.session_state.activity_page_uploads[
+                    selected_bank
+                ]["model"]
+                if model_file is None and saved_model is not None:
+                    st.caption(f"الملف المحفوظ: {saved_model.name}")
+
+        with activity_col:
+            with st.container(border=True):
+                st.markdown(
+                    f'<div style="color:{text_color};direction:rtl;text-align:center;'
+                    'font-size:18px;font-weight:900;margin-bottom:8px;">'
+                    'رفع ملف النشاط</div>',
+                    unsafe_allow_html=True
+                )
+                activity_key = f"activity_data_file_{selected_bank}"
+                activity_file = st.file_uploader(
+                    "رفع ملف النشاط",
+                    type=["xlsx", "csv"],
+                    accept_multiple_files=False,
+                    label_visibility="collapsed",
+                    key=activity_key,
+                    on_change=save_activity_page_upload,
+                    args=(selected_bank, "activity", activity_key)
+                )
+                saved_activity = st.session_state.activity_page_uploads[
+                    selected_bank
+                ]["activity"]
+                if activity_file is None and saved_activity is not None:
+                    st.caption(f"الملف المحفوظ: {saved_activity.name}")
     else:
         st.markdown(f"<p style='color:{label_color};font-weight:800;font-size:15px;text-align:right;direction:rtl;margin-top:8px;'>ارفعي الملف من الخانة اللي فوق لعرض التقرير.</p>", unsafe_allow_html=True)
 else:
