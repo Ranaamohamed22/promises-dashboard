@@ -6919,90 +6919,85 @@ def _filter_snb_activity_period(frame, activity_kind, daily_period,
         ].copy()
     return valid, overtime_excluded
 
-def _snb_after_break_notes(prepared, selected, notes_col, collector_col,
-                           activity_kind, daily_period="full",
-                           exclude_last_hour=False):
-    """Audit all collector Notes after the 12:00–12:30 break.
+def _snb_after_break_notes(prepared, selected, notes_col, collector_col):
+    """ONE row per collector per day with first post-break Note and duty span.
 
-    One sheet contains each actual Note from 12:30 to 16:00 and flags
-    the first Note per collector/day. Collectors with no post-break Note
-    get an explicit status row. The source is the complete uploaded activity,
-    not the selected shift, so this sheet also works for first-shift reports.
-    No unapproved evaluation is inferred or added.
+    After-break range is 12:30–16:00. The first/last daily Notes and duty
+    span use the full uploaded activity on the dates represented in the report.
+    Duty means last timestamp minus first timestamp, with no inferred shift
+    start/end or payroll adjustments.
     """
     columns = [
-        "التاريخ", "المحصل", "وقت الإفادة بعد البريك", "الإفادة",
-        "أول إفادة بعد البريك", "دقائق من نهاية البريك", "الحالة"
+        "التاريخ", "المحصل", "أول إفادة بعد البريك",
+        "ميعاد أول إفادة بعد البريك", "ميعاد أول إفادة",
+        "ميعاد آخر إفادة", "مدة الدوام",
+        "دقائق من نهاية البريك", "الحالة"
     ]
+    stamp = "__ejada_parsed_created"
     if prepared.empty or selected.empty:
         return pd.DataFrame(columns=columns)
-    stamp_col = "__ejada_parsed_created"
-    days = selected[stamp_col].dropna().dt.normalize().unique()
-    source = prepared.dropna(subset=[stamp_col]).copy()
-    source["__day"] = source[stamp_col].dt.normalize()
-    source = source.loc[source["__day"].isin(days)].copy()
+    active_days = selected[stamp].dropna().dt.normalize().unique()
+    source = prepared.dropna(subset=[stamp]).copy()
+    source["__ejada_day"] = source[stamp].dt.normalize()
+    source = source.loc[source["__ejada_day"].isin(active_days)].copy()
     if source.empty:
         return pd.DataFrame(columns=columns)
-    source["__collector"] = (
-        source[collector_col].fillna("(بدون اسم)").astype(str)
-        .str.strip().replace("", "(بدون اسم)")
+
+    source["__ejada_collector"] = (
+        source[collector_col].fillna("").astype(str).str.strip()
+        .replace("", "(بدون اسم)")
     )
-    minute = (
-        source[stamp_col].dt.hour * 60
-        + source[stamp_col].dt.minute
-    )
-    upper = (
-        900 if (activity_kind == "يومي" and daily_period == "second"
-                and exclude_last_hour) else 960
-    )
-    after = source.loc[(minute >= 750) & (minute < upper)].copy()
-    after = after.sort_values(
-        ["__day", "__collector", stamp_col], kind="stable"
-    )
-    grouped = {
-        key: group
-        for key, group in after.groupby(
-            ["__day", "__collector"], sort=False, dropna=False
-        )
-    }
-    participants = (
-        source[["__day", "__collector"]].drop_duplicates()
-        .sort_values(["__day", "__collector"], kind="stable")
+    source = source.sort_values(
+        ["__ejada_day", "__ejada_collector", stamp], kind="stable"
     )
     rows = []
-    for day, collector in participants.itertuples(index=False, name=None):
-        day = pd.Timestamp(day)
-        group = grouped.get((day, collector))
-        date_label = day.strftime("%Y-%m-%d")
-        if group is None or group.empty:
-            rows.append({
-                "التاريخ": date_label,
-                "المحصل": collector,
-                "وقت الإفادة بعد البريك": "",
-                "الإفادة": "",
-                "أول إفادة بعد البريك": "",
-                "دقائق من نهاية البريك": "",
-                "الحالة": "لم تسجل إفادة بعد البريك",
-            })
-            continue
-        break_end = day + pd.Timedelta(hours=12, minutes=30)
-        for ix, (_, record) in enumerate(group.iterrows()):
-            when = record[stamp_col]
-            rows.append({
-                "التاريخ": date_label,
-                "المحصل": collector,
-                "وقت الإفادة بعد البريك": when.strftime("%I:%M:%S %p"),
-                "الإفادة": (
-                    "" if pd.isna(record[notes_col])
-                    else str(record[notes_col])
-                ),
-                "أول إفادة بعد البريك": "نعم" if ix == 0 else "",
-                "دقائق من نهاية البريك": round(
-                    (when - break_end).total_seconds() / 60, 2
-                ),
-                "الحالة": "سجل إفادة بعد البريك",
-            })
+    for (day, collector), group in source.groupby(
+        ["__ejada_day", "__ejada_collector"], sort=True, dropna=False
+    ):
+        first_time = group.iloc[0][stamp]
+        last_time = group.iloc[-1][stamp]
+        duty_seconds = max(
+            0, int(round((last_time - first_time).total_seconds()))
+        )
+        duty_text = (
+            f"{duty_seconds // 3600:02d}:"
+            f"{(duty_seconds % 3600) // 60:02d}:"
+            f"{duty_seconds % 60:02d}"
+        )
+        minute_of_day = group[stamp].dt.hour * 60 + group[stamp].dt.minute
+        post_break = group.loc[
+            (minute_of_day >= 750) & (minute_of_day < 960)
+        ]
+        post_note, post_time, post_wait = "", "", ""
+        status = "لم يسجل إفادة بعد البريك"
+        if not post_break.empty:
+            first_post = post_break.iloc[0]
+            when = first_post[stamp]
+            post_note = (
+                "" if pd.isna(first_post[notes_col])
+                else str(first_post[notes_col])
+            )
+            post_time = when.strftime("%I:%M:%S %p")
+            break_end = pd.Timestamp(day) + pd.Timedelta(
+                hours=12, minutes=30
+            )
+            post_wait = round(
+                max(0, (when - break_end).total_seconds() / 60), 2
+            )
+            status = "سجل أول إفادة بعد البريك"
+        rows.append({
+            "التاريخ": pd.Timestamp(day).strftime("%Y-%m-%d"),
+            "المحصل": collector,
+            "أول إفادة بعد البريك": post_note,
+            "ميعاد أول إفادة بعد البريك": post_time,
+            "ميعاد أول إفادة": first_time.strftime("%I:%M:%S %p"),
+            "ميعاد آخر إفادة": last_time.strftime("%I:%M:%S %p"),
+            "مدة الدوام": duty_text,
+            "دقائق من نهاية البريك": post_wait,
+            "الحالة": status,
+        })
     return pd.DataFrame(rows, columns=columns)
+
 
 def _snb_model_similarity(note_key, model_keys):
     """Return similarity to nearest model Notes, NEVER infer the call evaluation."""
@@ -7323,11 +7318,17 @@ def _snb_add_call_duration(frame, collector):
     name = "مده المكالمه"
     if name in output.columns:
         output = output.drop(columns=[name])
+    stamp = "__ejada_parsed_created"
     ordered = output.sort_values(
-        [collector, "__ejada_parsed_created"], kind="stable"
+        [collector, stamp], kind="stable"
     )
+    # Never treat an overnight interval as a gap inside the same workday.
+    collector_keys = (
+        ordered[collector].fillna("").astype(str).str.strip()
+    )
+    days = ordered[stamp].dt.normalize()
     gaps = (
-        ordered.groupby(collector, dropna=False)["__ejada_parsed_created"]
+        ordered.groupby([collector_keys, days], dropna=False)[stamp]
         .diff().dt.total_seconds().div(60)
         .fillna(0).clip(lower=0).round(2)
     )
@@ -7450,6 +7451,136 @@ def _ejada_stc_activity_kpi_counts(uploaded):
     return len(df), successful, unsuccessful, (
         len(df) - successful - unsuccessful
     )
+
+
+def _snb_wasted_time_reports(result, collector_col, notes_col):
+    """Return audited call-gap waste and one collector/day summary.
+
+    The call-duration field is the gap to the previous recorded Note for the
+    same collector/day (first Note is zero). Subtract overlap with the fixed
+    12:00–12:30 break before applying the current Note's outcome threshold:
+    successful = 20 min, unsuccessful = 5 min. Waste is only the EXCESS.
+    Unclassified calls are not assigned an invented five-minute threshold.
+    """
+    detail_cols = [
+        "التاريخ", "المحصل", "العميل", "وقت الإفادة", "الإفادة",
+        "تقييم المكالمات", "مده المكالمه (دقائق)",
+        "البريك المستبعد (دقائق)", "المدة بعد استبعاد البريك (دقائق)",
+        "الحد المسموح (دقائق)", "الوقت المهدر (دقائق)", "الحالة"
+    ]
+    summary_cols = [
+        "التاريخ", "المحصل", "إجمالي المكالمات",
+        "المكالمات الناجحة", "المكالمات غير الناجحة",
+        "عدد المكالمات بوقت مهدر",
+        "إجمالي الوقت المهدر (دقائق)",
+        "إجمالي الوقت المهدر (ساعات)"
+    ]
+    stamp = "__ejada_parsed_created"
+    if result.empty:
+        return (
+            pd.DataFrame(columns=detail_cols),
+            pd.DataFrame(columns=summary_cols)
+        )
+    frame = result.dropna(subset=[stamp]).copy()
+    if frame.empty:
+        return (
+            pd.DataFrame(columns=detail_cols),
+            pd.DataFrame(columns=summary_cols)
+        )
+    frame["__ejada_day"] = frame[stamp].dt.normalize()
+    frame["__ejada_collector"] = (
+        frame[collector_col].fillna("").astype(str).str.strip()
+        .replace("", "(بدون اسم)")
+    )
+    frame = frame.sort_values(
+        ["__ejada_day", "__ejada_collector", stamp], kind="stable"
+    )
+    prev_time = frame.groupby(
+        ["__ejada_day", "__ejada_collector"], dropna=False
+    )[stamp].shift(1)
+    # The exported Activity 'مده المكالمه' is computed from the same
+    # per-collector/per-day timestamps, and is the source for this report.
+    raw_gap = (
+        pd.to_numeric(frame["مده المكالمه"], errors="coerce")
+        .fillna(0).clip(lower=0).round(2)
+    )
+    break_deduction = pd.Series(
+        [
+            _break_overlap_minutes_for_report(previous, current)
+            for previous, current in zip(prev_time, frame[stamp])
+        ],
+        index=frame.index, dtype="float64"
+    ).round(2)
+    effective_gap = (
+        raw_gap - break_deduction
+    ).clip(lower=0).round(2)
+    statuses = frame["تقييم المكالمات"].fillna("").astype(str).str.strip()
+    thresholds = statuses.map({
+        "ناجحة": 20.0, "غير ناجحة": 5.0
+    })
+    wasted = (
+        (effective_gap - thresholds.fillna(0))
+        .clip(lower=0)
+        .where(thresholds.notna(), 0)
+        .round(2)
+    )
+    debtor_col = _snb_find_column(
+        frame, "Debitor", "Debtor", "رقم العميل", "رقم الهوية"
+    )
+    customers = (
+        frame[debtor_col].fillna("").astype(str)
+        if debtor_col else pd.Series("", index=frame.index)
+    )
+    detail = pd.DataFrame({
+        "التاريخ": frame[stamp].dt.strftime("%Y-%m-%d"),
+        "المحصل": frame["__ejada_collector"],
+        "العميل": customers,
+        "وقت الإفادة": frame[stamp].dt.strftime("%I:%M:%S %p"),
+        "الإفادة": frame[notes_col].fillna("").astype(str),
+        "تقييم المكالمات": statuses,
+        "مده المكالمه (دقائق)": raw_gap,
+        "البريك المستبعد (دقائق)": break_deduction,
+        "المدة بعد استبعاد البريك (دقائق)": effective_gap,
+        "الحد المسموح (دقائق)": thresholds,
+        "الوقت المهدر (دقائق)": wasted,
+        "الحالة": [
+            (
+                "غير مصنفة - لا يحتسب وقت مهدر"
+                if pd.isna(limit)
+                else "وقت مهدر" if minutes > 0
+                else "لا يوجد وقت مهدر"
+            )
+            for limit, minutes in zip(thresholds, wasted)
+        ]
+    }, index=frame.index)
+    detail = detail[detail_cols].reset_index(drop=True)
+
+    rows = []
+    for (day, collector), group in detail.groupby(
+        ["التاريخ", "المحصل"], sort=True, dropna=False
+    ):
+        total_waste = round(
+            float(group["الوقت المهدر (دقائق)"].sum()), 2
+        )
+        rows.append({
+            "التاريخ": day,
+            "المحصل": collector,
+            "إجمالي المكالمات": int(len(group)),
+            "المكالمات الناجحة": int(
+                (group["تقييم المكالمات"] == "ناجحة").sum()
+            ),
+            "المكالمات غير الناجحة": int(
+                (group["تقييم المكالمات"] == "غير ناجحة").sum()
+            ),
+            "عدد المكالمات بوقت مهدر": int(
+                (group["الوقت المهدر (دقائق)"] > 0).sum()
+            ),
+            "إجمالي الوقت المهدر (دقائق)": total_waste,
+            "إجمالي الوقت المهدر (ساعات)": round(
+                total_waste / 60, 2
+            ),
+        })
+    return detail, pd.DataFrame(rows, columns=summary_cols)
 
 
 def render_snb_activity_report(model_upload, activity_upload, activity_kind="يومي", error_slot=None):
@@ -7655,20 +7786,37 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             height=460
         )
         after_break = _snb_after_break_notes(
-            prepared, selected, stats["notes"], stats["collector"],
-            activity_kind, daily_period=period,
-            exclude_last_hour=False
+            prepared, selected, stats["notes"], stats["collector"]
+        )
+        wasted_details, wasted_daily = _snb_wasted_time_reports(
+            result, stats["collector"], stats["notes"]
         )
         with st.expander(
-            "🕧 إفادات كل محصل بعد البريك (12:30 م)", expanded=False
+            "🕧 أول إفادة لكل محصل بعد البريك + مدة الدوام", expanded=False
         ):
             st.caption(
-                "يعرض جميع الإفادات بعد البريك، ويحدد أول إفادة لكل محصل "
-                "والدقائق من 12:30. يظهر المحصل بلا إفادة بحالة واضحة."
+                "صف واحد لكل محصل في كل يوم. مدة الدوام = وقت آخر إفادة "
+                "ناقص وقت أول إفادة في الملف المرفوع (وتشمل فترة البريك)."
             )
             st.dataframe(
                 after_break, use_container_width=True, hide_index=True,
                 height=360
+            )
+        with st.expander(
+            "⏱️ تفاصيل الوقت المهدر وإجماليه اليومي", expanded=False
+        ):
+            st.caption(
+                "الوقت المهدر = الفاصل بين الإفادات بعد خصم البريك "
+                "ناقص 20 دقيقة للناجحة أو 5 دقائق لغير الناجحة؛ "
+                "ولا يمكن أن يقل عن صفر."
+            )
+            st.dataframe(
+                wasted_details, use_container_width=True, hide_index=True,
+                height=340
+            )
+            st.dataframe(
+                wasted_daily, use_container_width=True, hide_index=True,
+                height=280
             )
         _snb_render_model_management(
             selected[stats["notes"]], model_mapping,
@@ -7679,6 +7827,12 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             final.to_excel(writer, sheet_name="Activity", index=False)
             after_break.to_excel(
                 writer, sheet_name="After_Break_Notes", index=False
+            )
+            wasted_details.to_excel(
+                writer, sheet_name="Wasted_Time_Details", index=False
+            )
+            wasted_daily.to_excel(
+                writer, sheet_name="Wasted_Time_Daily", index=False
             )
         st.download_button(
             "📥 تحميل نشاط SNB بعد المعالجة",
