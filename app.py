@@ -1423,6 +1423,46 @@ st.markdown(f"""
             padding: 5px 4px !important;
         }}
     }}
+
+    /* Activity-page upload cards only: compact outer border and dropzone. */
+    div[class*="st-key-activity_model_upload_card"],
+    div[class*="st-key-activity_file_upload_card"] {{
+        box-sizing: border-box !important;
+        width: 100% !important;
+        max-width: 340px !important;
+        min-width: 0 !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }}
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-activity_model_upload_card),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-activity_file_upload_card) {{
+        box-sizing: border-box !important;
+        width: 100% !important;
+        max-width: 340px !important;
+        min-width: 0 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        padding: 10px 10px 7px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }}
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploader"],
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploader"] {{
+        box-sizing: border-box !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+    }}
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderDropzone"],
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderDropzone"] {{
+        box-sizing: border-box !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        padding: 7px 9px !important;
+        min-height: 50px !important;
+        border-radius: 8px !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -6612,12 +6652,12 @@ if page_uploaded is None:
         """, unsafe_allow_html=True)
 
         _left_space, model_col, activity_col, _right_space = st.columns(
-            [1, 2, 2, 1], gap="medium", vertical_alignment="top"
+            [1.5, 1.15, 1.15, 1.5], gap="small", vertical_alignment="top"
         )
         with model_col:
-            with st.container(border=True):
+            with st.container(border=True, key="activity_model_upload_card"):
                 st.markdown(
-                    f'<div style="color:{text_color};direction:rtl;text-align:center;'
+                    f'<div style="color:{label_color};direction:rtl;text-align:center;'
                     'font-size:18px;font-weight:900;margin-bottom:8px;">'
                     'خانة رفع موديل النشاط</div>',
                     unsafe_allow_html=True
@@ -6639,9 +6679,9 @@ if page_uploaded is None:
                     st.caption(f"الملف المحفوظ: {saved_model.name}")
 
         with activity_col:
-            with st.container(border=True):
+            with st.container(border=True, key="activity_file_upload_card"):
                 st.markdown(
-                    f'<div style="color:{text_color};direction:rtl;text-align:center;'
+                    f'<div style="color:{label_color};direction:rtl;text-align:center;'
                     'font-size:18px;font-weight:900;margin-bottom:8px;">'
                     'رفع ملف النشاط</div>',
                     unsafe_allow_html=True
