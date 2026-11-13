@@ -7157,8 +7157,8 @@ def _snb_slash_row_decisions(activity_upload):
     return storage["ratings"]
 
 
-def _snb_review_slash_rows(frame, notes_col, activity_upload):
-    """Show complete customer rows in a collapsible editable review panel."""
+def _snb_review_slash_rows(frame, notes_col, activity_upload, model_mapping, manual_mapping=None):
+    """Prefill exact-model ratings for review; commit ONLY explicit row approval."""
     decisions = _snb_slash_row_decisions(activity_upload)
     marked = _snb_special_review_mask(frame[notes_col])
     flagged = frame.loc[marked].copy()
@@ -7174,13 +7174,30 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload):
         "، ".join(_snb_review_trigger_reasons(note))
         for note in flagged[notes_col]
     ]
+    manual_mapping = manual_mapping or {}
+    # Model values are ONLY editable suggestions here, never approvals.
+    # Previously approved row choices override the suggestion.
+    def _suggestion(note, original_index):
+        key = _snb_normalize_note(note)
+        prior = decisions.get(str(original_index))
+        if prior in (0, 1):
+            return prior, "معتمد سابقًا"
+        if key in manual_mapping:
+            return manual_mapping[key], "تقييم معتمد للإفادة"
+        if key in model_mapping:
+            return model_mapping[key], "موديل النشاط"
+        return None, "غير موجودة في الموديل"
+
+    suggestions = [
+        _suggestion(note, original_index)
+        for note, original_index in zip(flagged[notes_col], original_indices)
+    ]
     review = pd.DataFrame(index=full_rows.index)
     review["احسب المكالمة"] = [
-        {1: "ناجحة", 0: "غير ناجحة"}.get(
-            decisions.get(str(i)), "اختاري التقييم"
-        )
-        for i in original_indices
+        {1: "ناجحة", 0: "غير ناجحة"}.get(suggested, "اختاري التقييم")
+        for suggested, source in suggestions
     ]
+    review["مصدر التقييم"] = [source for suggested, source in suggestions]
     review["رقم الصف في الملف"] = [int(i) + 2 for i in original_indices]
     review["الإفادة"] = flagged[notes_col].fillna("").astype(str).tolist()
     review["سبب المراجعة"] = reasons
@@ -7203,10 +7220,11 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload):
             "راجعي كل صف ظاهر حتى لو طابق موديل النشاط."
         )
         st.markdown(
-            "**اختاري من أول عمود «احسب المكالمة»: ناجحة أو غير ناجحة، "
-            "ثم اضغطي «اعتماد التقييمات».** "
-            "جميع أعمدة العملاء الأصلية موجودة في نفس الجدول؛ "
-            "يمكنك التحريك أفقيًا لقراءة باقي البيانات."
+            "**التقييم ظاهر مسبقًا من موديل النشاط لو الإفادة مطابقة له.** "
+            "راجعيه وعدّلي «احسب المكالمة» لو محتاج، ثم اضغطي زر الاعتماد. "
+            "عمود «مصدر التقييم» يوضح هل التقييم من الموديل أو معتمد منك سابقًا. "
+            "**التقييم المقترح لا يدخل التقرير كتقييم معتمد قبل الضغط على الزر.** "
+            "جميع بيانات العملاء موجودة في نفس الجدول."
         )
         with st.form("snb_activity_slash_rows_review_form"):
             edited = st.data_editor(
@@ -7221,6 +7239,9 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload):
                         required=True,
                         width="medium",
                     ),
+                    "مصدر التقييم": st.column_config.TextColumn(
+                        "مصدر التقييم", width="medium"
+                    ),
                     "رقم الصف في الملف": st.column_config.NumberColumn(
                         "رقم الصف", width="small"
                     ),
@@ -7232,7 +7253,10 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload):
                     ),
                 },
                 height=min(max(200, len(review) * 36 + 44), 620),
-                key="snb_activity_slash_rows_editor",
+                key="snb_activity_slash_rows_editor_" + hashlib.sha256(
+                    (hashlib.sha256(activity_upload.getvalue()).hexdigest()
+                     + ":" + ",".join(map(str, original_indices))).encode("utf-8")
+                ).hexdigest()[:16],
             )
             approved = st.form_submit_button(
                 "✅ اعتماد تقييم الإفادات المحددة للمراجعة"
@@ -7495,7 +7519,8 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
         )
         _ejada_activity_kpis("SNB", *counts)
         slash_row_decisions, slash_reviewed = _snb_review_slash_rows(
-            selected, stats["notes"], activity_upload
+            selected, stats["notes"], activity_upload,
+            model_mapping, manual_decisions
         )
         if not slash_reviewed:
             return
