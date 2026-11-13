@@ -1734,7 +1734,7 @@ st.markdown(f"""
         }}
     }}
 
-    /* SNB Activity: uploader, report title, and small kind dropdown share one line. */
+    /* Activity: compact uploader and adjacent activity kind, no redundant title. */
     div.st-key-snb_activity_header_row {{
         box-sizing: border-box !important;
         width: 100% !important;
@@ -7114,7 +7114,7 @@ def _snb_slash_row_decisions(activity_upload):
 
 
 def _snb_review_slash_rows(frame, notes_col, activity_upload):
-    """Review all specially flagged Notes, retaining full row details."""
+    """Show complete customer rows in a collapsible editable review panel."""
     decisions = _snb_slash_row_decisions(activity_upload)
     marked = _snb_special_review_mask(frame[notes_col])
     flagged = frame.loc[marked].copy()
@@ -7122,82 +7122,76 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload):
         return decisions, True
 
     original_indices = flagged.index.tolist()
+    # Full original customer data, plus a very visible first-column decision.
     full_rows = flagged.drop(
         columns=["__ejada_parsed_created"], errors="ignore"
     ).copy()
-    full_rows.insert(
-        0, "رقم الصف في الملف", [int(i) + 2 for i in original_indices]
-    )
     reasons = [
         "، ".join(_snb_review_trigger_reasons(note))
         for note in flagged[notes_col]
     ]
-    full_rows.insert(1, "سبب المراجعة", reasons)
+    review = pd.DataFrame(index=full_rows.index)
+    review["احسب المكالمة"] = [
+        {1: "ناجحة", 0: "غير ناجحة"}.get(
+            decisions.get(str(i)), "اختاري التقييم"
+        )
+        for i in original_indices
+    ]
+    review["رقم الصف في الملف"] = [int(i) + 2 for i in original_indices]
+    review["الإفادة"] = flagged[notes_col].fillna("").astype(str).tolist()
+    review["سبب المراجعة"] = reasons
+    # Preserve *every* uploaded source field in the same editable table.
+    # Avoid repeating the Notes column, already displayed as "الإفادة".
+    for column in full_rows.columns:
+        if column not in review.columns and column != notes_col:
+            review[column] = full_rows[column].values
+    locked = [c for c in review.columns if c != "احسب المكالمة"]
 
-    # Keep the editable rating visible without horizontally scrolling
-    # through dozens of columns in the complete activity record.
-    review = pd.DataFrame({
-        "رقم الصف في الملف": [int(i) + 2 for i in original_indices],
-        "الإفادة": flagged[notes_col].fillna("").astype(str).tolist(),
-        "سبب المراجعة": reasons,
-        "الوقت": (
-            flagged["Time"].fillna("").astype(str).tolist()
-            if "Time" in flagged.columns
-            else [""] * len(flagged)
-        ),
-        "احسب المكالمة": [
-            {1: "ناجحة", 0: "غير ناجحة"}.get(
-                decisions.get(str(i)), "اختاري التقييم"
+    pending = sum(str(i) not in decisions for i in original_indices)
+    with st.expander(
+        f"📋 مراجعة الإفادات وبيانات العملاء الكاملة — {len(flagged):,} صف "
+        f"(متبقي {pending:,})",
+        expanded=True
+    ):
+        st.warning(
+            "تم تحديد الصفوف التي تحتوي على / أو // أو الكلمتين «معالج» أو «تم». "
+            "راجعي كل صف حتى لو طابق موديل النشاط."
+        )
+        st.markdown(
+            "**اختاري من أول عمود «احسب المكالمة»: ناجحة أو غير ناجحة، "
+            "ثم اضغطي «اعتماد التقييمات».** "
+            "جميع أعمدة العملاء الأصلية موجودة في نفس الجدول؛ "
+            "يمكنك التحريك أفقيًا لقراءة باقي البيانات."
+        )
+        with st.form("snb_activity_slash_rows_review_form"):
+            edited = st.data_editor(
+                review,
+                use_container_width=True,
+                hide_index=True,
+                disabled=locked,
+                column_config={
+                    "احسب المكالمة": st.column_config.SelectboxColumn(
+                        "احسب المكالمة",
+                        options=["اختاري التقييم", "ناجحة", "غير ناجحة"],
+                        required=True,
+                        width="medium",
+                    ),
+                    "رقم الصف في الملف": st.column_config.NumberColumn(
+                        "رقم الصف", width="small"
+                    ),
+                    "الإفادة": st.column_config.TextColumn(
+                        "الإفادة", width="large"
+                    ),
+                    "سبب المراجعة": st.column_config.TextColumn(
+                        "سبب المراجعة", width="medium"
+                    ),
+                },
+                height=min(max(200, len(review) * 36 + 44), 620),
+                key="snb_activity_slash_rows_editor",
             )
-            for i in original_indices
-        ],
-    })
-    st.warning(
-        f"توجد {len(flagged):,} إفادة تحتاج مراجعة لوجود / أو // أو "
-        "الكلمة «معالج» أو الكلمة «تم». "
-        "يظهر سبب المراجعة لكل صف، ويجب اعتماد تقييمه حتى لو طابق الموديل."
-    )
-    st.markdown(
-        "**👇 اختاري من عمود «احسب المكالمة» في الجدول الصغير هنا مباشرة:** "
-        "ناجحة أو غير ناجحة، ثم اضغطي زر الاعتماد."
-    )
-    with st.form("snb_activity_slash_rows_review_form"):
-        edited = st.data_editor(
-            review,
-            use_container_width=True,
-            hide_index=True,
-            disabled=["رقم الصف في الملف", "الإفادة", "سبب المراجعة", "الوقت"],
-            column_order=[
-                "رقم الصف في الملف", "الإفادة", "سبب المراجعة",
-                "الوقت", "احسب المكالمة"
-            ],
-            column_config={
-                "رقم الصف في الملف": st.column_config.NumberColumn(
-                    "رقم الصف", width="small"
-                ),
-                "الإفادة": st.column_config.TextColumn(
-                    "الإفادة", width="large"
-                ),
-                "سبب المراجعة": st.column_config.TextColumn(
-                    "سبب المراجعة", width="medium"
-                ),
-                "الوقت": st.column_config.TextColumn(
-                    "الوقت", width="small"
-                ),
-                "احسب المكالمة": st.column_config.SelectboxColumn(
-                    "احسب المكالمة",
-                    options=["اختاري التقييم", "ناجحة", "غير ناجحة"],
-                    required=True,
-                    width="medium",
-                ),
-            },
-            key="snb_activity_slash_rows_editor",
-        )
-        approved = st.form_submit_button("✅ اعتماد تقييم الإفادات المحددة للمراجعة")
-    with st.expander("📋 عرض كل بيانات الإفادات المحددة للمراجعة", expanded=False):
-        st.dataframe(
-            full_rows, use_container_width=True, hide_index=True, height=420
-        )
+            approved = st.form_submit_button(
+                "✅ اعتماد تقييم الإفادات المحددة للمراجعة"
+            )
 
     if approved:
         for position, original_index in enumerate(original_indices):
@@ -7260,6 +7254,106 @@ def _snb_add_call_duration(frame, collector):
         name, gaps.reindex(output.index).fillna(0)
     )
     return output
+
+
+def _ejada_activity_kpis(bank, covered, successful=None,
+                           unsuccessful=None, unresolved=0):
+    """A compact activity dashboard; unknown outcomes remain unclassified."""
+    st.markdown(
+        f'<div style="color:{label_color};font-weight:900;'
+        'font-size:20px;text-align:center;margin:12px 0 8px;">'
+        f'📊 لوحة مؤشرات النشاط | {bank}</div>',
+        unsafe_allow_html=True
+    )
+    with st.container(key="ejada_activity_kpi_panel"):
+        left, center, right = st.columns(3, gap="small")
+        with left:
+            st.metric("📞 إجمالي المكالمات المغطاة", f"{int(covered):,}")
+        with center:
+            st.metric(
+                "✅ إجمالي المكالمات الناجحة",
+                f"{int(successful):,}" if successful is not None else "—"
+            )
+        with right:
+            st.metric(
+                "❌ إجمالي المكالمات غير الناجحة",
+                f"{int(unsuccessful):,}" if unsuccessful is not None else "—"
+            )
+    if unresolved:
+        st.caption(
+            f"يوجد {int(unresolved):,} مكالمة لم تُعتمد نتيجتها بعد؛ "
+            "لا تُحتسب ناجحة ولا غير ناجحة."
+        )
+
+
+def _snb_kpi_counts(selected, notes_col, mapping, manual, row_decisions):
+    """Compute current SNB KPIs without auto-rating any special/unknown note."""
+    keys = selected[notes_col].map(_snb_normalize_note)
+    values = keys.map(mapping).combine_first(keys.map(manual))
+    special = _snb_special_review_mask(selected[notes_col])
+    # Special Notes ALWAYS require a per-row explicit decision.
+    values.loc[special] = None
+    if row_decisions:
+        overrides = pd.Series(
+            [row_decisions.get(str(index)) for index in selected.index],
+            index=selected.index, dtype=object
+        )
+        values = overrides.combine_first(values)
+    successful = int((values == 1).sum())
+    unsuccessful = int((values == 0).sum())
+    return len(selected), successful, unsuccessful, (
+        len(selected) - successful - unsuccessful
+    )
+
+
+def _ejada_stc_activity_kpi_counts(uploaded):
+    """Coverage from STC uploaded records; success only from explicit call rating."""
+    if uploaded is None:
+        return 0, None, None, 0
+    name = uploaded.name.lower()
+    raw = io.BytesIO(uploaded.getvalue())
+    if name.endswith(".csv"):
+        try:
+            df = pd.read_csv(raw, dtype=str, encoding="utf-8-sig")
+        except UnicodeDecodeError:
+            raw.seek(0)
+            df = pd.read_csv(raw, dtype=str, encoding="cp1256")
+    else:
+        df = pd.read_excel(raw, dtype=str)
+    df.columns = df.columns.astype(str).str.strip()
+    id_col = _snb_find_column(
+        df, "Debitor", "Debtor", "ID Numer", "ID Number", "ID",
+        "رقم العميل", "رقم الهوية"
+    )
+    notes_col = _snb_find_column(
+        df, "Notes", "Note", "الإفادة", "ملاحظات", "Feedback"
+    )
+    collector_col = _snb_find_column(
+        df, "Collector", "Collecter", "المحصل", "Agent"
+    )
+    if all(c is not None for c in (id_col, notes_col, collector_col)):
+        df = df.drop_duplicates(
+            subset=[id_col, notes_col, collector_col], keep="first"
+        ).copy()
+    status_col = _snb_find_column(
+        df, "تقييم المكالمات", "تقييم المكالمة", "التقيم",
+        "التقييم", "Evaluation", "Call_Status", "Call Status",
+        "Call Result", "Result"
+    )
+    if status_col is None:
+        return len(df), None, None, len(df)
+    raw_values = df[status_col].fillna("").astype(str).str.strip().str.casefold()
+    # Explicit statuses only: unknown words must NEVER become failures.
+    success_values = {"1", "ناجحة", "ناجح", "successful", "success", "yes"}
+    unsuccessful_values = {
+        "0", "غير ناجحة", "غير ناجح", "unsuccessful", "failed",
+        "failure", "no"
+    }
+    successful = int(raw_values.isin(success_values).sum())
+    unsuccessful = int(raw_values.isin(unsuccessful_values).sum())
+    return len(df), successful, unsuccessful, (
+        len(df) - successful - unsuccessful
+    )
 
 
 def render_snb_activity_report(model_upload, activity_upload, activity_kind="يومي", error_slot=None):
@@ -7349,6 +7443,12 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             exclude_after_shift=exclude_after_shift
         )
         manual_decisions = _snb_manual_evaluations(model_upload)
+        slash_row_decisions = _snb_slash_row_decisions(activity_upload)
+        counts = _snb_kpi_counts(
+            selected, stats["notes"], model_mapping,
+            manual_decisions, slash_row_decisions
+        )
+        _ejada_activity_kpis("SNB", *counts)
         slash_row_decisions, slash_reviewed = _snb_review_slash_rows(
             selected, stats["notes"], activity_upload
         )
@@ -8309,10 +8409,9 @@ if page_uploaded is None:
             selected_bank == "SNB" and bool(_snb_secret("SNB_MODEL_ENCRYPTED"))
         )
         with st.container(key="snb_activity_header_row"):
-            # Three columns with EQUAL side widths keep the title in the
-            # true horizontal centre regardless of uploader or menu size.
-            activity_col, header_col, kind_col = st.columns(
-                [1.8, 6.0, 1.8], gap="small",
+            # Rightmost uploader, compact adjacent activity type, free space left.
+            activity_col, kind_col, _left_space = st.columns(
+                [1.8, 1.15, 6.65], gap="small",
                 vertical_alignment="center"
             )
             with activity_col:
@@ -8334,21 +8433,6 @@ if page_uploaded is None:
                         on_change=save_activity_page_upload,
                         args=(selected_bank, "activity", activity_key)
                     )
-            with header_col:
-                st.markdown(f"""
-                <div style="display:flex;justify-content:center;
-                            align-items:center;direction:rtl;width:100%;margin:0;">
-                    <div style="display:inline-flex;align-items:center;
-                                justify-content:center;gap:10px;padding:11px 14px;
-                                width:fit-content;max-width:100%;
-                                background:{card_color};border:1px solid {border_color};
-                                border-radius:10px;color:{text_color};font-weight:900;
-                                font-size:23px;text-align:center;white-space:nowrap;">
-                        {PHONE_HEADER_SVG}
-                        <span>تقرير نشاط المحصلين | {selected_bank}</span>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
             with kind_col:
                 with st.container(key="snb_activity_kind_compact"):
                     activity_kind = st.selectbox(
@@ -8380,8 +8464,25 @@ if page_uploaded is None:
                         args=(selected_bank, "model", model_key)
                     )
 
-        # Auto-switch to the report screen when BOTH files have been uploaded.
-        # Same two upload controls remain visible above in the report screen.
+        # Bank-specific dashboard KPIs are shown as soon as Activity opens.
+        if selected_bank == "STC":
+            _stc_file = st.session_state.activity_page_uploads["STC"]["activity"]
+            try:
+                _stc_metrics = _ejada_stc_activity_kpi_counts(_stc_file)
+                _ejada_activity_kpis("STC", *_stc_metrics)
+                if _stc_file is not None and _stc_metrics[1] is None:
+                    st.caption(
+                        "ملف STC لا يحتوي على عمود تقييم مكالمة صريح؛ "
+                        "المغطاة محسوبة، أما الناجحة وغير الناجحة فتظهران "
+                        "بعلامة — بدل تخمين التصنيف."
+                    )
+            except Exception as exc:
+                st.error(f"تعذر قراءة بيانات نشاط STC: {exc}")
+                _ejada_activity_kpis("STC", 0)
+        elif st.session_state.activity_page_uploads["SNB"]["activity"] is None:
+            _ejada_activity_kpis("SNB", 0, 0, 0)
+
+        # SNB report is rendered only when an activity file and model exist.
         if selected_bank == 'SNB':
             _uploaded = st.session_state.activity_page_uploads['SNB']
             if (
