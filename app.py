@@ -1593,6 +1593,83 @@ st.markdown(f"""
         overflow-x: auto !important;
     }}
 
+    /* Consistent 315x185 upload boxes at the far right on all report pages. */
+    div[data-testid="stHorizontalBlock"]:has(.st-key-activity_model_upload_card),
+    div[data-testid="stHorizontalBlock"]:has(.st-key-overview_activity_upload_card),
+    div[class*="st-key-report_upload_bar_"] [data-testid="stHorizontalBlock"]:has([class*="st-key-ejada_shared_upload_card_"]) {{
+        direction: rtl !important;
+        justify-content: flex-start !important;
+        align-items: flex-start !important;
+        flex-wrap: nowrap !important;
+        gap: 12px !important;
+    }}
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-activity_model_upload_card),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-activity_file_upload_card),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-overview_activity_upload_card),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-overview_model_upload_card),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-overview_promises_upload_card),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has([class*="st-key-ejada_shared_upload_card_"]) {{
+        box-sizing: border-box !important;
+        width: min(315px, 100%) !important;
+        max-width: 315px !important;
+        min-width: 0 !important;
+        height: 185px !important;
+        min-height: 185px !important;
+        max-height: 185px !important;
+        margin-left: auto !important;
+        margin-right: 0 !important;
+        padding: 9px 10px !important;
+        overflow: visible !important;
+        background: #FFFFFF !important;
+        border: 1px solid {border_color} !important;
+        border-radius: 10px !important;
+    }}
+    div[class*="st-key-activity_model_upload_card"],
+    div[class*="st-key-activity_file_upload_card"],
+    div.st-key-overview_activity_upload_card,
+    div.st-key-overview_model_upload_card,
+    div.st-key-overview_promises_upload_card,
+    div[class*="st-key-ejada_shared_upload_card_"] {{
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+    }}
+    div.st-key-overview_activity_upload_card [data-testid="stFileUploader"],
+    div.st-key-overview_model_upload_card [data-testid="stFileUploader"],
+    div.st-key-overview_promises_upload_card [data-testid="stFileUploader"] {{
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+    }}
+    div.st-key-overview_activity_upload_card [data-testid="stFileUploaderDropzone"],
+    div.st-key-overview_model_upload_card [data-testid="stFileUploaderDropzone"],
+    div.st-key-overview_promises_upload_card [data-testid="stFileUploaderDropzone"] {{
+        width: 100% !important;
+        min-width: 0 !important;
+        min-height: 54px !important;
+        height: auto !important;
+        padding: 6px !important;
+    }}
+    div.st-key-overview_activity_upload_card [data-testid="stCaptionContainer"],
+    div.st-key-overview_model_upload_card [data-testid="stCaptionContainer"],
+    div.st-key-overview_promises_upload_card [data-testid="stCaptionContainer"] {{
+        max-width: 100% !important;
+        overflow: hidden !important;
+        white-space: nowrap !important;
+        text-overflow: ellipsis !important;
+    }}
+    div[class*="st-key-report_upload_bar_"] [data-testid="stHorizontalBlock"]:has([class*="st-key-ejada_shared_upload_card_"]) > [data-testid="stColumn"]:first-child {{
+        flex: 0 0 315px !important;
+        min-width: 315px !important;
+        max-width: 315px !important;
+    }}
+    @media (max-width: 1050px) {{
+        div[data-testid="stHorizontalBlock"]:has(.st-key-overview_activity_upload_card),
+        div[data-testid="stHorizontalBlock"]:has(.st-key-activity_model_upload_card) {{
+            flex-wrap: wrap !important;
+        }}
+    }}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -6822,7 +6899,7 @@ def render_report_upload_bar(page, promise_metrics=None):
             status_message = "مفيش ملف مرفوع لسه يا رنا"
 
         # A separate status line ensures filenames never push down either box.
-        status_col, _, _ = st.columns([2.9, 4.2, 2.9], gap='small')
+        status_col, _, _ = st.columns([1.7, 3.9, 4.4], gap='small')
         with status_col:
             st.markdown(
                 f'<div class="ejada-upload-name" title="{_xml_escape(status_message)}" '
@@ -6832,74 +6909,75 @@ def render_report_upload_bar(page, promise_metrics=None):
 
         # Top-aligned row used by all three reports for both banks.
         upload_col, title_col, _left_balance = st.columns(
-            [2.9, 4.2, 2.9], gap='small', vertical_alignment='top'
+            [1.7, 3.9, 4.4], gap='small', vertical_alignment='top'
         )
 
         with upload_col:
-            # The first (RTL/rightmost) subcolumn contains X above +.
-            actions_col, file_box_col = st.columns(
-                [0.16, 0.84], gap='small', vertical_alignment='top'
-            )
+            with st.container(border=True, key=f"ejada_shared_upload_card_{selected_bank}_{page}"):
+                # The first (RTL/rightmost) subcolumn contains X above +.
+                actions_col, file_box_col = st.columns(
+                    [0.16, 0.84], gap='small', vertical_alignment='top'
+                )
 
-            with actions_col:
-                with st.container(key=f"mini_actions_{selected_bank}_{page}"):
+                with actions_col:
+                    with st.container(key=f"mini_actions_{selected_bank}_{page}"):
+                        if current_files:
+                            st.button(
+                                "×",
+                                key=f"small_clear_report_{selected_bank}_{page}",
+                                on_click=clear_report_page_file,
+                                args=(selected_bank, page),
+                                help="مسح الملف المرفوع",
+                                use_container_width=False
+                            )
+                        else:
+                            # Reserve the X position so the + stays directly below it.
+                            st.markdown(
+                                '<div class="ejada-mini-x-placeholder"></div>',
+                                unsafe_allow_html=True
+                            )
+
+                        new_files = st.file_uploader(
+                            f"رفع ملف {titles[page]}",
+                            type=['xlsx', 'csv'],
+                            accept_multiple_files=True,
+                            label_visibility='collapsed',
+                            key=f"report_uploader_{selected_bank}_{page}_{uploader_version}"
+                        )
+                        if new_files:
+                            new_sig = [(x.name, x.size) for x in new_files]
+                            current_sig = [(x.name, x.size) for x in current_files]
+                            if new_sig != current_sig:
+                                bank_files[page] = new_files
+                                st.rerun()
+                        elif current_files:
+                            # Preserve native uploader clearing behavior and page state.
+                            bank_files[page] = None
+                            st.session_state.report_uploader_versions[selected_bank][page] += 1
+                            st.rerun()
+
+                with file_box_col:
                     if current_files:
-                        st.button(
-                            "×",
-                            key=f"small_clear_report_{selected_bank}_{page}",
-                            on_click=clear_report_page_file,
-                            args=(selected_bank, page),
-                            help="مسح الملف المرفوع",
-                            use_container_width=False
+                        main_file = current_files[0]
+                        file_name = _xml_escape(main_file.name)
+                        file_size = f"{main_file.size / (1024 * 1024):.1f} MB"
+                        extra_files = (
+                            f" · +{len(current_files) - 1} ملفات"
+                            if len(current_files) > 1 else ""
+                        )
+                        info_html = (
+                            f'<div class="ejada-file-name" title="{file_name}">{file_name}</div>'
+                            f'<div class="ejada-file-size">{file_size}{extra_files}</div>'
                         )
                     else:
-                        # Reserve the X position so the + stays directly below it.
-                        st.markdown(
-                            '<div class="ejada-mini-x-placeholder"></div>',
-                            unsafe_allow_html=True
+                        info_html = (
+                            '<div class="ejada-no-file">📄 لم يتم رفع ملف</div>'
+                            '<div class="ejada-file-size">XLSX / CSV</div>'
                         )
-
-                    new_files = st.file_uploader(
-                        f"رفع ملف {titles[page]}",
-                        type=['xlsx', 'csv'],
-                        accept_multiple_files=True,
-                        label_visibility='collapsed',
-                        key=f"report_uploader_{selected_bank}_{page}_{uploader_version}"
+                    st.markdown(
+                        '<div class="ejada-current-file-box">' + info_html + '</div>',
+                        unsafe_allow_html=True
                     )
-                    if new_files:
-                        new_sig = [(x.name, x.size) for x in new_files]
-                        current_sig = [(x.name, x.size) for x in current_files]
-                        if new_sig != current_sig:
-                            bank_files[page] = new_files
-                            st.rerun()
-                    elif current_files:
-                        # Preserve native uploader clearing behavior and page state.
-                        bank_files[page] = None
-                        st.session_state.report_uploader_versions[selected_bank][page] += 1
-                        st.rerun()
-
-            with file_box_col:
-                if current_files:
-                    main_file = current_files[0]
-                    file_name = _xml_escape(main_file.name)
-                    file_size = f"{main_file.size / (1024 * 1024):.1f} MB"
-                    extra_files = (
-                        f" · +{len(current_files) - 1} ملفات"
-                        if len(current_files) > 1 else ""
-                    )
-                    info_html = (
-                        f'<div class="ejada-file-name" title="{file_name}">{file_name}</div>'
-                        f'<div class="ejada-file-size">{file_size}{extra_files}</div>'
-                    )
-                else:
-                    info_html = (
-                        '<div class="ejada-no-file">📄 لم يتم رفع ملف</div>'
-                        '<div class="ejada-file-size">XLSX / CSV</div>'
-                    )
-                st.markdown(
-                    '<div class="ejada-current-file-box">' + info_html + '</div>',
-                    unsafe_allow_html=True
-                )
 
         with title_col:
             if page == 'Promises':
@@ -7392,78 +7470,77 @@ if curr_page == 'Overview':
         )
 
     overview_versions = st.session_state.overview_uploader_versions[selected_bank]
-    upload_cols = st.columns([1, 1], gap='small')
+    # Three separate, equal-size upload panels aligned right in RTL.
+    upload_cols = st.columns([1, 1, 1, 2.7], gap='small')
 
-    # العمود الأول: صندوق واحد يحتوي خانتين متجاورتين وواضحتي الاسم.
     with upload_cols[0]:
-        with st.container(border=True):
-            activity_model_cols = st.columns(2, gap='small')
+        with st.container(border=True, key='overview_activity_upload_card'):
+            st.markdown(
+                "<div style='text-align:center;font-weight:900;color:#1F4373;"
+                "font-size:14px;margin:0 0 3px;'>📈 1) تقرير النشاط</div>"
+                "",
+                unsafe_allow_html=True
+            )
+            activity_widget_files = st.file_uploader(
+                'ارفعي ملف تقرير النشاط في هذه الخانة',
+                type=['xlsx', 'csv'],
+                label_visibility='collapsed',
+                accept_multiple_files=True,
+                key=f"overview_activity_{selected_bank}_{overview_versions['Activity']}"
+            )
+            if activity_widget_files:
+                st.session_state.overview_uploads[selected_bank]['Activity'] = activity_widget_files
 
-            # الخانة الأولى: تقرير النشاط.
-            with activity_model_cols[0]:
-                st.markdown(
-                    "<div style='text-align:center;font-weight:900;color:#1F4373;"
-                    "font-size:14px;margin:0 0 3px;'>📈 1) تقرير النشاط</div>"
-                    "",
-                    unsafe_allow_html=True
+            saved_activity_files = st.session_state.overview_uploads[selected_bank]['Activity']
+            if saved_activity_files:
+                st.caption('المرفوع: ' + '، '.join(f.name for f in saved_activity_files))
+                st.button(
+                    'مسح تقرير النشاط',
+                    key=f'clear_overview_activity_{selected_bank}',
+                    on_click=clear_overview_upload,
+                    args=(selected_bank, 'Activity')
                 )
-                activity_widget_files = st.file_uploader(
-                    'ارفعي ملف تقرير النشاط في هذه الخانة',
-                    type=['xlsx', 'csv'],
-                    accept_multiple_files=True,
-                    key=f"overview_activity_{selected_bank}_{overview_versions['Activity']}"
-                )
-                if activity_widget_files:
-                    st.session_state.overview_uploads[selected_bank]['Activity'] = activity_widget_files
+            else:
+                st.caption('لم يُرفع تقرير النشاط بعد.')
 
-                saved_activity_files = st.session_state.overview_uploads[selected_bank]['Activity']
-                if saved_activity_files:
-                    st.caption('المرفوع: ' + '، '.join(f.name for f in saved_activity_files))
-                    st.button(
-                        'مسح تقرير النشاط',
-                        key=f'clear_overview_activity_{selected_bank}',
-                        on_click=clear_overview_upload,
-                        args=(selected_bank, 'Activity')
-                    )
-                else:
-                    st.caption('لم يُرفع تقرير النشاط بعد.')
+    with upload_cols[1]:
+        with st.container(border=True, key='overview_model_upload_card'):
+            st.markdown(
+                "<div style='text-align:center;font-weight:900;color:#1F4373;"
+                "font-size:14px;margin:0 0 3px;'>🧩 2) موديل النشاط</div>"
+                "",
+                unsafe_allow_html=True
+            )
+            activity_model_file = st.file_uploader(
+                'ارفعي ملف موديل النشاط في هذه الخانة',
+                type=['xlsx'],
+                label_visibility='collapsed',
+                accept_multiple_files=False,
+                key=f"overview_activity_model_{selected_bank}_{overview_versions['ActivityModel']}"
+            )
+            if activity_model_file is not None:
+                st.session_state.overview_uploads[selected_bank]['ActivityModel'] = activity_model_file
 
-            # الخانة الثانية: موديل النشاط.
-            with activity_model_cols[1]:
-                st.markdown(
-                    "<div style='text-align:center;font-weight:900;color:#1F4373;"
-                    "font-size:14px;margin:0 0 3px;'>🧩 2) موديل النشاط</div>"
-                    "",
-                    unsafe_allow_html=True
+            saved_activity_model = st.session_state.overview_uploads[selected_bank].get('ActivityModel')
+            if saved_activity_model is not None:
+                st.caption(f'الموديل المرفوع: {saved_activity_model.name}')
+                st.button(
+                    'مسح موديل النشاط',
+                    key=f'clear_overview_activity_model_{selected_bank}',
+                    on_click=clear_overview_upload,
+                    args=(selected_bank, 'ActivityModel')
                 )
-                activity_model_file = st.file_uploader(
-                    'ارفعي ملف موديل النشاط في هذه الخانة',
-                    type=['xlsx'],
-                    accept_multiple_files=False,
-                    key=f"overview_activity_model_{selected_bank}_{overview_versions['ActivityModel']}"
-                )
-                if activity_model_file is not None:
-                    st.session_state.overview_uploads[selected_bank]['ActivityModel'] = activity_model_file
-
-                saved_activity_model = st.session_state.overview_uploads[selected_bank].get('ActivityModel')
-                if saved_activity_model is not None:
-                    st.caption(f'الموديل المرفوع: {saved_activity_model.name}')
-                    st.button(
-                        'مسح موديل النشاط',
-                        key=f'clear_overview_activity_model_{selected_bank}',
-                        on_click=clear_overview_upload,
-                        args=(selected_bank, 'ActivityModel')
-                    )
-                else:
-                    st.caption('لم يُرفع موديل النشاط بعد.')
+            else:
+                st.caption('لم يُرفع موديل النشاط بعد.')
 
     # العمود الثاني: تقرير الوعود والإهمال.
-    with upload_cols[1]:
-        with st.container(border=True):
+    with upload_cols[2]:
+        with st.container(border=True, key='overview_promises_upload_card'):
             st.markdown("<div style='text-align:center;font-weight:900;color:#1F4373;font-size:14px;margin-bottom:3px;'>🤝 تقرير الوعود والإهمال (Promises & Neglect)</div>", unsafe_allow_html=True)
             promises_widget_files = st.file_uploader(
                 'ارفعي تقرير الوعود والإهمال هنا',
                 type=['xlsx', 'csv'],
+                label_visibility='collapsed',
                 accept_multiple_files=True,
                 key=f"overview_promises_{selected_bank}_{overview_versions['Promises']}"
             )
@@ -7541,8 +7618,8 @@ if page_uploaded is None:
         </div>
         """, unsafe_allow_html=True)
 
-        _left_space, model_col, activity_col, _right_space = st.columns(
-            [2.0, 1.0, 1.0, 2.0], gap="small", vertical_alignment="top"
+        model_col, activity_col, _left_space = st.columns(
+            [1.0, 1.0, 3.7], gap="small", vertical_alignment="top"
         )
         with model_col:
             with st.container(border=True, key="activity_model_upload_card"):
