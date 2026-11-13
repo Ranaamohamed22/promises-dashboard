@@ -4927,6 +4927,80 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
 
         total_unhandled = len(df_promises[base_condition])
 
+    # STC active-promises logic:
+    # 1) exclude rows whose processing status is exactly "معالج"
+    # 2) keep monthly installments / positive / promise-in-progress classifications
+    # 3) fill blank Expected Closing from Follow up Due Date
+    # 4) keep Expected Closing = today
+    # 5) exclude rows whose Follow up Last Date = today
+    if bank == "STC" and not df_promises.empty:
+        stc_processing_col = find_col_in(
+            df_promises,
+            ['حالة المعالجة - التمويل', 'حالة المعالجة', 'processing status', 'processing_status']
+        )
+        stc_classification_col = find_col_in(df_promises, ['Classification', 'classification'])
+        stc_expected_col = find_col_in(df_promises, ['Expected Closing', 'expected closing', 'Expected_Closing'])
+        stc_due_col = find_col_in(df_promises, ['Follow up Due Date', 'follow up due date'])
+        stc_last_col = find_col_in(df_promises, ['Follow up Last Date', 'follow up last date'])
+
+        if all([stc_processing_col, stc_classification_col, stc_expected_col, stc_due_col, stc_last_col]):
+            stc_promises = df_promises.copy()
+
+            def _normalize_stc_filter_text(value):
+                text = '' if pd.isna(value) else str(value).strip()
+                text = re.sub(r'\s+', ' ', text)
+                return (
+                    text
+                    .replace('أ', 'ا')
+                    .replace('إ', 'ا')
+                    .replace('آ', 'ا')
+                    .replace('ى', 'ي')
+                    .replace('ة', 'ه')
+                )
+
+            stc_due_date = pd.to_datetime(
+                stc_promises[stc_due_col], errors='coerce'
+            ).dt.normalize()
+            stc_expected_date = pd.to_datetime(
+                stc_promises[stc_expected_col], errors='coerce'
+            ).dt.normalize()
+
+            # Fill blank Expected Closing values from Follow up Due Date.
+            stc_expected_date = stc_expected_date.fillna(stc_due_date)
+            stc_promises[stc_expected_col] = stc_expected_date
+
+            stc_last_date = pd.to_datetime(
+                stc_promises[stc_last_col], errors='coerce'
+            ).dt.normalize()
+
+            stc_processing = stc_promises[stc_processing_col].apply(
+                _normalize_stc_filter_text
+            )
+            stc_classification = stc_promises[stc_classification_col].apply(
+                _normalize_stc_filter_text
+            )
+
+            stc_allowed_classifications = {
+                _normalize_stc_filter_text('اقساط شهريه'),
+                _normalize_stc_filter_text('ايجابي'),
+                _normalize_stc_filter_text('وعود سداد قيد التنفيذ'),
+                _normalize_stc_filter_text('وعود السداد قيد التنفيذ'),
+                _normalize_stc_filter_text('وعد سداد قيد التنفيذ'),
+            }
+
+            stc_base_condition = (
+                (stc_processing != _normalize_stc_filter_text('معالج')) &
+                (stc_classification.isin(stc_allowed_classifications))
+            )
+
+            active_promises_df = stc_promises[
+                stc_base_condition &
+                (stc_expected_date == today) &
+                (stc_last_date != today)
+            ].copy()
+
+            total_unhandled = int(stc_base_condition.sum())
+
     output_buffer = build_report_xlsx(active_promises_df, broken_promises_df, neglect_df, bank=bank)
     report_bytes = output_buffer.getvalue()
 
