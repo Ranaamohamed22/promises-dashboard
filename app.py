@@ -7680,27 +7680,6 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             after_break.to_excel(
                 writer, sheet_name="After_Break_Notes", index=False
             )
-            special_mask = _snb_special_review_mask(final[stats["notes"]])
-            if special_mask.any():
-                flagged_export = final.loc[special_mask].copy()
-                flagged_export.insert(
-                    flagged_export.columns.get_loc(stats["notes"]) + 1,
-                    "سبب المراجعة",
-                    flagged_export[stats["notes"]].map(
-                        lambda note: "، ".join(_snb_review_trigger_reasons(note))
-                    )
-                )
-                flagged_export.to_excel(
-                    writer, sheet_name="Notes_Review", index=False
-                )
-                # Retain the existing slash-only sheet for compatibility.
-                slash_mask = final[stats["notes"]].fillna("").astype(str).str.contains(
-                    "/", regex=False
-                )
-                if slash_mask.any():
-                    final.loc[slash_mask].to_excel(
-                        writer, sheet_name="Slash_Notes_Review", index=False
-                    )
         st.download_button(
             "📥 تحميل نشاط SNB بعد المعالجة",
             data=output.getvalue(),
