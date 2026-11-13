@@ -4855,6 +4855,35 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
                 pass
             temp_df = pd.read_csv(f, dtype=str) if f.name.endswith('.csv') else pd.read_excel(f, dtype=str)
             temp_df.columns = temp_df.columns.astype(str).str.strip()
+
+            # حماية من رفع محفظة STC داخل تقارير البنك الأهلي SNB.
+            # نعتمد على العمود المرجعي في محفظة STC: Portfolio Type = STC Bank.
+            portfolio_type_col = find_col_in(
+                temp_df,
+                ['Portfolio Type', 'portfolio type', 'Portfolio_Type']
+            )
+            if bank == 'SNB' and portfolio_type_col:
+                portfolio_values = (
+                    temp_df[portfolio_type_col]
+                    .dropna()
+                    .astype(str)
+                    .str.strip()
+                    .str.lower()
+                )
+                is_stc_portfolio = portfolio_values.str.fullmatch(
+                    r'stc\s*bank',
+                    case=False,
+                    na=False
+                ).any()
+
+                if is_stc_portfolio:
+                    st.error("⚠️ رنا إنتِ في البنك الغلط — الملف ده خاص بـ STC Bank.")
+                    st.caption(f"الملف المرفوع: {f.name}")
+                    return (
+                        pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(),
+                        None, 0, 0, 0, 0, 0, 0
+                    )
+
             if PIVOT_NOTE in temp_df.columns:
                 temp_df[PIVOT_NOTE] = temp_df[PIVOT_NOTE].apply(_normalize_note_bucket)
             all_dfs.append(temp_df)
