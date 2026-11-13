@@ -259,7 +259,7 @@ st.markdown(f"""
         white-space: nowrap !important;
     }}
 
-    /* One real flex row: each button is a separate item with exactly 38px gap. */
+    /* One real flex row: each button is a separate item with ~0.5 cm (19px) gap. */
     div.st-key-report_nav_group {{
         width: 100% !important;
         max-width: 100% !important;
@@ -274,7 +274,7 @@ st.markdown(f"""
         align-items: center !important;
         justify-content: flex-start !important;
         direction: rtl !important;
-        gap: 38px !important;
+        gap: 19px !important;
         width: 100% !important;
         min-width: max-content !important;
     }}
