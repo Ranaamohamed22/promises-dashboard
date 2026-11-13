@@ -6267,7 +6267,69 @@ def _snb_review_new_notes(notes, mapping, manual, conflicted=0):
     return similarity, False
 
 
-def _snb_add_evaluation(frame, notes_col, mapping, manual, similarity):
+
+def _snb_slash_row_decisions(activity_upload):
+    """Store explicit slash-note ratings only for the currently uploaded activity."""
+    digest = hashlib.sha256(activity_upload.getvalue()).hexdigest()
+    storage = st.session_state.get("snb_activity_slash_row_decisions")
+    if not isinstance(storage, dict) or storage.get("digest") != digest:
+        storage = {"digest": digest, "ratings": {}}
+        st.session_state["snb_activity_slash_row_decisions"] = storage
+    return storage["ratings"]
+
+
+def _snb_review_slash_rows(frame, notes_col, activity_upload):
+    """Show the FULL original row for each slash-marked Note and require a rating."""
+    decisions = _snb_slash_row_decisions(activity_upload)
+    marked = frame[notes_col].fillna("").astype(str).str.contains("/", regex=False)
+    flagged = frame.loc[marked].copy()
+    if flagged.empty:
+        return decisions, True
+
+    original_indices = flagged.index.tolist()
+    review = flagged.drop(columns=["__ejada_parsed_created"], errors="ignore").copy()
+    review.insert(0, "رقم الصف في الملف", [int(i) + 2 for i in original_indices])
+    review["احسب المكالمة"] = [
+        {1: "ناجحة", 0: "غير ناجحة"}.get(decisions.get(str(i)), "اختاري التقييم")
+        for i in original_indices
+    ]
+    st.warning(
+        f"توجد {len(flagged):,} إفادة تحتوي على / أو //؛ "
+        "اعتمدي تقييم كل صف منفصلًا، حتى إن كان موجودًا في موديل النشاط."
+    )
+    with st.form("snb_activity_slash_rows_review_form"):
+        edited = st.data_editor(
+            review.reset_index(drop=True),
+            use_container_width=True,
+            hide_index=True,
+            disabled=[col for col in review.columns if col != "احسب المكالمة"],
+            column_config={
+                "احسب المكالمة": st.column_config.SelectboxColumn(
+                    "احسب المكالمة",
+                    options=["اختاري التقييم", "ناجحة", "غير ناجحة"],
+                    required=True
+                )
+            },
+            key="snb_activity_slash_rows_editor"
+        )
+        approved = st.form_submit_button("اعتماد تقييم صفوف / و //")
+    if approved:
+        for position, original_index in enumerate(original_indices):
+            choice = edited.iloc[position]["احسب المكالمة"]
+            if choice in ("ناجحة", "غير ناجحة"):
+                decisions[str(original_index)] = 1 if choice == "ناجحة" else 0
+            else:
+                decisions.pop(str(original_index), None)
+        if all(str(i) in decisions for i in original_indices):
+            st.rerun()
+        st.error("اختاري ناجحة أو غير ناجحة لكل صف قبل استخراج التقرير.")
+    pending = sum(str(i) not in decisions for i in original_indices)
+    if pending:
+        st.info(f"متبقي {pending:,} صف لم يتم تحديد تقييمه. لا يمكن اعتماد التقرير حتى اكتمال المراجعة.")
+    return decisions, pending == 0
+
+
+def _snb_add_evaluation(frame, notes_col, mapping, manual, similarity, row_decisions=None):
     """Place call evaluation and percentage match in adjacent columns after Notes."""
     output = frame.copy()
     for name in ("تقييم المكالمات", "نسبة تطابق التقييم"):
@@ -6276,6 +6338,10 @@ def _snb_add_evaluation(frame, notes_col, mapping, manual, similarity):
     keys = output[notes_col].map(_snb_normalize_note)
     # Only exact model matches or user-approved new Notes set the evaluation.
     values = keys.map(mapping).combine_first(keys.map(manual))
+    # Explicit row-level decisions take precedence over model and note-level ratings.
+    if row_decisions:
+        overrides = pd.Series([row_decisions.get(str(i)) for i in output.index], index=output.index)
+        values = overrides.combine_first(values)
     labels = values.map({1: "ناجحة", 0: "غير ناجحة"}).fillna("غير مصنفة")
     index = output.columns.get_loc(notes_col) + 1
     output.insert(index, "تقييم المكالمات", labels)
@@ -6359,8 +6425,19 @@ def render_snb_activity_report(model_upload, activity_upload):
             prepared, activity_kind, period
         )
         manual_decisions = _snb_manual_evaluations(model_upload)
+        slash_row_decisions, slash_reviewed = _snb_review_slash_rows(
+            selected, stats["notes"], activity_upload
+        )
+        if not slash_reviewed:
+            return
+        # Slash-marked rows have their own mandatory row-by-row rating;
+        # they must not also require note-level classification.
+        ordinary_notes = selected.loc[
+            ~selected[stats["notes"]].fillna("").astype(str).str.contains("/", regex=False),
+            stats["notes"]
+        ]
         similarity, fully_reviewed = _snb_review_new_notes(
-            selected[stats["notes"]],
+            ordinary_notes,
             model_mapping,
             manual_decisions,
             conflicted=conflicted_notes
@@ -6371,7 +6448,7 @@ def render_snb_activity_report(model_upload, activity_upload):
 
         result = _snb_add_evaluation(
             selected, stats["notes"], model_mapping,
-            manual_decisions, similarity
+            manual_decisions, similarity, row_decisions=slash_row_decisions
         )
         result = _snb_add_call_duration(
             result, stats["collector"]
@@ -6453,6 +6530,11 @@ def render_snb_activity_report(model_upload, activity_upload):
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             final.to_excel(writer, sheet_name="Activity", index=False)
+            slash_mask = final[stats["notes"]].fillna("").astype(str).str.contains("/", regex=False)
+            if slash_mask.any():
+                final.loc[slash_mask].to_excel(
+                    writer, sheet_name="Slash_Notes_Review", index=False
+                )
         st.download_button(
             "📥 تحميل نشاط SNB بعد المعالجة",
             data=output.getvalue(),
