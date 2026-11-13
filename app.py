@@ -1188,6 +1188,129 @@ st.markdown(f"""
         font-weight: 900 !important;
     }}
 
+
+    /* Compact promise KPIs replace the old report title, without extra row. */
+    [class*="st-key-report_upload_bar_"] .ejada-promises-header-kpis {{
+        display: flex !important;
+        align-items: stretch !important;
+        justify-content: center !important;
+        gap: 9px !important;
+        direction: rtl !important;
+        height: 90px !important;
+        width: 100% !important;
+        margin: 0 !important;
+    }}
+    [class*="st-key-report_upload_bar_"] .ejada-mini-kpi {{
+        display: flex !important;
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        max-width: 210px !important;
+        box-sizing: border-box !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 6px !important;
+        text-align: center !important;
+        padding: 7px 6px !important;
+        background: #FFFFFF !important;
+        border: 1px solid #99AABF !important;
+        border-radius: 9px !important;
+        color: #1F4373 !important;
+        font-weight: 900 !important;
+        overflow: hidden !important;
+    }}
+    [class*="st-key-report_upload_bar_"] .ejada-mini-kpi-active {{
+        border-color: #2CA549 !important;
+    }}
+    [class*="st-key-report_upload_bar_"] .ejada-mini-kpi span {{
+        font-size: clamp(11px, 0.88vw, 16px) !important;
+        font-weight: 900 !important;
+        white-space: normal !important;
+        line-height: 1.25 !important;
+    }}
+    [class*="st-key-report_upload_bar_"] .ejada-mini-kpi strong {{
+        font-size: clamp(20px, 1.6vw, 29px) !important;
+        line-height: 1.1 !important;
+        font-weight: 900 !important;
+        color: #1F4373 !important;
+    }}
+    [class*="st-key-report_upload_bar_"] .ejada-mini-kpi-active strong {{
+        color: #2CA549 !important;
+    }}
+    /* Center the details expander title independently of its right-side caret. */
+    div[class*="st-key-active_sheet_detail_"] [data-testid="stExpander"] summary {{
+        position: relative !important;
+        min-height: 48px !important;
+    }}
+    div[class*="st-key-active_sheet_detail_"] [data-testid="stExpander"] summary p {{
+        position: absolute !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        text-align: center !important;
+        margin: 0 !important;
+        width: max-content !important;
+        max-width: calc(100% - 70px) !important;
+        font-size: 15px !important;
+        font-weight: 900 !important;
+    }}
+    div[class*="st-key-promise_downloads_"] [data-testid="stDownloadButton"] {{
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        width: 100% !important;
+    }}
+    div[class*="st-key-promise_downloads_"] [data-testid="stDownloadButton"] button {{
+        width: fit-content !important;
+        max-width: 100% !important;
+        margin: 0 auto !important;
+        min-height: 44px !important;
+        padding: 8px 18px !important;
+        text-align: center !important;
+        font-weight: 900 !important;
+    }}
+    div[class*="st-key-promise_downloads_"] [data-testid="stDownloadButton"] button p {{
+        font-size: 16px !important;
+        text-align: center !important;
+        font-weight: 900 !important;
+        white-space: normal !important;
+    }}
+    /* Two bordered diagnostic tables side by side: steps on right, class counts on left. */
+    div[class*="st-key-promise_diagnostic_"] [data-testid="stHorizontalBlock"]:has(.ejada-diagnostic-table) {{
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: flex-start !important;
+        direction: rtl !important;
+        gap: 12px !important;
+    }}
+    div[class*="st-key-promise_diagnostic_"] [data-testid="stHorizontalBlock"]:has(.ejada-diagnostic-table) [data-testid="stColumn"] {{
+        min-width: 0 !important;
+        align-self: flex-start !important;
+    }}
+    div[class*="st-key-promise_diagnostic_"] [data-testid="stHorizontalBlock"] table.ejada-diagnostic-table {{
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        table-layout: auto !important;
+    }}
+    div[class*="st-key-promise_diagnostic_"] .ejada-diagnostic-small-caption {{
+        text-align: center !important;
+        color: #1F4373 !important;
+        font-size: 12px !important;
+        font-weight: 900 !important;
+        margin-bottom: 6px !important;
+    }}
+    @media (max-width: 1100px) {{
+        [class*="st-key-report_upload_bar_"] .ejada-promises-header-kpis {{
+            gap: 5px !important;
+        }}
+        [class*="st-key-report_upload_bar_"] .ejada-mini-kpi {{
+            padding: 5px 3px !important;
+        }}
+        [class*="st-key-report_upload_bar_"] .ejada-mini-kpi span {{
+            font-size: 11px !important;
+        }}
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -5552,13 +5675,28 @@ bank_files = st.session_state.page_files[selected_bank]
 curr_page = st.session_state.current_page
 
 def render_promise_filter_diagnostics(bank, kind):
-    """Compact diagnostic presentation; does not modify filtering decisions."""
+    """Display each bank's unchanged filters, with two diagnostic tables side-by-side."""
     payload = (
         st.session_state.get('promise_filter_debug', {})
         .get(bank, {}).get(kind)
     )
     if not payload:
         return
+
+    def _table_html(items, name_col):
+        html_parts = [
+            '<table class="ejada-diagnostic-table" dir="rtl">',
+            f'<thead><tr><th>{name_col}</th><th>العدد</th></tr></thead><tbody>'
+        ]
+        for item in items:
+            label = _xml_escape(str(item.get(name_col, '')))
+            try:
+                quantity = f"{int(item.get('العدد', 0)):,}"
+            except (TypeError, ValueError):
+                quantity = _xml_escape(str(item.get('العدد', '')))
+            html_parts.append(f'<tr><td>{label}</td><td>{quantity}</td></tr>')
+        html_parts.append('</tbody></table>')
+        return ''.join(html_parts)
 
     kind_label = 'القائمة' if kind == 'active' else 'المكسورة'
     with st.container(key=f'promise_diagnostic_{bank}_{kind}'):
@@ -5573,53 +5711,35 @@ def render_promise_filter_diagnostics(bank, kind):
                 unsafe_allow_html=True
             )
             rows = payload.get('steps') or []
-            if rows:
-                parts = [
-                    '<table class="ejada-diagnostic-table" dir="rtl">',
-                    '<thead><tr><th>الخطوة</th><th>العدد</th></tr></thead><tbody>'
-                ]
-                for item in rows:
-                    step = _xml_escape(str(item.get('الخطوة', '')))
-                    count = item.get('العدد', 0)
-                    try:
-                        count_str = f'{int(count):,}'
-                    except (TypeError, ValueError):
-                        count_str = _xml_escape(str(count))
-                    parts.append(
-                        f'<tr><td>{step}</td><td>{count_str}</td></tr>'
-                    )
-                parts.append('</tbody></table>')
-                st.markdown(''.join(parts), unsafe_allow_html=True)
-
             class_rows = payload.get('classification_counts') or []
-            if class_rows:
+
+            if rows and class_rows:
+                steps_col, class_col = st.columns(
+                    [1.4, 1], gap='small', vertical_alignment='top'
+                )
+                with steps_col:
+                    st.markdown(_table_html(rows, 'الخطوة'), unsafe_allow_html=True)
+                with class_col:
+                    st.markdown(
+                        "<div class='ejada-diagnostic-small-caption'>"
+                        "قيم Classification بعد فلترة حالة المعالجة"
+                        "</div>",
+                        unsafe_allow_html=True
+                    )
+                    st.markdown(
+                        _table_html(class_rows, 'Classification'),
+                        unsafe_allow_html=True
+                    )
+            elif rows:
+                st.markdown(_table_html(rows, 'الخطوة'), unsafe_allow_html=True)
+            elif class_rows:
                 st.markdown(
-                    "<div style='font-size:13px;font-weight:900;color:#1F4373;"
-                    "text-align:right;margin-top:10px;'>"
-                    "القيم الموجودة فعليًا في Classification بعد فلترة حالة المعالجة:"
-                    "</div>",
+                    _table_html(class_rows, 'Classification'),
                     unsafe_allow_html=True
                 )
-                class_table = [
-                    '<table class="ejada-diagnostic-table" dir="rtl">',
-                    '<thead><tr><th>Classification</th><th>العدد</th></tr></thead><tbody>'
-                ]
-                for item in class_rows:
-                    classification = _xml_escape(
-                        str(item.get('Classification', ''))
-                    )
-                    try:
-                        amount = f"{int(item.get('العدد', 0)):,}"
-                    except (TypeError, ValueError):
-                        amount = _xml_escape(str(item.get('العدد', '')))
-                    class_table.append(
-                        f'<tr><td>{classification}</td><td>{amount}</td></tr>'
-                    )
-                class_table.append('</tbody></table>')
-                st.markdown(''.join(class_table), unsafe_allow_html=True)
 
 
-def render_report_upload_bar(page):
+def render_report_upload_bar(page, promise_metrics=None):
     """Compact report header: file details and stacked X/+ alongside the title."""
     titles = {
         'Promises': '🤝 إدارة ومتابعة الوعود (القائمة والمكسورة)',
@@ -5717,19 +5837,41 @@ def render_report_upload_bar(page):
                 )
 
         with title_col:
-            title_font_size = 24 if page == 'Promises' else 20
-            st.markdown(
-                f"""
-                <div class="ejada-report-title-holder">
+            if page == 'Promises':
+                _n_total, _n_active, _n_broken = promise_metrics or (0, 0, 0)
+                st.markdown(
+                    f"""
+                    <div class="ejada-promises-header-kpis" dir="rtl">
+                        <div class="ejada-mini-kpi">
+                            <span>📁 إجمالي الحسابات</span>
+                            <strong>{int(_n_total):,}</strong>
+                        </div>
+                        <div class="ejada-mini-kpi ejada-mini-kpi-active">
+                            <span>🤝 الوعود القائمة</span>
+                            <strong>{int(_n_active):,}</strong>
+                        </div>
+                        <div class="ejada-mini-kpi">
+                            <span>⚠️ الوعود المكسورة</span>
+                            <strong>{int(_n_broken):,}</strong>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            else:
+                title_font_size = 20
+                st.markdown(
+                    f"""
+                    <div class="ejada-report-title-holder">
                     <div class="ejada-report-title"
                          style="background:{card_color};border-color:{border_color};
                                 color:{text_color};font-size:{title_font_size}px;">
                         {titles[page]}
                     </div>
                 </div>
-                """,
-                unsafe_allow_html=True
-            )
+                    """,
+                    unsafe_allow_html=True
+                )
 
 # دالة معالجة بيانات أي صفحة
 
@@ -6322,8 +6464,23 @@ if curr_page == 'Overview':
     overview_combined_files = (overview_activity_files or []) + (overview_promises_files or [])
     bank_files['Overview'] = overview_combined_files if overview_combined_files else None
 
+# Process Promise data once before rendering the header KPIs.
+# Reuse the same result below; no duplicate parsing or filtering.
+_promise_header_result = None
+if curr_page == 'Promises' and bank_files.get('Promises'):
+    _promise_header_result = process_page_data(
+        bank_files['Promises'], bank=selected_bank
+    )
+
 if curr_page in ('Promises', 'Neglect', 'Activity'):
-    render_report_upload_bar(curr_page)
+    _promise_metrics = None
+    if curr_page == 'Promises' and _promise_header_result is not None:
+        _promise_metrics = (
+            _promise_header_result[5],
+            _promise_header_result[7],
+            _promise_header_result[8],
+        )
+    render_report_upload_bar(curr_page, promise_metrics=_promise_metrics)
 
 page_uploaded = bank_files[curr_page]
 
@@ -6346,33 +6503,6 @@ if page_uploaded is None:
     elif curr_page == 'Activity':
         render_activity_boxes(None)
         st.markdown(f"<p style='color:{label_color};font-weight:800;font-size:15px;text-align:right;direction:rtl;margin-top:8px;'>ارفعي ملف النشاط من الخانة اللي فوق لعرض التقرير.</p>", unsafe_allow_html=True)
-    elif curr_page == 'Promises':
-        st.markdown(
-            f"""
-            <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap;
-                        margin:16px 0 8px;direction:rtl;">
-                <div style="display:inline-flex;flex-direction:column;align-items:center;
-                            background:{card_color};border:1px solid {border_color};border-radius:10px;
-                            padding:10px 18px;width:fit-content;min-width:210px;">
-                    <div style="color:{kpi_title_color};font-size:20px;font-weight:900;">📁 إجمالي عدد الحسابات بالملف</div>
-                    <div style="color:{text_color};font-size:28px;font-weight:900;margin-top:5px;">0</div>
-                </div>
-                <div style="display:inline-flex;flex-direction:column;align-items:center;
-                            background:{card_color};border:1px solid {snb_green};border-radius:10px;
-                            padding:10px 18px;width:fit-content;min-width:190px;">
-                    <div style="color:{kpi_title_color};font-size:20px;font-weight:900;">🤝 عدد الوعود القائمة</div>
-                    <div style="color:{snb_green};font-size:28px;font-weight:900;margin-top:5px;">0</div>
-                </div>
-                <div style="display:inline-flex;flex-direction:column;align-items:center;
-                            background:{card_color};border:1px solid {border_color};border-radius:10px;
-                            padding:10px 18px;width:fit-content;min-width:200px;">
-                    <div style="color:{kpi_title_color};font-size:20px;font-weight:900;">⚠️ عدد الوعود المكسورة</div>
-                    <div style="color:{text_color};font-size:28px;font-weight:900;margin-top:5px;">0</div>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
     else:
         st.markdown(f"<p style='color:{label_color};font-weight:800;font-size:15px;text-align:right;direction:rtl;margin-top:8px;'>ارفعي الملف من الخانة اللي فوق لعرض التقرير.</p>", unsafe_allow_html=True)
 else:
@@ -6382,6 +6512,11 @@ else:
             activity_files=st.session_state.overview_uploads[selected_bank]['Activity'],
             promises_files=st.session_state.overview_uploads[selected_bank]['Promises']
         )
+    elif curr_page == 'Promises' and _promise_header_result is not None:
+        (active_promises_df, broken_promises_df, neglect_df,
+         activity_base_df, report_bytes, total_rows, total_unhandled,
+         active_count, broken_count, neglect_count,
+         total_activity_count) = _promise_header_result
     else:
         active_promises_df, broken_promises_df, neglect_df, activity_base_df, report_bytes, total_rows, total_unhandled, active_count, broken_count, neglect_count, total_activity_count = process_page_data(bank_files[curr_page], bank=selected_bank)
 
@@ -6546,46 +6681,6 @@ else:
         with tab_active:
             # Diagnostics and sheet details are displayed together below the KPIs.
 
-            # مؤشرات رئيسية لملخص الوعود: صناديق صغيرة على قد النص وعناوين أكبر.
-            st.markdown(
-                f"""
-                <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap;
-                            margin:10px 0 6px;direction:rtl;">
-                    <div style="display:inline-flex;flex-direction:column;align-items:center;
-                                background:{card_color};border:1px solid {border_color};
-                                border-radius:10px;padding:10px 18px;width:fit-content;min-width:210px;">
-                        <div style="color:{kpi_title_color};font-size:20px;font-weight:900;">
-                            📁 إجمالي عدد الحسابات بالملف
-                        </div>
-                        <div style="color:#304D73;font-size:29px;font-weight:900;margin-top:5px;">
-                            {int(total_rows):,}
-                        </div>
-                    </div>
-                    <div style="display:inline-flex;flex-direction:column;align-items:center;
-                                background:{card_color};border:1px solid {snb_green};
-                                border-radius:10px;padding:10px 18px;width:fit-content;min-width:190px;">
-                        <div style="color:{kpi_title_color};font-size:20px;font-weight:900;">
-                            🤝 عدد الوعود القائمة
-                        </div>
-                        <div style="color:{snb_green};font-size:29px;font-weight:900;margin-top:5px;">
-                            {int(active_count):,}
-                        </div>
-                    </div>
-                    <div style="display:inline-flex;flex-direction:column;align-items:center;
-                                background:{card_color};border:1px solid {border_color};
-                                border-radius:10px;padding:10px 18px;width:fit-content;min-width:200px;">
-                        <div style="color:{kpi_title_color};font-size:20px;font-weight:900;">
-                            ⚠️ عدد الوعود المكسورة
-                        </div>
-                        <div style="color:#586F8C;font-size:29px;font-weight:900;margin-top:5px;">
-                            {int(broken_count):,}
-                        </div>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
             st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
 
             # Preserve SNB's original Pivot summary; STC has no active Pivot.
@@ -6606,16 +6701,17 @@ else:
                 with diag_col:
                     render_promise_filter_diagnostics(selected_bank, 'active')
                 with details_col:
-                    with st.expander(
-                        "📋 تفاصيل شيت الوعود القائمة",
-                        expanded=(selected_bank != 'STC')
-                    ):
-                        st.dataframe(
-                            active_promises_df,
-                            use_container_width=True,
-                            height=400,
-                            hide_index=True
-                        )
+                    with st.container(key=f"active_sheet_detail_{selected_bank}"):
+                        with st.expander(
+                            "📋 تفاصيل شيت الوعود القائمة",
+                            expanded=(selected_bank != 'STC')
+                        ):
+                            st.dataframe(
+                                active_promises_df,
+                                use_container_width=True,
+                                height=400,
+                                hide_index=True
+                            )
             
         with tab_broken:
             render_promise_filter_diagnostics(selected_bank, 'broken')
@@ -6650,34 +6746,43 @@ else:
                 bank='STC'
             ).getvalue()
 
-            dl_active_col, dl_broken_col = st.columns(2, gap='medium')
-            with dl_active_col:
-                st.download_button(
-                    "📥 تحميل تقرير الوعود القائمة STC.xlsx",
-                    data=stc_active_report,
-                    file_name="STC_Active_Promises_Report.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="dl_stc_active_promises",
-                    use_container_width=True
+            with st.container(key="promise_downloads_STC"):
+                _right_gap, dl_active_col, dl_broken_col, _left_gap = st.columns(
+                    [0.7, 2, 2, 0.7], gap='medium'
                 )
-            with dl_broken_col:
-                st.download_button(
-                    "📥 تحميل تقرير الوعود المكسورة STC.xlsx",
-                    data=stc_broken_report,
-                    file_name="STC_Broken_Promises_Report.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="dl_stc_broken_promises",
-                    use_container_width=True
-                )
+                with dl_active_col:
+                    st.download_button(
+                        "📥 تحميل تقرير الوعود القائمة STC.xlsx",
+                        data=stc_active_report,
+                        file_name="STC_Active_Promises_Report.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="dl_stc_active_promises",
+                        use_container_width=False
+                    )
+                with dl_broken_col:
+                    st.download_button(
+                        "📥 تحميل تقرير الوعود المكسورة STC.xlsx",
+                        data=stc_broken_report,
+                        file_name="STC_Broken_Promises_Report.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="dl_stc_broken_promises",
+                        use_container_width=False
+                    )
         else:
-            st.download_button(
-                "📥 تحميل التقرير الشامل (الإكسيل بالملخصات).xlsx",
-                data=report_bytes,
-                file_name=f"{selected_bank}_Daily_Promises_Report.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=f"dl_promises_all_{selected_bank}"
-            )
-        
+            with st.container(key="promise_downloads_SNB"):
+                _left_spacer, center_download, _right_spacer = st.columns(
+                    [1, 2.2, 1], gap='medium'
+                )
+                with center_download:
+                    st.download_button(
+                        "📥 تحميل التقرير الشامل (الإكسيل بالملخصات).xlsx",
+                        data=report_bytes,
+                        file_name=f"{selected_bank}_Daily_Promises_Report.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"dl_promises_all_{selected_bank}",
+                        use_container_width=False
+                    )
+
     elif curr_page == 'Neglect':
         default_sub_states = ['وعد بسداد مبلغ المعالجة', 'واعد بسداد مبلغ المعالجه', 'رافض السداد', 'الجوال مغلق', 'مماطل', 'تم سداد جزء وليس مبلغ المعالجه', 'لا يجيب', 'متقاعد الراتب علي بنك آخر', 'يرغب بجدوله المديونيه']
         selected_sub_states = st.multiselect("فلاتر الـ Sub State المشمولة:", options=default_sub_states, default=default_sub_states, key=f"neglect_states_{selected_bank}")
