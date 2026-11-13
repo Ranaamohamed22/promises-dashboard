@@ -760,21 +760,25 @@ if st.session_state.current_page not in ('Overview', 'Home'):
 # ==========================================
 # 2. شريط التنقل
 # ==========================================
-nav_cols = st.columns([0.55, 1.65, 1.05, 0.8, 5.95], gap="small") 
+# نجمع أزرار التقارير في كتلة واحدة متراصة بدل توزيعها على عرض الصفحة.
+nav_group, _nav_spacer = st.columns([3.45, 6.55], gap="small")
 
-with nav_cols[0]:
-    st.button("🏠", key="nav_home_btn", type="primary" if st.session_state.current_page == 'Home' else "secondary", use_container_width=False, on_click=set_page, args=('Home',), help="الرئيسية")
+with nav_group:
+    nav_cols = st.columns([0.52, 2.55, 1.55, 1.05], gap="small")
 
-with nav_cols[1]:
-    st.button("🤝 الوعود القائمة والمكسورة", key="nav_prom_btn", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=False, on_click=set_page, args=('Promises',))
+    with nav_cols[0]:
+        st.button("🏠", key="nav_home_btn", type="primary" if st.session_state.current_page == 'Home' else "secondary", use_container_width=False, on_click=set_page, args=('Home',), help="الرئيسية")
 
-with nav_cols[2]:
-    st.button("🚨 تقرير الإهمال", key="nav_neg_btn", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=False, on_click=set_page, args=('Neglect',))
+    with nav_cols[1]:
+        st.button("🤝 الوعود القائمة والمكسورة", key="nav_prom_btn", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=False, on_click=set_page, args=('Promises',))
 
-with nav_cols[3]:
-    st.button("📈 النشاط", key="nav_act_btn", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=False, on_click=set_page, args=('Activity',))
+    with nav_cols[2]:
+        st.button("🚨 تقرير الإهمال", key="nav_neg_btn", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=False, on_click=set_page, args=('Neglect',))
 
-with nav_cols[4]:
+    with nav_cols[3]:
+        st.button("📈 النشاط", key="nav_act_btn", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=False, on_click=set_page, args=('Activity',))
+
+with _nav_spacer:
     st.markdown("")
 
 st.markdown(f"<hr style='margin: 10px 0 20px 0; border-color: {border_color}; clear: both;'>", unsafe_allow_html=True)
