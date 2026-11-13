@@ -5833,6 +5833,46 @@ else:
                                 hide_index=True
                             )
 
+            # مؤشرات رئيسية لملخص الوعود: إجمالي الملف والقائمة والمكسورة.
+            promises_kpi_cols = st.columns(3, gap='small')
+            promises_kpis = [
+                {
+                    'title': 'إجمالي عدد الحسابات بالملف',
+                    'value': total_rows,
+                    'icon': '📁',
+                    'accent': '#304D73',
+                },
+                {
+                    'title': 'عدد الوعود القائمة',
+                    'value': active_count,
+                    'icon': '🤝',
+                    'accent': '#2CA549',
+                },
+                {
+                    'title': 'عدد الوعود المكسورة',
+                    'value': broken_count,
+                    'icon': '⚠️',
+                    'accent': '#586F8C',
+                },
+            ]
+            for kpi_col, kpi in zip(promises_kpi_cols, promises_kpis):
+                with kpi_col:
+                    st.markdown(
+                        f"""
+                        <div style="background:{card_color};border:1px solid {border_color};
+                                    border-right:6px solid {kpi['accent']};border-radius:11px;
+                                    padding:13px 10px;text-align:center;direction:rtl;
+                                    box-shadow:0 2px 7px rgba(0,0,0,0.08);">
+                            <div style="color:{kpi_title_color};font-size:14px;font-weight:800;
+                                        margin-bottom:7px;">{kpi['icon']} {kpi['title']}</div>
+                            <div style="color:{kpi['accent']};font-size:29px;font-weight:900;
+                                        line-height:1.2;">{int(kpi['value']):,}</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+            st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
             st.markdown(f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900;'>📊 ملخص تقرير الوعود القائمة (Pivot)</h4>", unsafe_allow_html=True)
             st.dataframe(style_pivot_frame(pivot_to_frame(build_pivot(active_promises_df, order='first'))), use_container_width=True, hide_index=True)
             st.markdown(f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900; margin-top:20px;'>📋 تفاصيل شيت الوعود القائمة</h4>", unsafe_allow_html=True)
