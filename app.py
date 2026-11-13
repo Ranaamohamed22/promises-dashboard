@@ -259,6 +259,32 @@ st.markdown(f"""
         white-space: nowrap !important;
     }}
 
+    /* Navigation row: shrink each Streamlit column to its button, then use
+       one fixed 38px gap between boxes (rather than wide proportional columns). */
+    div.st-key-report_nav_group [data-testid="stHorizontalBlock"] {{
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        direction: rtl !important;
+        gap: 38px !important;
+        width: fit-content !important;
+        max-width: 100% !important;
+        margin-left: auto !important;
+        margin-right: 0 !important;
+        overflow-x: auto !important;
+    }}
+    div.st-key-report_nav_group [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+        flex: 0 0 auto !important;
+        width: fit-content !important;
+        min-width: fit-content !important;
+        padding: 0 !important;
+    }}
+    div.st-key-report_nav_group [data-testid="column"] > div {{
+        width: fit-content !important;
+    }}
+
     /* Report navigation boxes should hug their text exactly. */
     div.st-key-nav_prom_btn div[data-testid="stButton"],
     div.st-key-nav_neg_btn div[data-testid="stButton"],
@@ -764,27 +790,21 @@ if st.session_state.current_page not in ('Overview', 'Home'):
 # ==========================================
 # 2. شريط التنقل
 # ==========================================
-# نجمع أزرار التقارير مع فواصل مستقلة بين الأزرار، حتى لا تقل مساحة النص.
-nav_group, _nav_spacer = st.columns([4.2, 5.8], gap=None)
-
-with nav_group:
-    # الأعمدة 1 و3 و5 فواصل مستقلة تقارب 1 سم بصرياً على شاشة الديسكتوب.
-    nav_cols = st.columns([0.50, 0.30, 2.60, 0.30, 1.55, 0.30, 1.05], gap=None)
+# صف واحد بأزرار على قد النص ومسافة ثابتة 38px تقريباً بين كل صندوق.
+with st.container(key="report_nav_group"):
+    nav_cols = st.columns(4, gap=None)
 
     with nav_cols[0]:
         st.button("🏠", key="nav_home_btn", type="primary" if st.session_state.current_page == 'Home' else "secondary", use_container_width=False, on_click=set_page, args=('Home',), help="الرئيسية")
 
-    with nav_cols[2]:
+    with nav_cols[1]:
         st.button("🤝 الوعود القائمة والمكسورة", key="nav_prom_btn", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=False, on_click=set_page, args=('Promises',))
 
-    with nav_cols[4]:
+    with nav_cols[2]:
         st.button("🚨 تقرير الإهمال", key="nav_neg_btn", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=False, on_click=set_page, args=('Neglect',))
 
-    with nav_cols[6]:
+    with nav_cols[3]:
         st.button("📈 النشاط", key="nav_act_btn", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=False, on_click=set_page, args=('Activity',))
-
-with _nav_spacer:
-    st.markdown("")
 
 st.markdown(f"<hr style='margin: 10px 0 20px 0; border-color: {border_color}; clear: both;'>", unsafe_allow_html=True)
 
