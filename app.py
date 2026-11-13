@@ -6279,7 +6279,7 @@ def _snb_slash_row_decisions(activity_upload):
 
 
 def _snb_review_slash_rows(frame, notes_col, activity_upload):
-    """Show the FULL original row for each slash-marked Note and require a rating."""
+    """Review slash-marked Notes using a compact visible editor; full rows remain available."""
     decisions = _snb_slash_row_decisions(activity_upload)
     marked = frame[notes_col].fillna("").astype(str).str.contains("/", regex=False)
     flagged = frame.loc[marked].copy()
@@ -6287,32 +6287,72 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload):
         return decisions, True
 
     original_indices = flagged.index.tolist()
-    review = flagged.drop(columns=["__ejada_parsed_created"], errors="ignore").copy()
-    review.insert(0, "رقم الصف في الملف", [int(i) + 2 for i in original_indices])
-    review["احسب المكالمة"] = [
-        {1: "ناجحة", 0: "غير ناجحة"}.get(decisions.get(str(i)), "اختاري التقييم")
-        for i in original_indices
-    ]
+    full_rows = flagged.drop(
+        columns=["__ejada_parsed_created"], errors="ignore"
+    ).copy()
+    full_rows.insert(
+        0, "رقم الصف في الملف", [int(i) + 2 for i in original_indices]
+    )
+
+    # Keep the editable rating visible without horizontally scrolling
+    # through dozens of columns in the complete activity record.
+    review = pd.DataFrame({
+        "رقم الصف في الملف": [int(i) + 2 for i in original_indices],
+        "الإفادة": flagged[notes_col].fillna("").astype(str).tolist(),
+        "الوقت": (
+            flagged["Time"].fillna("").astype(str).tolist()
+            if "Time" in flagged.columns
+            else [""] * len(flagged)
+        ),
+        "احسب المكالمة": [
+            {1: "ناجحة", 0: "غير ناجحة"}.get(
+                decisions.get(str(i)), "اختاري التقييم"
+            )
+            for i in original_indices
+        ],
+    })
     st.warning(
         f"توجد {len(flagged):,} إفادة تحتوي على / أو //؛ "
         "اعتمدي تقييم كل صف منفصلًا، حتى إن كان موجودًا في موديل النشاط."
     )
+    st.markdown(
+        "**👇 اختاري من عمود «احسب المكالمة» في الجدول الصغير هنا مباشرة:** "
+        "ناجحة أو غير ناجحة، ثم اضغطي زر الاعتماد."
+    )
     with st.form("snb_activity_slash_rows_review_form"):
         edited = st.data_editor(
-            review.reset_index(drop=True),
+            review,
             use_container_width=True,
             hide_index=True,
-            disabled=[col for col in review.columns if col != "احسب المكالمة"],
+            disabled=["رقم الصف في الملف", "الإفادة", "الوقت"],
+            column_order=[
+                "رقم الصف في الملف", "الإفادة", "الوقت", "احسب المكالمة"
+            ],
             column_config={
+                "رقم الصف في الملف": st.column_config.NumberColumn(
+                    "رقم الصف", width="small"
+                ),
+                "الإفادة": st.column_config.TextColumn(
+                    "الإفادة", width="large"
+                ),
+                "الوقت": st.column_config.TextColumn(
+                    "الوقت", width="small"
+                ),
                 "احسب المكالمة": st.column_config.SelectboxColumn(
                     "احسب المكالمة",
                     options=["اختاري التقييم", "ناجحة", "غير ناجحة"],
-                    required=True
-                )
+                    required=True,
+                    width="medium",
+                ),
             },
-            key="snb_activity_slash_rows_editor"
+            key="snb_activity_slash_rows_editor",
         )
-        approved = st.form_submit_button("اعتماد تقييم صفوف / و //")
+        approved = st.form_submit_button("✅ اعتماد تقييم صفوف / و //")
+    with st.expander("📋 عرض كل بيانات الصفوف الـ / و // كاملة", expanded=False):
+        st.dataframe(
+            full_rows, use_container_width=True, hide_index=True, height=420
+        )
+
     if approved:
         for position, original_index in enumerate(original_indices):
             choice = edited.iloc[position]["احسب المكالمة"]
@@ -6325,7 +6365,10 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload):
         st.error("اختاري ناجحة أو غير ناجحة لكل صف قبل استخراج التقرير.")
     pending = sum(str(i) not in decisions for i in original_indices)
     if pending:
-        st.info(f"متبقي {pending:,} صف لم يتم تحديد تقييمه. لا يمكن اعتماد التقرير حتى اكتمال المراجعة.")
+        st.info(
+            f"متبقي {pending:,} صف لم يتم تحديد تقييمه. "
+            "لا يمكن اعتماد التقرير حتى اكتمال المراجعة."
+        )
     return decisions, pending == 0
 
 
