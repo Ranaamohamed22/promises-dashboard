@@ -6431,6 +6431,7 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
         st.warning("حددي إفادة معتمدة أو اكتبي إفادة جديدة للحفظ.")
         return
     batch = {}
+    batch_labels = {}
     for note, rating in additions:
         key = _snb_normalize_note(note)
         if not key:
@@ -6447,10 +6448,11 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
             st.warning("فيه إفادة بتقييم مختلف عن الموديل؛ فعّلي الموافقة على الاستبدال أولًا.")
             return
         batch[key] = rating
+        batch_labels[key] = note.strip()
     try:
         count = _snb_save_model_notes(
             settings,
-            [(display_labels.get(key, key), rating) for key, rating in batch.items()]
+            [(batch_labels[key], rating) for key, rating in batch.items()]
         )
     except (RuntimeError, ValueError) as exc:
         st.error(f"تعذّر الحفظ على GitHub: {exc}")
@@ -7049,11 +7051,6 @@ def render_snb_activity_report(model_upload, activity_upload, error_slot=None):
             model_mapping, conflicted_notes, invalid_model = (
                 _snb_model_evaluations(model_upload)
             )
-            # Apply previously approved, persistent additions on top of the Excel model.
-            saved_model_mapping, _, _ = _snb_load_saved_model_notes(
-                _snb_model_git_settings()
-            )
-            model_mapping.update(saved_model_mapping)
         except Exception as exc:
             message = f"تعذر تجهيز التقرير: {exc}"
             if error_slot is not None:
@@ -7061,6 +7058,19 @@ def render_snb_activity_report(model_upload, activity_upload, error_slot=None):
             else:
                 st.error(message)
             return
+        # Persistent model sync failure must never disable the Activity report.
+        # Display a warning rather than silently pretending remote notes loaded.
+        try:
+            saved_model_mapping, _, _ = _snb_load_saved_model_notes(
+                _snb_model_git_settings()
+            )
+            model_mapping.update(saved_model_mapping)
+        except Exception as exc:
+            st.warning(
+                "تعذر تحميل إضافات موديل النشاط المحفوظة على GitHub؛ "
+                "التقرير سيعتمد مؤقتًا على الموديل المرفوع فقط. "
+                f"التفاصيل: {exc}"
+            )
 
         period = "full"
         ambiguous = False
