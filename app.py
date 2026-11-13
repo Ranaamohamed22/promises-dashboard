@@ -790,50 +790,148 @@ st.markdown(f"""
         align-items: center;
         justify-content: center;
     }}
-    /* Compact upload zone beside the title in dedicated report pages. */
-    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploader"] {{
-        width: 196px !important;
-        max-width: 100% !important;
-        margin: 3px 0 0 auto !important;
-    }}
-    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] {{
-        height: 48px !important;
-        min-height: 48px !important;
-        max-height: 48px !important;
-        width: 196px !important;
-        max-width: 100% !important;
-        border: 1px dashed {border_color} !important;
-        border-radius: 8px !important;
-        padding: 2px 5px !important;
-        background: #FFFFFF !important;
-    }}
-    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] > div {{
-        min-height: 40px !important;
-        height: 40px !important;
+    /* Dedicated report header: compact inline title, responsive upload box. */
+    [class*="st-key-report_upload_bar_"] {
         width: 100% !important;
+    }
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploader"] {
+        width: 100% !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+        overflow: visible !important;
+    }
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] {
+        box-sizing: border-box !important;
+        height: auto !important;
+        min-height: 64px !important;
+        max-height: none !important;
+        width: 100% !important;
+        padding: 8px 10px !important;
+        border: 1px dashed {border_color} !important;
+        background-color: #FFFFFF !important;
+        border-radius: 9px !important;
+        overflow: hidden !important;
+    }
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] > div {
         display: flex !important;
+        min-height: 46px !important;
+        height: auto !important;
         flex-direction: row !important;
         align-items: center !important;
         justify-content: center !important;
-    }}
+        flex-wrap: wrap !important;
+        gap: 5px !important;
+        overflow: hidden !important;
+    }
     [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzoneInstructions"],
-    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] small {{
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] small {
         display: none !important;
-    }}
-    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] button {{
-        min-height: 32px !important;
-        height: 32px !important;
-        padding: 4px 12px !important;
-        font-size: 14px !important;
-        border-radius: 7px !important;
+    }
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] button {
+        height: 38px !important;
+        min-height: 38px !important;
+        font-size: 15px !important;
+        padding: 5px 15px !important;
         margin: 0 auto !important;
-    }}
-    @media (max-width: 950px) {{
-        [class*="st-key-report_upload_bar_"] [data-testid="stFileUploader"],
-        [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] {{
-            width: 100% !important;
-        }}
-    }}
+    }
+    /* The uploaded name is shown above in a dedicated ellipsized line;
+       hide Streamlit's duplicate list to prevent overlapping file chips. */
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderFile"],
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderFileList"] {
+        display: none !important;
+    }
+    [class*="st-key-report_upload_bar_"] .ejada-upload-name {
+        width: 100%;
+        max-width: 100%;
+        white-space: nowrap;
+        text-align: right;
+        direction: rtl;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 15px;
+        font-weight: 900;
+        min-height: 25px;
+        line-height: 25px;
+    }
+    div[class*="st-key-small_clear_report_"] button {
+        width: 34px !important;
+        min-width: 34px !important;
+        height: 36px !important;
+        min-height: 36px !important;
+        padding: 0 !important;
+        border-radius: 8px !important;
+        color: #FFFFFF !important;
+        background: #C5393B !important;
+        border: 0 !important;
+        font-size: 19px !important;
+        font-weight: 900 !important;
+    }
+    div[class*="st-key-small_clear_report_"] button p {
+        color: #FFFFFF !important;
+        font-size: 19px !important;
+        font-weight: 900 !important;
+    }
+
+    /* Compact promise diagnostic with smaller bold labels and centered heading. */
+    div[class*="st-key-promise_diagnostic_"] {
+        width: min(1050px, 96%) !important;
+        max-width: 1050px !important;
+        margin: 8px auto 12px !important;
+    }
+    div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 auto !important;
+        box-sizing: border-box !important;
+    }
+    div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] summary {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        direction: rtl !important;
+        text-align: center !important;
+        min-height: 44px !important;
+    }
+    div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] summary p {
+        font-size: 16px !important;
+        font-weight: 900 !important;
+        text-align: center !important;
+        line-height: 1.45 !important;
+        color: #1F4373 !important;
+    }
+    div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
+        padding: 8px 10px !important;
+    }
+    table.ejada-diagnostic-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        direction: rtl;
+        font-size: 13px;
+        font-weight: 800;
+        color: #1F4373;
+        background: #FFFFFF;
+    }
+    table.ejada-diagnostic-table th,
+    table.ejada-diagnostic-table td {
+        padding: 7px 10px;
+        border-bottom: 1px solid #D5DEEB;
+        font-size: 13px;
+        font-weight: 800;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+    table.ejada-diagnostic-table th:first-child,
+    table.ejada-diagnostic-table td:first-child {
+        width: 76%;
+        text-align: right;
+    }
+    table.ejada-diagnostic-table th:last-child,
+    table.ejada-diagnostic-table td:last-child {
+        width: 24%;
+        text-align: left;
+        font-variant-numeric: tabular-nums;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -5197,8 +5295,76 @@ bank_files = st.session_state.page_files[selected_bank]
 
 curr_page = st.session_state.current_page
 
+def render_promise_filter_diagnostics(bank, kind):
+    """Compact diagnostic presentation; does not modify filtering decisions."""
+    payload = (
+        st.session_state.get('promise_filter_debug', {})
+        .get(bank, {}).get(kind)
+    )
+    if not payload:
+        return
+
+    kind_label = 'القائمة' if kind == 'active' else 'المكسورة'
+    with st.container(key=f'promise_diagnostic_{bank}_{kind}'):
+        with st.expander(
+            f'🔎 تشخيص فلترة الوعود {kind_label} {bank}',
+            expanded=True
+        ):
+            st.markdown(
+                "<div style='font-size:12px;font-weight:800;"
+                "text-align:right;color:#586F8C;margin-bottom:7px;'>"
+                "الأرقام للتشخيص فقط، ولا تغيّر نتيجة التقرير.</div>",
+                unsafe_allow_html=True
+            )
+            rows = payload.get('steps') or []
+            if rows:
+                parts = [
+                    '<table class="ejada-diagnostic-table" dir="rtl">',
+                    '<thead><tr><th>الخطوة</th><th>العدد</th></tr></thead><tbody>'
+                ]
+                for item in rows:
+                    step = _xml_escape(str(item.get('الخطوة', '')))
+                    count = item.get('العدد', 0)
+                    try:
+                        count_str = f'{int(count):,}'
+                    except (TypeError, ValueError):
+                        count_str = _xml_escape(str(count))
+                    parts.append(
+                        f'<tr><td>{step}</td><td>{count_str}</td></tr>'
+                    )
+                parts.append('</tbody></table>')
+                st.markdown(''.join(parts), unsafe_allow_html=True)
+
+            class_rows = payload.get('classification_counts') or []
+            if class_rows:
+                st.markdown(
+                    "<div style='font-size:13px;font-weight:900;color:#1F4373;"
+                    "text-align:right;margin-top:10px;'>"
+                    "القيم الموجودة فعليًا في Classification بعد فلترة حالة المعالجة:"
+                    "</div>",
+                    unsafe_allow_html=True
+                )
+                class_table = [
+                    '<table class="ejada-diagnostic-table" dir="rtl">',
+                    '<thead><tr><th>Classification</th><th>العدد</th></tr></thead><tbody>'
+                ]
+                for item in class_rows:
+                    classification = _xml_escape(
+                        str(item.get('Classification', ''))
+                    )
+                    try:
+                        amount = f"{int(item.get('العدد', 0)):,}"
+                    except (TypeError, ValueError):
+                        amount = _xml_escape(str(item.get('العدد', '')))
+                    class_table.append(
+                        f'<tr><td>{classification}</td><td>{amount}</td></tr>'
+                    )
+                class_table.append('</tbody></table>')
+                st.markdown(''.join(class_table), unsafe_allow_html=True)
+
+
 def render_report_upload_bar(page):
-    """Show a compact uploader on the far right, beside its report title."""
+    """Render uploader at right and its report-title box directly beside it."""
     titles = {
         'Promises': '🤝 إدارة ومتابعة الوعود (القائمة والمكسورة)',
         'Neglect': '🚨 تقرير الإهمال',
@@ -5208,52 +5374,64 @@ def render_report_upload_bar(page):
     uploader_version = st.session_state.report_uploader_versions[selected_bank][page]
 
     with st.container(key=f"report_upload_bar_{selected_bank}_{page}"):
-        # First column is on the right because the app layout uses RTL.
-        upload_col, title_col, action_col, _left_spacer = st.columns(
-            [1.6, 3.3, 1.1, 4.0], gap='small'
-        )
+        # RTL: first column is the rightmost, followed immediately by the title.
+        upload_col, title_col, _rest = st.columns([2.2, 3.5, 4.3], gap='small')
+
         with upload_col:
             if current_files:
-                file_names = "، ".join(_xml_escape(x.name) for x in current_files)
+                file_names = "، ".join(x.name for x in current_files)
                 upload_message = f"الملف الحالي: {file_names}"
             else:
                 upload_message = "مفيش ملف مرفوع لسه يا رنا"
+
             st.markdown(
-                f'<div style="color:{label_color};font-size:17px;font-weight:900;'
-                'text-align:right;direction:rtl;white-space:nowrap;'
-                'width:100%;margin:0 0 6px 0;">'
-                f'{upload_message}</div>',
+                f'<div class="ejada-upload-name" title="{_xml_escape(upload_message)}" '
+                f'style="color:{label_color};">{_xml_escape(upload_message)}</div>',
                 unsafe_allow_html=True
             )
 
-            new_files = st.file_uploader(
-                f"رفع ملف {titles[page]}",
-                type=['xlsx', 'csv'],
-                accept_multiple_files=True,
-                label_visibility='collapsed',
-                key=f"report_uploader_{selected_bank}_{page}_{uploader_version}"
-            )
-            if new_files:
-                new_sig = [(x.name, x.size) for x in new_files]
-                current_sig = [(x.name, x.size) for x in current_files]
-                if new_sig != current_sig:
-                    bank_files[page] = new_files
+            clear_col, picker_col = st.columns([0.13, 0.87], gap='small')
+            with clear_col:
+                if current_files:
+                    st.button(
+                        "×",
+                        key=f"small_clear_report_{selected_bank}_{page}",
+                        on_click=clear_report_page_file,
+                        args=(selected_bank, page),
+                        help="مسح الملف المرفوع",
+                        use_container_width=False
+                    )
+
+            with picker_col:
+                new_files = st.file_uploader(
+                    f"رفع ملف {titles[page]}",
+                    type=['xlsx', 'csv'],
+                    accept_multiple_files=True,
+                    label_visibility='collapsed',
+                    key=f"report_uploader_{selected_bank}_{page}_{uploader_version}"
+                )
+                if new_files:
+                    new_sig = [(x.name, x.size) for x in new_files]
+                    current_sig = [(x.name, x.size) for x in current_files]
+                    if new_sig != current_sig:
+                        bank_files[page] = new_files
+                        st.rerun()
+                elif current_files:
+                    # Native remove controls also clear this page's stored files.
+                    bank_files[page] = None
+                    st.session_state.report_uploader_versions[selected_bank][page] += 1
                     st.rerun()
-            elif current_files:
-                bank_files[page] = None
-                st.session_state.report_uploader_versions[selected_bank][page] += 1
-                st.rerun()
 
         with title_col:
             title_font_size = 24 if page == 'Promises' else 20
             st.markdown(
                 f"""
-                <div style="height:81px;display:flex;align-items:center;
+                <div style="min-height:112px;display:flex;align-items:center;
                             justify-content:flex-start;direction:rtl;">
                     <div style="display:inline-flex;align-items:center;justify-content:center;
                                 background:{card_color};border:1px solid {border_color};
                                 border-radius:9px;padding:8px 14px;width:fit-content;
-                                max-width:100%;white-space:nowrap;color:{text_color};
+                                max-width:100%;color:{text_color};
                                 font-weight:900;font-size:{title_font_size}px;">
                         {titles[page]}
                     </div>
@@ -5261,17 +5439,6 @@ def render_report_upload_bar(page):
                 """,
                 unsafe_allow_html=True
             )
-
-        with action_col:
-            if current_files:
-                st.button(
-                    "🗑️ إزالة الملف",
-                    key=f"clear_report_file_{selected_bank}_{page}",
-                    on_click=clear_report_page_file,
-                    args=(selected_bank, page),
-                    use_container_width=False,
-                    help="إزالة الملف الحالي ورفع ملف آخر"
-                )
 
 # دالة معالجة بيانات أي صفحة
 
@@ -5395,6 +5562,10 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
     broken_promises_df = pd.DataFrame()
     neglect_df = pd.DataFrame()
     total_unhandled = 0
+    # Diagnostic only; never changes either bank's filter results.
+    st.session_state.setdefault('promise_filter_debug', {})[bank] = {
+        'active': None, 'broken': None
+    }
 
     if not df_promises.empty and all(c in df_promises.columns for c in ['Follow up Due Date', 'Follow up Last Date', 'حالة المعالجة - التمويل', 'تحديث فئة العميل - التمويل', 'Classification']):
         due_date = pd.to_datetime(df_promises['Follow up Due Date'], errors='coerce').dt.normalize()
@@ -5404,6 +5575,43 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
             (df_promises['تحديث فئة العميل - التمويل'].astype(str).str.strip().str.lower() != 'writeoff') & 
             (df_promises['Classification'].astype(str).str.strip() == 'وعود السداد قيد التنفيذ')
         )
+        if bank == 'SNB':
+            _snb_status = (df_promises['حالة المعالجة - التمويل'].astype(str).str.strip() == 'غير معالج')
+            _snb_not_writeoff = (
+                df_promises['تحديث فئة العميل - التمويل']
+                .astype(str).str.strip().str.lower() != 'writeoff'
+            )
+            _snb_class = (
+                df_promises['Classification'].astype(str).str.strip()
+                == 'وعود السداد قيد التنفيذ'
+            )
+            _snb_after_status = _snb_status
+            _snb_after_category = _snb_after_status & _snb_not_writeoff
+            _snb_after_class = _snb_after_category & _snb_class
+            _snb_active_date = _snb_after_class & (due_date == today)
+            _snb_broken_date = _snb_after_class & (due_date < today)
+            _snb_negative_delta = (last_date - due_date).dt.days < 0
+            _snb_diag = st.session_state['promise_filter_debug'][bank]
+            _snb_diag['active'] = {'steps': [
+                {'الخطوة': 'إجمالي الصفوف الأصلية', 'العدد': int(len(df_promises))},
+                {'الخطوة': 'بعد حالة المعالجة = غير معالج', 'العدد': int(_snb_after_status.sum())},
+                {'الخطوة': 'بعد استبعاد فئة writeoff', 'العدد': int(_snb_after_category.sum())},
+                {'الخطوة': 'بعد Classification = وعود السداد قيد التنفيذ',
+                 'العدد': int(_snb_after_class.sum())},
+                {'الخطوة': 'بعد Follow up Due Date = اليوم', 'العدد': int(_snb_active_date.sum())},
+                {'الخطوة': 'بعد استبعاد Follow up Last Date = اليوم',
+                 'العدد': int((_snb_active_date & (last_date != today)).sum())},
+            ]}
+            _snb_diag['broken'] = {'steps': [
+                {'الخطوة': 'إجمالي الصفوف الأصلية', 'العدد': int(len(df_promises))},
+                {'الخطوة': 'بعد حالة المعالجة = غير معالج', 'العدد': int(_snb_after_status.sum())},
+                {'الخطوة': 'بعد استبعاد فئة writeoff', 'العدد': int(_snb_after_category.sum())},
+                {'الخطوة': 'بعد Classification = وعود السداد قيد التنفيذ',
+                 'العدد': int(_snb_after_class.sum())},
+                {'الخطوة': 'بعد Follow up Due Date قبل اليوم', 'العدد': int(_snb_broken_date.sum())},
+                {'الخطوة': 'بعد فرق التاريخ السالب (Last Date - Due Date)',
+                 'العدد': int((_snb_broken_date & _snb_negative_delta).sum())},
+            ]}
         active_promises_df = df_promises[base_condition & (due_date == today) & (last_date != today)].copy()
         broken_promises_df = df_promises[base_condition & (due_date < today)].copy()
         _diff = (last_date[broken_promises_df.index] - due_date[broken_promises_df.index]).dt.days
@@ -5544,6 +5752,10 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
                 'steps': _dbg_steps,
                 'classification_counts': _dbg_class_counts.to_dict('records'),
             }
+            st.session_state['promise_filter_debug'][bank]['active'] = (
+                st.session_state['stc_active_promises_debug']
+            )
+
 
             stc_base_condition = (
                 (stc_processing != _normalize_stc_filter_text('معالج')) &
@@ -5574,6 +5786,38 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
                 (stc_classification.isin(stc_broken_allowed_classifications)) &
                 (stc_expected_date < today)
             )
+
+            # Diagnostic steps use STC's own broken-promise conditions.
+            _dbg_broken_status = (
+                _dbg_processing != _normalize_stc_filter_text('معالج')
+            )
+            _dbg_broken_class = _dbg_classification.isin(
+                stc_broken_allowed_classifications
+            )
+            _dbg_broken_after_class = _dbg_broken_status & _dbg_broken_class
+            _dbg_broken_has_last = _dbg_broken_after_class & (~_dbg_last_blank)
+            _dbg_broken_before = _dbg_broken_has_last & (_dbg_expected_date < today)
+            _dbg_broken_negative = (
+                (_dbg_last_date - _dbg_expected_date).dt.days < 0
+            )
+            st.session_state['promise_filter_debug'][bank]['broken'] = {
+                'steps': [
+                    {'الخطوة': 'إجمالي الصفوف الأصلية',
+                     'العدد': int(len(_dbg))},
+                    {'الخطوة': 'بعد استبعاد حالة المعالجة = معالج',
+                     'العدد': int(_dbg_broken_status.sum())},
+                    {'الخطوة': 'بعد فلتر Classification للوعود المكسورة',
+                     'العدد': int(_dbg_broken_after_class.sum())},
+                    {'الخطوة': 'Expected Closing blank تم ملؤه من Due Date',
+                     'العدد': int((_dbg_broken_after_class & _dbg_expected_blank).sum())},
+                    {'الخطوة': 'بعد استبعاد Follow up Last Date الفارغ',
+                     'العدد': int(_dbg_broken_has_last.sum())},
+                    {'الخطوة': 'بعد Expected Closing قبل اليوم',
+                     'العدد': int(_dbg_broken_before.sum())},
+                    {'الخطوة': 'بعد فرق التاريخ السالب (Last Date - Expected Closing)',
+                     'العدد': int((_dbg_broken_before & _dbg_broken_negative).sum())},
+                ]
+            }
 
             broken_promises_df = stc_promises[stc_broken_condition].copy()
             if not broken_promises_df.empty:
@@ -6009,24 +6253,7 @@ else:
         tab_active, tab_broken = st.tabs([f"✅ الوعود القائمة ({active_count:,})", f"⚠️ الوعود المكسورة ({broken_count:,})"])
         
         with tab_active:
-            if selected_bank == 'STC':
-                _stc_debug = st.session_state.get('stc_active_promises_debug')
-                if _stc_debug:
-                    with st.expander("🔎 تشخيص فلترة الوعود القائمة STC", expanded=True):
-                        st.caption("الأرقام دي للتشخيص فقط ولا تغيّر نتيجة التقرير.")
-                        st.dataframe(
-                            pd.DataFrame(_stc_debug.get('steps', [])),
-                            use_container_width=True,
-                            hide_index=True
-                        )
-                        _class_debug_df = pd.DataFrame(_stc_debug.get('classification_counts', []))
-                        if not _class_debug_df.empty:
-                            st.markdown("**القيم الموجودة فعليًا في Classification بعد استبعاد معالج:**")
-                            st.dataframe(
-                                _class_debug_df,
-                                use_container_width=True,
-                                hide_index=True
-                            )
+            render_promise_filter_diagnostics(selected_bank, 'active')
 
             # مؤشرات رئيسية لملخص الوعود: صناديق صغيرة على قد النص وعناوين أكبر.
             st.markdown(
@@ -6096,6 +6323,7 @@ else:
                     )
             
         with tab_broken:
+            render_promise_filter_diagnostics(selected_bank, 'broken')
             # في STC نخفي ملخص الـ Pivot الخاص بالوعود المكسورة.
             if selected_bank != 'STC':
                 st.markdown(
