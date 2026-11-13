@@ -991,28 +991,28 @@ st.markdown(f"""
         white-space: nowrap !important;
     }}
 
-    /* Fixed-row header for all three report pages. Filename has its own row.
-       Both bordered boxes share the same top coordinate and 112px height. */
+    /* Compact same-height file panel and title across SNB/STC reports.
+       The X sits above the real native Streamlit uploader (+), outside file panel. */
     [class*="st-key-report_upload_bar_"] [data-testid="stHorizontalBlock"]:has(.ejada-report-title-holder) {{
         direction: rtl !important;
-        align-items: flex-start !important;
         flex-wrap: nowrap !important;
+        align-items: flex-start !important;
     }}
     [class*="st-key-report_upload_bar_"] [data-testid="stHorizontalBlock"]:has(.ejada-report-title-holder) > [data-testid="stColumn"] {{
-        align-self: flex-start !important;
         min-width: 0 !important;
+        align-self: flex-start !important;
     }}
     [class*="st-key-report_upload_bar_"] .ejada-report-title-holder {{
         display: flex !important;
         align-items: flex-start !important;
         justify-content: center !important;
         width: 100% !important;
-        height: 112px !important;
-        min-height: 112px !important;
-        max-height: 112px !important;
+        height: 90px !important;
+        min-height: 90px !important;
+        max-height: 90px !important;
         box-sizing: border-box !important;
-        margin: 0 !important;
         padding: 0 !important;
+        margin: 0 !important;
         direction: rtl !important;
     }}
     [class*="st-key-report_upload_bar_"] .ejada-report-title {{
@@ -1020,56 +1020,174 @@ st.markdown(f"""
         align-items: center !important;
         justify-content: center !important;
         text-align: center !important;
+        height: 90px !important;
+        min-height: 90px !important;
+        max-height: 90px !important;
+        box-sizing: border-box !important;
         width: fit-content !important;
         max-width: 100% !important;
-        height: 112px !important;
-        min-height: 112px !important;
-        max-height: 112px !important;
-        box-sizing: border-box !important;
-        padding: 8px 14px !important;
+        padding: 8px 13px !important;
         border: 1px solid !important;
         border-radius: 9px !important;
         font-weight: 900 !important;
-        line-height: 1.3 !important;
+        line-height: 1.25 !important;
         white-space: normal !important;
         margin: 0 !important;
     }}
-    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploader"] {{
+    [class*="st-key-report_upload_bar_"] .ejada-current-file-box {{
+        box-sizing: border-box !important;
+        width: 100% !important;
+        height: 90px !important;
+        min-height: 90px !important;
+        max-height: 90px !important;
+        background: #FFFFFF !important;
+        border: 1px dashed {border_color} !important;
+        border-radius: 9px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 8px 9px !important;
+        margin: 0 !important;
+        overflow: hidden !important;
+        color: #1F4373 !important;
+        direction: ltr !important;
+        text-align: center !important;
+    }}
+    [class*="st-key-report_upload_bar_"] .ejada-file-name {{
+        font-size: 14px !important;
+        font-weight: 800 !important;
+        line-height: 1.4 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        color: #1F4373 !important;
+    }}
+    [class*="st-key-report_upload_bar_"] .ejada-file-size {{
+        font-size: 12px !important;
+        font-weight: 700 !important;
+        white-space: nowrap !important;
+        color: #586F8C !important;
+        line-height: 1.6 !important;
+    }}
+    [class*="st-key-report_upload_bar_"] .ejada-no-file {{
+        color: #1F4373 !important;
+        font-size: 14px !important;
+        font-weight: 900 !important;
+    }}
+    [class*="st-key-report_upload_bar_"] .ejada-upload-name {{
+        max-width: 100% !important;
+        min-height: 25px !important;
+        line-height: 25px !important;
+        margin: 0 !important;
+        overflow: hidden !important;
+        white-space: nowrap !important;
+        text-overflow: ellipsis !important;
+        text-align: right !important;
+        direction: rtl !important;
+    }}
+    [class*="st-key-mini_actions_"] [data-testid="stVerticalBlock"] {{
+        gap: 4px !important;
+    }}
+    [class*="st-key-mini_actions_"] .ejada-mini-x-placeholder {{
+        width: 40px !important;
+        height: 40px !important;
+        min-height: 40px !important;
+        margin: 0 !important;
+    }}
+    [class*="st-key-mini_actions_"] [data-testid="stFileUploader"] {{
+        width: 40px !important;
+        min-width: 40px !important;
+        max-width: 40px !important;
         margin: 0 !important;
         padding: 0 !important;
-        width: 100% !important;
     }}
-    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] {{
+    [class*="st-key-mini_actions_"] [data-testid="stFileUploaderDropzone"] {{
         box-sizing: border-box !important;
+        width: 40px !important;
+        min-width: 40px !important;
+        max-width: 40px !important;
+        height: 40px !important;
+        min-height: 40px !important;
+        max-height: 40px !important;
+        padding: 1px !important;
+        margin: 0 !important;
+        border: 1px solid #1F4373 !important;
+        border-radius: 8px !important;
+        background: #FFFFFF !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        margin: 0 !important;
-        padding: 8px !important;
+        overflow: hidden !important;
+    }}
+    [class*="st-key-mini_actions_"] [data-testid="stFileUploaderDropzone"] > div {{
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
         width: 100% !important;
-        height: 112px !important;
-        min-height: 112px !important;
-        max-height: 112px !important;
-        border: 1px dashed {border_color} !important;
-        border-radius: 9px !important;
-        overflow: hidden !important;
-    }}
-    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] > div {{
         min-height: 0 !important;
-        max-height: 100% !important;
-        height: auto !important;
-    }}
-    [class*="st-key-report_upload_bar_"] .ejada-upload-name {{
-        margin: 0 !important;
-        min-height: 25px !important;
-        line-height: 25px !important;
-        max-width: 100% !important;
+        height: 100% !important;
         overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-        direction: rtl !important;
-        text-align: right !important;
     }}
+    [class*="st-key-mini_actions_"] [data-testid="stFileUploaderDropzoneInstructions"],
+    [class*="st-key-mini_actions_"] [data-testid="stFileUploaderDropzone"] small,
+    [class*="st-key-mini_actions_"] [data-testid="stFileUploaderFile"],
+    [class*="st-key-mini_actions_"] [data-testid="stFileUploaderFileList"] {{
+        display: none !important;
+    }}
+    [class*="st-key-mini_actions_"] [data-testid="stFileUploaderDropzone"] button {{
+        position: relative !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 36px !important;
+        min-width: 36px !important;
+        height: 36px !important;
+        min-height: 36px !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        font-size: 0 !important;
+        color: transparent !important;
+        background: #FFFFFF !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        cursor: pointer !important;
+    }}
+    [class*="st-key-mini_actions_"] [data-testid="stFileUploaderDropzone"] button * {{
+        font-size: 0 !important;
+        color: transparent !important;
+        visibility: hidden !important;
+    }}
+    [class*="st-key-mini_actions_"] [data-testid="stFileUploaderDropzone"] button::after {{
+        content: "+" !important;
+        font-size: 25px !important;
+        font-weight: 500 !important;
+        line-height: 1 !important;
+        color: #1F4373 !important;
+        visibility: visible !important;
+    }}
+    div[class*="st-key-small_clear_report_"] button {{
+        width: 40px !important;
+        min-width: 40px !important;
+        height: 40px !important;
+        min-height: 40px !important;
+        padding: 0 !important;
+        border-radius: 8px !important;
+        background: #C5393B !important;
+        border: 0 !important;
+        color: #FFFFFF !important;
+        box-shadow: none !important;
+        font-size: 20px !important;
+        font-weight: 900 !important;
+    }}
+    div[class*="st-key-small_clear_report_"] button p {{
+        color: #FFFFFF !important;
+        font-size: 20px !important;
+        font-weight: 900 !important;
+    }}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -5502,7 +5620,7 @@ def render_promise_filter_diagnostics(bank, kind):
 
 
 def render_report_upload_bar(page):
-    """Title and upload boxes share one fixed-height, top-aligned row."""
+    """Compact report header: file details and stacked X/+ alongside the title."""
     titles = {
         'Promises': '🤝 إدارة ومتابعة الوعود (القائمة والمكسورة)',
         'Neglect': '🚨 تقرير الإهمال',
@@ -5510,58 +5628,93 @@ def render_report_upload_bar(page):
     }
     current_files = bank_files.get(page) or []
     uploader_version = st.session_state.report_uploader_versions[selected_bank][page]
+
     with st.container(key=f"report_upload_bar_{selected_bank}_{page}"):
         if current_files:
             names = "، ".join(x.name for x in current_files)
-            message = f"الملف الحالي: {names}"
+            status_message = f"الملف الحالي: {names}"
         else:
-            message = "مفيش ملف مرفوع لسه يا رنا"
+            status_message = "مفيش ملف مرفوع لسه يا رنا"
 
-        # Keep filename ABOVE both boxes, outside their shared controls row.
+        # A separate status line ensures filenames never push down either box.
         status_col, _, _ = st.columns([2.9, 4.2, 2.9], gap='small')
         with status_col:
             st.markdown(
-                f'<div class="ejada-upload-name" title="{_xml_escape(message)}" '
-                f'style="color:{label_color};">{_xml_escape(message)}</div>',
+                f'<div class="ejada-upload-name" title="{_xml_escape(status_message)}" '
+                f'style="color:{label_color};">{_xml_escape(status_message)}</div>',
                 unsafe_allow_html=True
             )
 
-        # The two actual boxes start on the SAME horizontal line.
-        upload_col, title_col, _ = st.columns(
+        # Top-aligned row used by all three reports for both banks.
+        upload_col, title_col, _left_balance = st.columns(
             [2.9, 4.2, 2.9], gap='small', vertical_alignment='top'
         )
+
         with upload_col:
-            clear_col, picker_col = st.columns(
-                [0.13, 0.87], gap='small', vertical_alignment='top'
+            # The first (RTL/rightmost) subcolumn contains X above +.
+            actions_col, file_box_col = st.columns(
+                [0.16, 0.84], gap='small', vertical_alignment='top'
             )
-            with clear_col:
-                if current_files:
-                    st.button(
-                        "×",
-                        key=f"small_clear_report_{selected_bank}_{page}",
-                        on_click=clear_report_page_file,
-                        args=(selected_bank, page),
-                        help="مسح الملف المرفوع",
-                        use_container_width=False
+
+            with actions_col:
+                with st.container(key=f"mini_actions_{selected_bank}_{page}"):
+                    if current_files:
+                        st.button(
+                            "×",
+                            key=f"small_clear_report_{selected_bank}_{page}",
+                            on_click=clear_report_page_file,
+                            args=(selected_bank, page),
+                            help="مسح الملف المرفوع",
+                            use_container_width=False
+                        )
+                    else:
+                        # Reserve the X position so the + stays directly below it.
+                        st.markdown(
+                            '<div class="ejada-mini-x-placeholder"></div>',
+                            unsafe_allow_html=True
+                        )
+
+                    new_files = st.file_uploader(
+                        f"رفع ملف {titles[page]}",
+                        type=['xlsx', 'csv'],
+                        accept_multiple_files=True,
+                        label_visibility='collapsed',
+                        key=f"report_uploader_{selected_bank}_{page}_{uploader_version}"
                     )
-            with picker_col:
-                new_files = st.file_uploader(
-                    f"رفع ملف {titles[page]}",
-                    type=['xlsx', 'csv'],
-                    accept_multiple_files=True,
-                    label_visibility='collapsed',
-                    key=f"report_uploader_{selected_bank}_{page}_{uploader_version}"
-                )
-                if new_files:
-                    new_sig = [(x.name, x.size) for x in new_files]
-                    current_sig = [(x.name, x.size) for x in current_files]
-                    if new_sig != current_sig:
-                        bank_files[page] = new_files
+                    if new_files:
+                        new_sig = [(x.name, x.size) for x in new_files]
+                        current_sig = [(x.name, x.size) for x in current_files]
+                        if new_sig != current_sig:
+                            bank_files[page] = new_files
+                            st.rerun()
+                    elif current_files:
+                        # Preserve native uploader clearing behavior and page state.
+                        bank_files[page] = None
+                        st.session_state.report_uploader_versions[selected_bank][page] += 1
                         st.rerun()
-                elif current_files:
-                    bank_files[page] = None
-                    st.session_state.report_uploader_versions[selected_bank][page] += 1
-                    st.rerun()
+
+            with file_box_col:
+                if current_files:
+                    main_file = current_files[0]
+                    file_name = _xml_escape(main_file.name)
+                    file_size = f"{main_file.size / (1024 * 1024):.1f} MB"
+                    extra_files = (
+                        f" · +{len(current_files) - 1} ملفات"
+                        if len(current_files) > 1 else ""
+                    )
+                    info_html = (
+                        f'<div class="ejada-file-name" title="{file_name}">{file_name}</div>'
+                        f'<div class="ejada-file-size">{file_size}{extra_files}</div>'
+                    )
+                else:
+                    info_html = (
+                        '<div class="ejada-no-file">📄 لم يتم رفع ملف</div>'
+                        '<div class="ejada-file-size">XLSX / CSV</div>'
+                    )
+                st.markdown(
+                    '<div class="ejada-current-file-box">' + info_html + '</div>',
+                    unsafe_allow_html=True
+                )
 
         with title_col:
             title_font_size = 24 if page == 'Promises' else 20
