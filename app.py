@@ -794,7 +794,7 @@ st.markdown(f"""
     [class*="st-key-report_upload_bar_"] [data-testid="stFileUploader"] {{
         width: 196px !important;
         max-width: 100% !important;
-        margin: 3px auto 0 !important;
+        margin: 3px 0 0 auto !important;
     }}
     [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] {{
         height: 48px !important;
@@ -853,14 +853,9 @@ with top_cols[1]:
 # ==========================================
 # وضع اسم البنك على يسار الشاشة مباشرة، بعيداً عن انعكاس أعمدة RTL.
 # الشعار في منتصف الصفحة، ولا نستخدم وسوماً غير مغلقة.
-_bank_title = 'SNB' if st.session_state.selected_bank == 'SNB' else ''
-_bank_subtitle = '(30-60-NPL)' if st.session_state.selected_bank == 'SNB' else ''
+# Keep EJADA centered; no duplicate green bank title above the bank selectors.
 st.markdown(f"""
 <div class="ejada-header" style="position:relative;width:100%;height:72px;margin-top:-54px;direction:ltr;pointer-events:none;z-index:1;">
-  <div style="position:absolute;left:12px;right:auto;top:9px;text-align:left;direction:ltr;color:{snb_green};font-weight:900;white-space:nowrap;">
-    <div style="font-size:22px;">{_bank_title}</div>
-    <div style="font-size:14px;">{_bank_subtitle}</div>
-  </div>
   <div style="position:absolute;left:50%;top:0;transform:translateX(-50%);text-align:center;line-height:1.03;white-space:nowrap;">
     <div style="color:{header_logo_color};font-size:43px;font-weight:900;font-family:Tahoma,sans-serif;">إجـــادة</div>
     <div style="color:{header_logo_color};font-size:18px;letter-spacing:9px;font-weight:900;">EJADA</div>
@@ -875,6 +870,13 @@ if st.session_state.current_page not in ('Overview', 'Home'):
         st.button('🏦 SNB', key='bank_SNB',
                   type='primary' if st.session_state.selected_bank == 'SNB' else 'secondary',
                   use_container_width=False, on_click=set_bank, args=('SNB',))
+        if st.session_state.selected_bank == 'SNB':
+            st.markdown(
+                f'<div style="color:{snb_green};font-size:19px;font-weight:900;'
+                'width:116px;text-align:center;direction:ltr;white-space:nowrap;'
+                'margin-top:-12px;">(30-60-NPL)</div>',
+                unsafe_allow_html=True
+            )
     with bank_stc_col:
         st.button('🏦 STC', key='bank_STC',
                   type='primary' if st.session_state.selected_bank == 'STC' else 'secondary',
@@ -5145,7 +5147,7 @@ bank_files = st.session_state.page_files[selected_bank]
 curr_page = st.session_state.current_page
 
 def render_report_upload_bar(page):
-    """Keep the report title and its compact file uploader in the SAME row."""
+    """Show a compact uploader on the far right, beside its report title."""
     titles = {
         'Promises': '🤝 إدارة ومتابعة الوعود (القائمة والمكسورة)',
         'Neglect': '🚨 تقرير الإهمال',
@@ -5155,30 +5157,24 @@ def render_report_upload_bar(page):
     uploader_version = st.session_state.report_uploader_versions[selected_bank][page]
 
     with st.container(key=f"report_upload_bar_{selected_bank}_{page}"):
-        # Real columns keep the title and uploader on the same horizontal row.
-        # Text box has fit-content width, not a page-wide border.
-        _right_gap, title_col, upload_col, action_col, _left_gap = st.columns(
-            [2.6, 3.4, 1.65, 0.95, 1.4], gap='small'
+        # First column is on the right because the app layout uses RTL.
+        upload_col, title_col, action_col, _left_spacer = st.columns(
+            [1.6, 3.3, 1.1, 4.0], gap='small'
         )
-        with title_col:
-            title_font_size = 24 if page == 'Promises' else 20
+        with upload_col:
+            if current_files:
+                file_names = "، ".join(_xml_escape(x.name) for x in current_files)
+                upload_message = f"الملف الحالي: {file_names}"
+            else:
+                upload_message = "مفيش ملف مرفوع لسه يا رنا"
             st.markdown(
-                f"""
-                <div style="height:54px;display:flex;align-items:center;
-                            justify-content:center;direction:rtl;">
-                    <div style="display:inline-flex;align-items:center;justify-content:center;
-                                background:{card_color};border:1px solid {border_color};
-                                border-radius:9px;padding:8px 14px;width:fit-content;
-                                max-width:100%;white-space:nowrap;color:{text_color};
-                                font-weight:900;font-size:{title_font_size}px;">
-                        {titles[page]}
-                    </div>
-                </div>
-                """,
+                f'<div style="color:{label_color};font-size:17px;font-weight:900;'
+                'text-align:right;direction:rtl;white-space:nowrap;'
+                'width:100%;margin:0 0 6px 0;">'
+                f'{upload_message}</div>',
                 unsafe_allow_html=True
             )
 
-        with upload_col:
             new_files = st.file_uploader(
                 f"رفع ملف {titles[page]}",
                 type=['xlsx', 'csv'],
@@ -5193,15 +5189,27 @@ def render_report_upload_bar(page):
                     bank_files[page] = new_files
                     st.rerun()
             elif current_files:
-                # Clearing uploader via X must also clear stored page files.
                 bank_files[page] = None
                 st.session_state.report_uploader_versions[selected_bank][page] += 1
                 st.rerun()
 
-            if current_files:
-                st.caption("الملف الحالي: " + "، ".join(x.name for x in current_files))
-            else:
-                st.caption("مفيش ملف مرفوع لسه يا رنا")
+        with title_col:
+            title_font_size = 24 if page == 'Promises' else 20
+            st.markdown(
+                f"""
+                <div style="height:81px;display:flex;align-items:center;
+                            justify-content:flex-start;direction:rtl;">
+                    <div style="display:inline-flex;align-items:center;justify-content:center;
+                                background:{card_color};border:1px solid {border_color};
+                                border-radius:9px;padding:8px 14px;width:fit-content;
+                                max-width:100%;white-space:nowrap;color:{text_color};
+                                font-weight:900;font-size:{title_font_size}px;">
+                        {titles[page]}
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
         with action_col:
             if current_files:
@@ -5616,6 +5624,13 @@ if curr_page == 'Overview':
             on_click=set_bank,
             args=('SNB',)
         )
+        if selected_bank == 'SNB':
+            st.markdown(
+                f'<div style="color:{snb_green};font-size:19px;font-weight:900;'
+                'width:116px;text-align:center;direction:ltr;white-space:nowrap;'
+                'margin-top:-12px;">(30-60-NPL)</div>',
+                unsafe_allow_html=True
+            )
     with overview_stc_col:
         st.button(
             '🏦 STC',
