@@ -791,16 +791,16 @@ st.markdown(f"""
         justify-content: center;
     }}
     /* Dedicated report header: compact inline title, responsive upload box. */
-    [class*="st-key-report_upload_bar_"] {
+    [class*="st-key-report_upload_bar_"] {{
         width: 100% !important;
-    }
-    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploader"] {
+    }}
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploader"] {{
         width: 100% !important;
         min-width: 0 !important;
         margin: 0 !important;
         overflow: visible !important;
-    }
-    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] {
+    }}
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] {{
         box-sizing: border-box !important;
         height: auto !important;
         min-height: 64px !important;
@@ -811,8 +811,8 @@ st.markdown(f"""
         background-color: #FFFFFF !important;
         border-radius: 9px !important;
         overflow: hidden !important;
-    }
-    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] > div {
+    }}
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] > div {{
         display: flex !important;
         min-height: 46px !important;
         height: auto !important;
@@ -822,25 +822,25 @@ st.markdown(f"""
         flex-wrap: wrap !important;
         gap: 5px !important;
         overflow: hidden !important;
-    }
+    }}
     [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzoneInstructions"],
-    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] small {
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] small {{
         display: none !important;
-    }
-    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] button {
+    }}
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] button {{
         height: 38px !important;
         min-height: 38px !important;
         font-size: 15px !important;
         padding: 5px 15px !important;
         margin: 0 auto !important;
-    }
+    }}
     /* The uploaded name is shown above in a dedicated ellipsized line;
        hide Streamlit's duplicate list to prevent overlapping file chips. */
     [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderFile"],
-    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderFileList"] {
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderFileList"] {{
         display: none !important;
-    }
-    [class*="st-key-report_upload_bar_"] .ejada-upload-name {
+    }}
+    [class*="st-key-report_upload_bar_"] .ejada-upload-name {{
         width: 100%;
         max-width: 100%;
         white-space: nowrap;
@@ -852,8 +852,8 @@ st.markdown(f"""
         font-weight: 900;
         min-height: 25px;
         line-height: 25px;
-    }
-    div[class*="st-key-small_clear_report_"] button {
+    }}
+    div[class*="st-key-small_clear_report_"] button {{
         width: 34px !important;
         min-width: 34px !important;
         height: 36px !important;
@@ -865,44 +865,44 @@ st.markdown(f"""
         border: 0 !important;
         font-size: 19px !important;
         font-weight: 900 !important;
-    }
-    div[class*="st-key-small_clear_report_"] button p {
+    }}
+    div[class*="st-key-small_clear_report_"] button p {{
         color: #FFFFFF !important;
         font-size: 19px !important;
         font-weight: 900 !important;
-    }
+    }}
 
     /* Compact promise diagnostic with smaller bold labels and centered heading. */
-    div[class*="st-key-promise_diagnostic_"] {
+    div[class*="st-key-promise_diagnostic_"] {{
         width: min(1050px, 96%) !important;
         max-width: 1050px !important;
         margin: 8px auto 12px !important;
-    }
-    div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] {
+    }}
+    div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] {{
         width: 100% !important;
         max-width: 100% !important;
         margin: 0 auto !important;
         box-sizing: border-box !important;
-    }
-    div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] summary {
+    }}
+    div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] summary {{
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
         direction: rtl !important;
         text-align: center !important;
         min-height: 44px !important;
-    }
-    div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] summary p {
+    }}
+    div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] summary p {{
         font-size: 16px !important;
         font-weight: 900 !important;
         text-align: center !important;
         line-height: 1.45 !important;
         color: #1F4373 !important;
-    }
-    div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
+    }}
+    div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] {{
         padding: 8px 10px !important;
-    }
-    table.ejada-diagnostic-table {
+    }}
+    table.ejada-diagnostic-table {{
         width: 100%;
         border-collapse: collapse;
         table-layout: fixed;
@@ -911,27 +911,27 @@ st.markdown(f"""
         font-weight: 800;
         color: #1F4373;
         background: #FFFFFF;
-    }
+    }}
     table.ejada-diagnostic-table th,
-    table.ejada-diagnostic-table td {
+    table.ejada-diagnostic-table td {{
         padding: 7px 10px;
         border-bottom: 1px solid #D5DEEB;
         font-size: 13px;
         font-weight: 800;
         white-space: normal;
         overflow-wrap: anywhere;
-    }
+    }}
     table.ejada-diagnostic-table th:first-child,
-    table.ejada-diagnostic-table td:first-child {
+    table.ejada-diagnostic-table td:first-child {{
         width: 76%;
         text-align: right;
-    }
+    }}
     table.ejada-diagnostic-table th:last-child,
-    table.ejada-diagnostic-table td:last-child {
+    table.ejada-diagnostic-table td:last-child {{
         width: 24%;
         text-align: left;
         font-variant-numeric: tabular-nums;
-    }
+    }}
 </style>
 """, unsafe_allow_html=True)
 
