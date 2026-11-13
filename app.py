@@ -1466,141 +1466,121 @@ st.markdown(f"""
         border-radius: 8px !important;
     }}
 
-    /* SNB Activity: the native navy X remains; + and the uploaded file sit on ONE line. */
+
+    /* Activity uploaders: RESTORE the native Streamlit 2026 file chips and add button.
+       The uploaded filename, native navy X, and native plus are INSIDE the dropzone.
+       Never force the entire dropzone to a 36px square! */
     div[class*="st-key-activity_model_upload_card"],
     div[class*="st-key-activity_file_upload_card"] {{
-        max-width: 288px !important;
-        min-width: 0 !important;
-        margin: 0 auto !important;
-    }}
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-activity_model_upload_card),
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-activity_file_upload_card) {{
-        max-width: 288px !important;
+        box-sizing: border-box !important;
         width: 100% !important;
+        max-width: 315px !important;
         min-width: 0 !important;
-        height: auto !important;
-        min-height: 0 !important;
-        padding: 6px 8px !important;
         margin-left: auto !important;
         margin-right: auto !important;
     }}
-    /* Both cards: use Streamlit's real file deletion X, not an extra custom X. */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-activity_model_upload_card),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-activity_file_upload_card) {{
+        box-sizing: border-box !important;
+        width: 100% !important;
+        max-width: 315px !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        height: auto !important;
+        padding: 7px 9px !important;
+        margin: 0 auto !important;
+    }}
     div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploader"],
     div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploader"] {{
-        display: flex !important;
-        flex-direction: row !important;
-        align-items: center !important;
-        justify-content: flex-start !important;
-        gap: 5px !important;
+        box-sizing: border-box !important;
+        display: block !important;
         direction: ltr !important;
         width: 100% !important;
         min-width: 0 !important;
         max-width: 100% !important;
     }}
-    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploader"] > label,
-    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploader"] > label {{
-        display: none !important;
-    }}
-    /* Turn the browse area into a compact functional + button. */
     div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderDropzone"],
     div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderDropzone"] {{
-        order: 0 !important;
-        flex: 0 0 36px !important;
-        width: 36px !important;
-        min-width: 36px !important;
-        max-width: 36px !important;
-        height: 36px !important;
-        min-height: 36px !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        background: #FFFFFF !important;
-        border: 1px solid #1F4373 !important;
-        border-radius: 7px !important;
-        overflow: hidden !important;
-    }}
-    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderDropzone"] > div,
-    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderDropzone"] > div {{
+        box-sizing: border-box !important;
         display: flex !important;
-        align-items: center !important;
+        flex-flow: row nowrap !important;
         justify-content: center !important;
-        height: 100% !important;
-        min-height: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
+        align-items: center !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        min-height: 54px !important;
+        height: auto !important;
+        max-height: none !important;
+        padding: 7px 8px !important;
+        overflow: visible !important;
     }}
-    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderDropzoneInstructions"],
-    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderDropzoneInstructions"],
-    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderDropzone"] small,
-    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderDropzone"] small {{
-        display: none !important;
-    }}
+    /* Do NOT hide the original upload button or its icon. */
     div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderDropzone"] button,
     div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderDropzone"] button {{
-        position: relative !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        width: 34px !important;
-        min-width: 34px !important;
-        height: 34px !important;
-        min-height: 34px !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        border: 0 !important;
-        border-radius: 7px !important;
-        box-shadow: none !important;
-        background: #FFFFFF !important;
-        color: transparent !important;
-        font-size: 0 !important;
-        cursor: pointer !important;
+        font-size: inherit !important;
+        color: #1F4373 !important;
+        visibility: visible !important;
+        text-indent: 0 !important;
     }}
     div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderDropzone"] button *,
     div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderDropzone"] button * {{
-        font-size: 0 !important;
-        visibility: hidden !important;
-    }}
-    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderDropzone"] button::after,
-    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderDropzone"] button::after {{
-        content: "+" !important;
-        position: absolute !important;
-        inset: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        font-size: 25px !important;
-        font-weight: 500 !important;
-        line-height: 1 !important;
-        color: #1F4373 !important;
+        font-size: inherit !important;
         visibility: visible !important;
     }}
-    /* Native file row takes the remaining space, with its original navy X. */
-    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderFileList"],
-    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderFileList"] {{
-        display: block !important;
-        order: 1 !important;
-        flex: 1 1 auto !important;
-        width: auto !important;
-        min-width: 0 !important;
+    /* The redesigned uploader renders both native X and native plus inside stFileChips. */
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileChips"],
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileChips"] {{
+        display: flex !important;
+        flex-flow: row nowrap !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 5px !important;
+        width: 100% !important;
         max-width: 100% !important;
+        min-width: 0 !important;
+        overflow: visible !important;
+    }}
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileChips"] > ul,
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileChips"] > ul {{
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        width: auto !important;
+        max-width: calc(100% - 35px) !important;
         margin: 0 !important;
         padding: 0 !important;
-    }}
-    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderFile"],
-    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderFile"] {{
         display: flex !important;
-        align-items: center !important;
-        box-sizing: border-box !important;
-        width: 100% !important;
-        min-width: 0 !important;
-        min-height: 36px !important;
-        max-width: 100% !important;
+        flex-flow: row nowrap !important;
+    }}
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileChips"] > button,
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileChips"] > button {{
+        flex: 0 0 28px !important;
+        min-width: 28px !important;
+        width: 28px !important;
+        height: 28px !important;
+        min-height: 28px !important;
         margin: 0 !important;
-        padding: 2px 4px !important;
+        padding: 2px !important;
+    }}
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileChip"],
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileChip"] {{
+        box-sizing: border-box !important;
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
         overflow: hidden !important;
     }}
-    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderFile"] > *,
-    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderFile"] > * {{
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileChip"] > div,
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileChip"] > div {{
         min-width: 0 !important;
+    }}
+    div[class*="st-key-activity_model_upload_card"] [data-testid="stFileChipName"],
+    div[class*="st-key-activity_file_upload_card"] [data-testid="stFileChipName"] {{
+        display: block !important;
+        max-width: 120px !important;
+        white-space: nowrap !important;
+        text-overflow: ellipsis !important;
+        overflow: hidden !important;
     }}
     /* Bank buttons and report navigation now share a single parent row. */
     .stApp [data-testid="stHorizontalBlock"]:has(.st-key-bank_SNB) > [data-testid="stColumn"]:last-child {{
