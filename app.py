@@ -7115,22 +7115,32 @@ def _snb_review_new_notes(notes, mapping, manual, conflicted=0):
 
 
 def _snb_review_trigger_reasons(note):
-    """Return the special-review triggers found in Notes only.
+    """Return reasons requiring row-by-row manual classification.
 
-    'تم' and 'معالج' are standalone Arabic words; a fragment inside a longer
-    word (such as 'تمام') must NOT create a false-positive review.
+    The word «تم» by itself requires review, EXCEPT for payment or debit
+    phrases that should be evaluated by exact match with the activity model.
+    A slash or «معالج» still forces review, even in those phrases.
     """
     value = "" if pd.isna(note) else str(note)
     reasons = []
     if "/" in value:
         reasons.append("/ أو //")
-    # Boundary checks use Unicode-aware word characters (including Arabic).
     if re.search(r"(?<!\w)معالج(?!\w)", value):
         reasons.append("معالج")
-    if re.search(r"(?<!\w)تم(?!\w)", value):
+
+    # These established payment messages must use their exact model rating,
+    # not a new manual review just because they contain the word «تم».
+    # The discount/withdrawal exemption is specifically for text starting
+    # with «تم خصم» or «تم سحب», including later details or amounts.
+    normalized = re.sub(r"\s+", " ", value).strip()
+    payment_from_model = bool(
+        re.search(r"(?<!\w)تم\s+سداد\s+جزء(?!\w)", normalized)
+        or re.search(r"(?<!\w)تم\s+السداد(?!\w)", normalized)
+        or re.match(r"تم\s+(?:خصم|سحب)(?!\w)", normalized)
+    )
+    if not payment_from_model and re.search(r"(?<!\w)تم(?!\w)", value):
         reasons.append("تم")
     return reasons
-
 
 def _snb_special_review_mask(notes):
     """Rows requiring explicit evaluation even when their Note matches the model."""
@@ -7188,8 +7198,9 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload):
         expanded=True
     ):
         st.warning(
-            "تم تحديد الصفوف التي تحتوي على / أو // أو الكلمتين «معالج» أو «تم». "
-            "راجعي كل صف حتى لو طابق موديل النشاط."
+            "تم تحديد الصفوف التي تحتوي على / أو // أو «معالج» أو «تم» "
+            "(باستثناء الإفادات الخاصة بالسداد والخصم والسحب التي تُقيَّم من الموديل). "
+            "راجعي كل صف ظاهر حتى لو طابق موديل النشاط."
         )
         st.markdown(
             "**اختاري من أول عمود «احسب المكالمة»: ناجحة أو غير ناجحة، "
