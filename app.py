@@ -1791,7 +1791,9 @@ if st.session_state.current_page not in ('Overview', 'Home'):
     with nav_col:
         _render_ejada_main_navigation()
 elif st.session_state.current_page == 'Overview':
-    # Render original Overview upload widgets into the top navigation area.
+    # Overview must always expose navigation back to the three report pages.
+    # Place the original upload widgets directly below this navigation row.
+    _render_ejada_main_navigation()
     _overview_upload_header = st.container(key="overview_upload_header")
 else:
     _render_ejada_main_navigation()
