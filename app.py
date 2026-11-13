@@ -5065,7 +5065,7 @@ def render_report_upload_bar(page):
 
     with st.container(key=f"report_upload_bar_{selected_bank}_{page}"):
         if page == 'Promises':
-            # العنوان في منتصف الصفحة وبحجم أكبر.
+            # العنوان يفضل في منتصف الصفحة وبحجم كبير.
             st.markdown(
                 f"""
                 <div style="display:flex;justify-content:center;align-items:center;
@@ -5082,10 +5082,32 @@ def render_report_upload_bar(page):
                 unsafe_allow_html=True
             )
 
-            # خانة الرفع أصغر ومتمركزة، وزر الإزالة بجانبها.
-            left_space, compact_group, right_space = st.columns([3.1, 3.8, 3.1], gap='small')
-            with compact_group:
-                upload_col, action_col = st.columns([3.2, 1.2], gap='small')
+            # خانة الرفع في أقصى يمين الصفحة. الرسالة تظهر مرة واحدة فقط فوقها.
+            upload_group, page_spacer = st.columns([3.0, 7.0], gap='small')
+
+            with upload_group:
+                if current_files:
+                    st.markdown(
+                        f"""
+                        <div style="text-align:center;direction:rtl;color:{label_color};
+                                    font-size:15px;font-weight:900;margin:0 0 6px;">
+                            الملف الحالي: {"، ".join(x.name for x in current_files)}
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+                else:
+                    st.markdown(
+                        f"""
+                        <div style="text-align:center;direction:rtl;color:{label_color};
+                                    font-size:18px;font-weight:900;margin:0 0 7px;">
+                            مفيش ملف مرفوع لسه يا رنا
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                upload_col, action_col = st.columns([3.3, 1.25], gap='small')
 
                 with upload_col:
                     new_files = st.file_uploader(
@@ -5102,14 +5124,10 @@ def render_report_upload_bar(page):
                             bank_files[page] = new_files
                             st.rerun()
                     elif current_files:
+                        # إزالة كل الملفات من علامة × داخل الـ uploader تمسح الحالة القديمة أيضاً.
                         bank_files[page] = None
                         st.session_state.report_uploader_versions[selected_bank][page] += 1
                         st.rerun()
-
-                    if current_files:
-                        st.caption("الملف الحالي: " + "، ".join(x.name for x in current_files))
-                    else:
-                        st.caption("مفيش ملف مرفوع لسه يا رنا")
 
                 with action_col:
                     if current_files:
@@ -5121,23 +5139,7 @@ def render_report_upload_bar(page):
                             use_container_width=True,
                             help="إزالة الملف الحالي ورفع ملف آخر"
                         )
-                    else:
-                        st.markdown(
-                            "<div style='height:42px;display:flex;align-items:center;"
-                            "justify-content:center;font-weight:800;color:#586F8C;'>—</div>",
-                            unsafe_allow_html=True
-                        )
 
-            if not current_files:
-                st.markdown(
-                    f"""
-                    <div style="text-align:center;direction:rtl;color:{label_color};
-                                font-size:17px;font-weight:900;margin:4px 0 2px;">
-                        مفيش ملف مرفوع لسه يا رنا
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
             return
 
         # باقي التقارير تحتفظ بالتخطيط الحالي.
@@ -5769,8 +5771,6 @@ if page_uploaded is None:
                     <div style="color:{text_color};font-size:28px;font-weight:900;margin-top:5px;">0</div>
                 </div>
             </div>
-            <div style="text-align:center;color:{label_color};font-weight:900;font-size:17px;
-                        direction:rtl;margin-top:8px;">مفيش ملف مرفوع لسه يا رنا</div>
             """,
             unsafe_allow_html=True
         )
