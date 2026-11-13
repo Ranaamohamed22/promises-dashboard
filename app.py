@@ -5027,10 +5027,89 @@ def clear_overview_upload(bank, report_kind):
         st.session_state.overview_uploads[bank][report_kind] = []
     st.session_state.overview_uploader_versions[bank][report_kind] += 1
 
+# نسخة مستقلة لخانة رفع كل تقرير، عشان زر الإزالة يفضّي الـ widget فعلياً.
+if 'report_uploader_versions' not in st.session_state:
+    st.session_state.report_uploader_versions = {
+        b: {page: 0 for page in ('Promises', 'Neglect', 'Activity')}
+        for b in BANKS
+    }
+else:
+    for b in BANKS:
+        st.session_state.report_uploader_versions.setdefault(
+            b, {page: 0 for page in ('Promises', 'Neglect', 'Activity')}
+        )
+        for page in ('Promises', 'Neglect', 'Activity'):
+            st.session_state.report_uploader_versions[b].setdefault(page, 0)
+
+def clear_report_page_file(bank, page):
+    st.session_state.page_files[bank][page] = None
+    st.session_state.report_uploader_versions[bank][page] += 1
+
 selected_bank = st.session_state.selected_bank
 bank_files = st.session_state.page_files[selected_bank]
 
 curr_page = st.session_state.current_page
+
+def render_report_upload_bar(page):
+    titles = {
+        'Promises': '🤝 إدارة ومتابعة الوعود (القائمة والمكسورة)',
+        'Neglect': '🚨 تقرير الإهمال',
+        'Activity': '📈 تقرير نشاط المحصلين',
+    }
+    current_files = bank_files.get(page) or []
+    uploader_version = st.session_state.report_uploader_versions[selected_bank][page]
+
+    with st.container(key=f"report_upload_bar_{selected_bank}_{page}"):
+        title_col, upload_col, action_col = st.columns([3.0, 5.2, 1.8], gap='small')
+
+        with title_col:
+            st.markdown(
+                f"<div style='height:58px;box-sizing:border-box;background:{card_color};"
+                f"border:1px solid {border_color};border-radius:9px;display:flex;"
+                f"align-items:center;justify-content:center;padding:6px 12px;"
+                f"color:{text_color};font-weight:900;font-size:18px;"
+                f"white-space:nowrap;direction:rtl;'>{titles[page]}</div>",
+                unsafe_allow_html=True
+            )
+
+        with upload_col:
+            new_files = st.file_uploader(
+                f"رفع ملف {titles[page]}",
+                type=['xlsx', 'csv'],
+                accept_multiple_files=True,
+                label_visibility='collapsed',
+                key=f"report_uploader_{selected_bank}_{page}_{uploader_version}"
+            )
+            if new_files:
+                new_sig = [(x.name, x.size) for x in new_files]
+                current_sig = [(x.name, x.size) for x in current_files]
+                if new_sig != current_sig:
+                    bank_files[page] = new_files
+                    st.rerun()
+
+            if current_files:
+                st.caption("الملف الحالي: " + "، ".join(x.name for x in current_files))
+            else:
+                st.caption("لم يتم رفع ملف بعد.")
+
+        with action_col:
+            if current_files:
+                st.button(
+                    "🗑️ إزالة الملف",
+                    key=f"clear_report_file_{selected_bank}_{page}",
+                    on_click=clear_report_page_file,
+                    args=(selected_bank, page),
+                    use_container_width=True,
+                    help="إزالة الملف الحالي ورفع ملف آخر"
+                )
+            else:
+                st.markdown(
+                    "<div style='height:38px;display:flex;align-items:center;"
+                    "justify-content:center;font-weight:800;color:#586F8C;'>جاهز للرفع</div>",
+                    unsafe_allow_html=True
+                )
+
+# دالة معالجة بيانات أي صفحة
 
 # دالة معالجة بيانات أي صفحة
 def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, promises_files=None):
@@ -5386,7 +5465,7 @@ def render_activity_header():
     """, unsafe_allow_html=True)
 
 def render_activity_boxes(activity_base_df=None):
-    col_model, col_file, col_coll = st.columns([1, 1, 1], gap="medium")
+    col_model, col_coll = st.columns([1, 1], gap="medium")
 
     with col_model:
         with st.container(border=True):
@@ -5404,28 +5483,6 @@ def render_activity_boxes(activity_base_df=None):
                 if uploaded_mapping_file is not None
                 else st.session_state.overview_uploads[selected_bank].get('ActivityModel')
             )
-
-    with col_file:
-        with st.container(border=True):
-            cur_files = bank_files.get('Activity') or []
-            if cur_files:
-                cur_names = "، ".join(f.name for f in cur_files)
-                hdr_col1, hdr_col2 = st.columns([8.5, 1.5])
-                with hdr_col1:
-                    st.markdown(f"<p style='font-size: 13px; color: {input_text}; direction: rtl; text-align: right; margin: 0; font-weight: bold;'>الملف الحالي: {cur_names}</p>", unsafe_allow_html=True)
-                with hdr_col2:
-                    st.button("✖", key="clear_act_files_btn", on_click=clear_activity_files, help="إزالة الملف المرفوع")
-            else:
-                st.markdown(f"<p style='font-size: 13px; color: {input_text}; direction: rtl; text-align: right; margin: 0 0 2px 0; font-weight: bold;'>الملف الحالي: لسه ما اترفعش ملف</p>", unsafe_allow_html=True)
-
-            uploader_key = f"uploader_inpage_{selected_bank}_Activity_{st.session_state.act_uploader_ver[selected_bank]}"
-            new_files = st.file_uploader("ارفعي الملف هنا يا رنا", type=["xlsx", "csv"], accept_multiple_files=True, key=uploader_key)
-            if new_files:
-                new_sig = [(f.name, f.size) for f in new_files]
-                cur_sig = [(f.name, f.size) for f in cur_files]
-                if new_sig != cur_sig:
-                    bank_files['Activity'] = new_files
-                    st.rerun()
 
     collector_col_name = None
     selected_collector = "الكل (جميع المحصلين)"
@@ -5562,6 +5619,9 @@ if curr_page == 'Overview':
     overview_combined_files = (overview_activity_files or []) + (overview_promises_files or [])
     bank_files['Overview'] = overview_combined_files if overview_combined_files else None
 
+if curr_page in ('Promises', 'Neglect', 'Activity'):
+    render_report_upload_bar(curr_page)
+
 page_uploaded = bank_files[curr_page]
 
 if page_uploaded is None:
@@ -5581,17 +5641,10 @@ if page_uploaded is None:
         </div>
         """, unsafe_allow_html=True)
     elif curr_page == 'Activity':
-        render_activity_header()
         render_activity_boxes(None)
-        st.markdown(f"<p style='color: {label_color}; font-weight: 800; font-size: 16px; text-align: right; direction: rtl; margin-top: 10px;'>ارفعي ملف النشاط من الخانة اللي فوق عشان يظهر التقرير.</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color:{label_color};font-weight:800;font-size:15px;text-align:right;direction:rtl;margin-top:8px;'>ارفعي ملف النشاط من الخانة اللي فوق لعرض التقرير.</p>", unsafe_allow_html=True)
     else:
-        st.markdown(f"<p style='color: {label_color}; font-weight: 800; font-size: 18px; text-align: right; direction: rtl; margin-top: 20px;'>ارفعي الملفات هنا ي رنا</p>", unsafe_allow_html=True)
-        col_up1, col_up2 = st.columns([7, 3])
-        with col_up1:
-            files_in = st.file_uploader("ارفعي الملفات هنا ي رنا", type=["xlsx"], accept_multiple_files=True, label_visibility="collapsed", key=f"uploader_{selected_bank}_{curr_page}")
-            if files_in:
-                bank_files[curr_page] = files_in
-                st.rerun()
+        st.markdown(f"<p style='color:{label_color};font-weight:800;font-size:15px;text-align:right;direction:rtl;margin-top:8px;'>ارفعي الملف من الخانة اللي فوق لعرض التقرير.</p>", unsafe_allow_html=True)
 else:
     if curr_page == 'Overview':
         active_promises_df, broken_promises_df, neglect_df, activity_base_df, report_bytes, total_rows, total_unhandled, active_count, broken_count, neglect_count, total_activity_count = process_page_data(
@@ -5758,12 +5811,6 @@ else:
             st.download_button(label="📥 تحميل التقرير الكامل.xlsx", data=report_bytes, file_name=f"{selected_bank}_Daily_Promises_Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
     elif curr_page == 'Promises':
-        st.markdown(f"""
-        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; text-align: right; margin-bottom: 20px;">
-            <h3 style="margin:0; color:#1F4373; font-weight:900;">🤝 إدارة ومتابعة الوعود (القائمة والمكسورة)</h3>
-        </div>
-        """, unsafe_allow_html=True)
-        
         tab_active, tab_broken = st.tabs([f"✅ الوعود القائمة ({active_count:,})", f"⚠️ الوعود المكسورة ({broken_count:,})"])
         
         with tab_active:
@@ -5839,11 +5886,6 @@ else:
             )
         
     elif curr_page == 'Neglect':
-        st.markdown(f"""
-        <div style="background-color: {card_color}; border-radius: 12px; padding: 20px; border: 1px solid {border_color}; direction:rtl; text-align: right; margin-bottom: 20px;">
-            <h3 style="margin:0; color:#586F8C; font-weight:900;">🚨 تقرير الإهمال (تأخير أكثر من 3 أيام)</h3>
-        </div>
-        """, unsafe_allow_html=True)
         default_sub_states = ['وعد بسداد مبلغ المعالجة', 'واعد بسداد مبلغ المعالجه', 'رافض السداد', 'الجوال مغلق', 'مماطل', 'تم سداد جزء وليس مبلغ المعالجه', 'لا يجيب', 'متقاعد الراتب علي بنك آخر', 'يرغب بجدوله المديونيه']
         selected_sub_states = st.multiselect("فلاتر الـ Sub State المشمولة:", options=default_sub_states, default=default_sub_states, key=f"neglect_states_{selected_bank}")
         sub_col = 'Sub State' if 'Sub State' in neglect_df.columns else 'sub state' if 'sub state' in neglect_df.columns else None
@@ -5855,7 +5897,6 @@ else:
     # صفحة تقرير النشاط
     # ==========================================
     elif curr_page == 'Activity':
-        render_activity_header()
         selected_collector, mapping_file, collector_col_name = render_activity_boxes(activity_base_df)
 
         filter_act_col1, filter_act_col2, filter_act_col3, filter_act_col4 = st.columns([1.5, 2, 1.5, 1.5])
