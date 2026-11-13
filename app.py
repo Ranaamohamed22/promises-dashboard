@@ -5840,10 +5840,283 @@ else:
 
 
 def save_activity_page_upload(bank, kind, widget_key):
-    """Persist only the uploaded file; don't run the old Activity analytics."""
+    """Save independently for each bank; None means the upload was cleared."""
     st.session_state.activity_page_uploads[bank][kind] = st.session_state.get(
         widget_key
     )
+
+
+def _prepare_snb_activity_file(uploaded_file):
+    """Read SNB activity and deduplicate on Debitor+Notes+Collector as a unit.
+
+    Notes is the "إفادة" field. Preserve Created on and insert a 12-hour Time
+    column immediately after it. No original file is modified.
+    """
+    file_name = uploaded_file.name
+    file_bytes = uploaded_file.getvalue()
+    if file_name.lower().endswith(".csv"):
+        try:
+            frame = pd.read_csv(
+                io.BytesIO(file_bytes), dtype=str, encoding="utf-8-sig",
+                low_memory=False
+            )
+        except UnicodeDecodeError:
+            frame = pd.read_csv(
+                io.BytesIO(file_bytes), dtype=str, encoding="cp1256",
+                low_memory=False
+            )
+    else:
+        frame = pd.read_excel(io.BytesIO(file_bytes), dtype=str)
+
+    frame.columns = frame.columns.astype(str).str.strip()
+
+    def resolve(*aliases):
+        column_map = {
+            re.sub(r"[\s_]+", "", str(col)).casefold(): col
+            for col in frame.columns
+        }
+        for alias in aliases:
+            actual = column_map.get(
+                re.sub(r"[\s_]+", "", alias).casefold()
+            )
+            if actual is not None:
+                return actual
+        return None
+
+    debitor = resolve("Debitor", "Debtor")
+    notes = resolve("Notes", "Note", "الإفادة", "افادة")
+    collector = resolve("Collector", "Collecter")
+    created = resolve("Created on", "Created_on", "CreatedOn")
+    missing = [
+        label for label, col in [
+            ("Debitor", debitor), ("Notes (الإفادة)", notes),
+            ("Collector", collector), ("Created on", created)
+        ] if col is None
+    ]
+    if missing:
+        raise ValueError("الأعمدة المطلوبة غير موجودة: " + "، ".join(missing))
+
+    source_count = len(frame)
+    # Key normalization is used for comparison ONLY; original values remain.
+    key_columns = [
+        "__ejada_key_debitor", "__ejada_key_notes",
+        "__ejada_key_collector"
+    ]
+    for key, col in zip(key_columns, [debitor, notes, collector]):
+        frame[key] = frame[col].fillna("").astype(str).str.strip()
+    frame = (
+        frame.loc[~frame.duplicated(subset=key_columns, keep="first")]
+        .drop(columns=key_columns)
+        .copy()
+    )
+    duplicate_count = source_count - len(frame)
+
+    parsed = pd.to_datetime(frame[created], errors="coerce")
+    if len(frame) and parsed.notna().sum() == 0:
+        raise ValueError(
+            "تعذر قراءة أي تاريخ أو وقت من عمود Created on."
+        )
+    if "Time" in frame.columns:
+        frame = frame.drop(columns=["Time"])
+    frame.insert(
+        frame.columns.get_loc(created) + 1,
+        "Time",
+        parsed.dt.strftime("%I:%M:%S %p").fillna("")
+    )
+    frame["__ejada_parsed_created"] = parsed
+    return frame, source_count, duplicate_count
+
+
+def _infer_snb_daily_period(frame):
+    """Infer from Created on timestamps; ambiguous 14:00-16:00 is flagged."""
+    timestamps = frame["__ejada_parsed_created"].dropna()
+    if timestamps.empty:
+        return "full", False
+    latest_date = timestamps.max().normalize()
+    relevant = timestamps[
+        (timestamps >= latest_date - pd.Timedelta(days=1))
+    ]
+    minutes = relevant.dt.hour * 60 + relevant.dt.minute
+    # The first shift runs 14:00 -> midnight. A record at exactly
+    # 00:00 can belong to its preceding evening shift.
+    has_morning = ((minutes > 0) & (minutes < 720)).any()
+    has_noon = ((minutes >= 720) & (minutes < 840)).any()
+    has_evening = (minutes > 960).any()
+    has_midnight = (minutes == 0).any()
+    if has_morning:
+        return "full", False
+    if has_noon and has_evening:
+        return "full", False
+    if has_noon:
+        return "second", False
+    if has_evening or has_midnight:
+        return "first", False
+    # 14:00-16:00 belongs to both periods. Make it editable in the UI.
+    return "second", True
+
+
+def _filter_snb_activity_period(frame, activity_kind, daily_period):
+    """Use the latest Created on day as anchor; return data and exclusion count."""
+    valid = frame.dropna(subset=["__ejada_parsed_created"]).copy()
+    if valid.empty:
+        return valid, 0
+    timestamps = valid["__ejada_parsed_created"]
+    latest = timestamps.max()
+    day_start = latest.normalize()
+    excluded_final_hour = 0
+
+    if activity_kind == "يومي":
+        if daily_period == "first":
+            # Midnight at the END of the first shift can belong to yesterday.
+            if (
+                latest.hour == 0 and latest.minute == 0
+                and (
+                    (timestamps >= day_start - pd.Timedelta(hours=10))
+                    & (timestamps < day_start)
+                ).any()
+            ):
+                day_start -= pd.Timedelta(days=1)
+            lower = day_start + pd.Timedelta(hours=14)
+            upper = day_start + pd.Timedelta(days=1)
+            valid = valid[
+                (timestamps >= lower) & (timestamps <= upper)
+            ].copy()
+        elif daily_period == "second":
+            lower = day_start + pd.Timedelta(hours=12)
+            upper = day_start + pd.Timedelta(hours=16)
+            valid = valid[
+                (timestamps >= lower) & (timestamps <= upper)
+            ].copy()
+        else:
+            lower = day_start
+            upper = day_start + pd.Timedelta(days=1)
+            valid = valid[
+                (timestamps >= lower) & (timestamps < upper)
+            ].copy()
+
+        # ONLY the first and second daily periods lose their last hour.
+        # The "full day" selection retains every hour.
+        if daily_period in ("first", "second") and not valid.empty:
+            latest_period_call = valid["__ejada_parsed_created"].max()
+            last_hour_start = latest_period_call - pd.Timedelta(hours=1)
+            keep = valid["__ejada_parsed_created"] < last_hour_start
+            excluded_final_hour = int((~keep).sum())
+            valid = valid.loc[keep].copy()
+    elif activity_kind == "أسبوعي":
+        valid = valid[
+            timestamps >= day_start - pd.Timedelta(days=6)
+        ].copy()
+    elif activity_kind == "شهري":
+        valid = valid[
+            timestamps >= day_start - pd.Timedelta(days=29)
+        ].copy()
+
+    return valid, excluded_final_hour
+
+
+def render_snb_activity_report(model_upload, activity_upload):
+    """New minimal report: user period choice, deduplicated rows and Time column."""
+    # Both files are required before any SNB report controls are shown.
+    if model_upload is None or activity_upload is None:
+        st.info("ارفعي موديل النشاط وملف النشاط أولًا لعرض إعدادات التقرير.")
+        return
+
+    with st.container(key="snb_activity_work_area"):
+        st.markdown(
+            f'<h3 style="text-align:center;color:{label_color};'
+            'font-size:22px;font-weight:900;">'
+            'تقرير نشاط المحصلين | SNB</h3>',
+            unsafe_allow_html=True
+        )
+
+        activity_kind = st.selectbox(
+            "نوع النشاط",
+            options=["يومي", "أسبوعي", "شهري"],
+            key="snb_activity_kind_selector"
+        )
+        try:
+            prepared, original_rows, duplicates = _prepare_snb_activity_file(
+                activity_upload
+            )
+        except Exception as exc:
+            st.error(f"تعذر تجهيز ملف النشاط: {exc}")
+            return
+
+        valid_dates = int(
+            prepared["__ejada_parsed_created"].notna().sum()
+        )
+        invalid_dates = len(prepared) - valid_dates
+        period = "full"
+        if activity_kind == "يومي":
+            inferred, ambiguous = _infer_snb_daily_period(prepared)
+            options = {
+                "تلقائي حسب Created on": "auto",
+                "الفترة الأولى: 2:00 مساءً – 12:00 منتصف الليل": "first",
+                "الفترة الثانية: 12:00 ظهرًا – 4:00 عصرًا": "second",
+                "اليوم كله": "full"
+            }
+            choice = st.selectbox(
+                "الفترة اليومية",
+                options=list(options),
+                key="snb_activity_daily_period_selector"
+            )
+            period = inferred if options[choice] == "auto" else options[choice]
+            period_names = {
+                "first": "الفترة الأولى (2 مساءً – 12 منتصف الليل)",
+                "second": "الفترة الثانية (12 ظهرًا – 4 عصرًا)",
+                "full": "اليوم كله"
+            }
+            st.caption(
+                "الفترة المحددة من Created on: "
+                + period_names[period]
+                + " — استبعاد آخر ساعة"
+                if period in ("first", "second")
+                else "الفترة المحددة من Created on: اليوم كله — بدون استبعاد آخر ساعة"
+            )
+            if ambiguous and options[choice] == "auto":
+                st.warning(
+                    "أوقات الملف بين 2 و4 عصرًا تصلح للفترتين؛ "
+                    "راجعي اختيار الفترة اليومية وعدّليه عند الحاجة."
+                )
+
+        filtered, hour_excluded = _filter_snb_activity_period(
+            prepared, activity_kind, period
+        )
+        st.markdown(
+            f'<p style="color:{label_color};font-weight:800;direction:rtl;'
+            'text-align:right;font-size:15px;">'
+            f'صفوف الملف الأصلية: {original_rows:,} | '
+            f'التكرارات المحذوفة (Debitor + Notes + Collector): {duplicates:,} | '
+            f'صفوف الفترة: {len(filtered):,} | '
+            f'المستبعد من آخر ساعة: {hour_excluded:,} '
+            f'| تواريخ Created on غير الصالحة: {invalid_dates:,}'
+            '</p>',
+            unsafe_allow_html=True
+        )
+        st.caption("Notes = الإفادة. عمود Time مستخرج من Created on بصيغة AM/PM.")
+        result = filtered.drop(
+            columns=["__ejada_parsed_created"], errors="ignore"
+        )
+        if result.empty:
+            st.warning("لا توجد مكالمات ضمن الفترة المحددة بعد تطبيق القواعد.")
+            return
+
+        st.dataframe(
+            result,
+            use_container_width=True,
+            height=430,
+            hide_index=True
+        )
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+            result.to_excel(writer, index=False, sheet_name="Activity")
+        st.download_button(
+            "📥 تحميل ملف النشاط بعد إزالة التكرارات وإضافة Time",
+            data=buffer.getvalue(),
+            file_name=f"SNB_Activity_{activity_kind}_Processed.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="download_snb_activity_processed"
+        )
 
 
 selected_bank = st.session_state.selected_bank
@@ -6701,6 +6974,13 @@ if page_uploaded is None:
                 ]["activity"]
                 if activity_file is None and saved_activity is not None:
                     st.caption(f"الملف المحفوظ: {saved_activity.name}")
+
+        # The new Activity report is limited to SNB until STC rules are defined.
+        if selected_bank == 'SNB':
+            render_snb_activity_report(
+                st.session_state.activity_page_uploads[selected_bank]["model"],
+                st.session_state.activity_page_uploads[selected_bank]["activity"]
+            )
     else:
         st.markdown(f"<p style='color:{label_color};font-weight:800;font-size:15px;text-align:right;direction:rtl;margin-top:8px;'>ارفعي الملف من الخانة اللي فوق لعرض التقرير.</p>", unsafe_allow_html=True)
 else:
