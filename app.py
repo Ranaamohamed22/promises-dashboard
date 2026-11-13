@@ -286,14 +286,6 @@ st.markdown(f"""
         white-space: nowrap !important;
     }}
 
-    /* Keep a fixed ~1 cm visual gap (38 px) between navigation boxes. */
-    div.st-key-nav_home_btn,
-    div.st-key-nav_prom_btn,
-    div.st-key-nav_neg_btn {{
-        padding-left: 38px !important;
-        box-sizing: border-box !important;
-    }}
-
     /* Move the Streamlit cloud toolbar (Share / star / edit / GitHub / menu)
        to the far-left and keep all of its icons/text white. */
     header[data-testid="stHeader"] [data-testid="stToolbar"],
@@ -773,22 +765,23 @@ if st.session_state.current_page not in ('Overview', 'Home'):
 # ==========================================
 # 2. شريط التنقل
 # ==========================================
-# نجمع أزرار التقارير في كتلة واحدة متراصة بدل توزيعها على عرض الصفحة.
-nav_group, _nav_spacer = st.columns([3.2, 6.8], gap=None)
+# نجمع أزرار التقارير مع فواصل مستقلة بين الأزرار، حتى لا تقل مساحة النص.
+nav_group, _nav_spacer = st.columns([4.2, 5.8], gap=None)
 
 with nav_group:
-    nav_cols = st.columns([0.50, 2.45, 1.45, 1.00], gap=None)
+    # الأعمدة 1 و3 و5 فواصل مستقلة تقارب 1 سم بصرياً على شاشة الديسكتوب.
+    nav_cols = st.columns([0.50, 0.30, 2.60, 0.30, 1.55, 0.30, 1.05], gap=None)
 
     with nav_cols[0]:
         st.button("🏠", key="nav_home_btn", type="primary" if st.session_state.current_page == 'Home' else "secondary", use_container_width=True, on_click=set_page, args=('Home',), help="الرئيسية")
 
-    with nav_cols[1]:
+    with nav_cols[2]:
         st.button("🤝 الوعود القائمة والمكسورة", key="nav_prom_btn", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=True, on_click=set_page, args=('Promises',))
 
-    with nav_cols[2]:
+    with nav_cols[4]:
         st.button("🚨 تقرير الإهمال", key="nav_neg_btn", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=True, on_click=set_page, args=('Neglect',))
 
-    with nav_cols[3]:
+    with nav_cols[6]:
         st.button("📈 النشاط", key="nav_act_btn", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=True, on_click=set_page, args=('Activity',))
 
 with _nav_spacer:
