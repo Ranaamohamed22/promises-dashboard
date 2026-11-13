@@ -301,6 +301,26 @@ st.markdown(f"""
         stroke: #FFFFFF !important;
     }}
 
+    /* Hard-force toolbar glyphs to white across current Streamlit variants. */
+    [data-testid="stToolbar"] svg,
+    [data-testid="stToolbar"] img,
+    [data-testid="stToolbarActions"] svg,
+    [data-testid="stToolbarActions"] img,
+    header[data-testid="stHeader"] svg,
+    header[data-testid="stHeader"] img {{
+        filter: brightness(0) invert(1) !important;
+        opacity: 1 !important;
+    }}
+
+    [data-testid="stToolbar"] span,
+    [data-testid="stToolbarActions"] span,
+    header[data-testid="stHeader"] span,
+    header[data-testid="stHeader"] [role="button"],
+    header[data-testid="stHeader"] [aria-label] {{
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }}
+
     /* Keep the main menu / overflow control aligned with the left toolbar too. */
     header[data-testid="stHeader"] [data-testid="stMainMenu"],
     header[data-testid="stHeader"] button[aria-label*="menu" i] {{
