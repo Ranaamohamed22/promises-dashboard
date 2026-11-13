@@ -5499,9 +5499,6 @@ def render_activity_boxes(activity_base_df=None):
 
     return selected_collector, mapping_file, collector_col_name
 
-if curr_page != 'Home':
-    st.markdown(f"<div style='text-align:right; color:{label_color}; font-weight:900; font-size:18px; margin-bottom:12px'>🏦 تقارير {'البنك الأهلي السعودي SNB' if selected_bank == 'SNB' else 'STC'}</div>")
-
 if curr_page == 'Overview':
     st.markdown(f"<h3 style='text-align:center;color:{label_color};font-weight:900;margin:6px 0 12px;'>اختاري البنك</h3>", unsafe_allow_html=True)
     overview_bank_cols = st.columns(2, gap='large')
