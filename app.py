@@ -6555,8 +6555,31 @@ def _snb_review_new_notes(notes, mapping, manual, conflicted=0):
 
 
 
+def _snb_review_trigger_reasons(note):
+    """Return the special-review triggers found in Notes only.
+
+    'تم' and 'معالج' are standalone Arabic words; a fragment inside a longer
+    word (such as 'تمام') must NOT create a false-positive review.
+    """
+    value = "" if pd.isna(note) else str(note)
+    reasons = []
+    if "/" in value:
+        reasons.append("/ أو //")
+    # Boundary checks use Unicode-aware word characters (including Arabic).
+    if re.search(r"(?<!\\w)معالج(?!\\w)", value):
+        reasons.append("معالج")
+    if re.search(r"(?<!\\w)تم(?!\\w)", value):
+        reasons.append("تم")
+    return reasons
+
+
+def _snb_special_review_mask(notes):
+    """Rows requiring explicit evaluation even when their Note matches the model."""
+    return notes.map(lambda note: bool(_snb_review_trigger_reasons(note)))
+
+
 def _snb_slash_row_decisions(activity_upload):
-    """Store explicit slash-note ratings only for the currently uploaded activity."""
+    """Store explicit special-review decisions for the current activity upload."""
     digest = hashlib.sha256(activity_upload.getvalue()).hexdigest()
     storage = st.session_state.get("snb_activity_slash_row_decisions")
     if not isinstance(storage, dict) or storage.get("digest") != digest:
@@ -6566,9 +6589,9 @@ def _snb_slash_row_decisions(activity_upload):
 
 
 def _snb_review_slash_rows(frame, notes_col, activity_upload):
-    """Review slash-marked Notes using a compact visible editor; full rows remain available."""
+    """Review all specially flagged Notes, retaining full row details."""
     decisions = _snb_slash_row_decisions(activity_upload)
-    marked = frame[notes_col].fillna("").astype(str).str.contains("/", regex=False)
+    marked = _snb_special_review_mask(frame[notes_col])
     flagged = frame.loc[marked].copy()
     if flagged.empty:
         return decisions, True
@@ -6580,12 +6603,18 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload):
     full_rows.insert(
         0, "رقم الصف في الملف", [int(i) + 2 for i in original_indices]
     )
+    reasons = [
+        "، ".join(_snb_review_trigger_reasons(note))
+        for note in flagged[notes_col]
+    ]
+    full_rows.insert(1, "سبب المراجعة", reasons)
 
     # Keep the editable rating visible without horizontally scrolling
     # through dozens of columns in the complete activity record.
     review = pd.DataFrame({
         "رقم الصف في الملف": [int(i) + 2 for i in original_indices],
         "الإفادة": flagged[notes_col].fillna("").astype(str).tolist(),
+        "سبب المراجعة": reasons,
         "الوقت": (
             flagged["Time"].fillna("").astype(str).tolist()
             if "Time" in flagged.columns
@@ -6599,8 +6628,9 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload):
         ],
     })
     st.warning(
-        f"توجد {len(flagged):,} إفادة تحتوي على / أو //؛ "
-        "اعتمدي تقييم كل صف منفصلًا، حتى إن كان موجودًا في موديل النشاط."
+        f"توجد {len(flagged):,} إفادة تحتاج مراجعة لوجود / أو // أو "
+        "الكلمة «معالج» أو الكلمة «تم». "
+        "يظهر سبب المراجعة لكل صف، ويجب اعتماد تقييمه حتى لو طابق الموديل."
     )
     st.markdown(
         "**👇 اختاري من عمود «احسب المكالمة» في الجدول الصغير هنا مباشرة:** "
@@ -6611,9 +6641,10 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload):
             review,
             use_container_width=True,
             hide_index=True,
-            disabled=["رقم الصف في الملف", "الإفادة", "الوقت"],
+            disabled=["رقم الصف في الملف", "الإفادة", "سبب المراجعة", "الوقت"],
             column_order=[
-                "رقم الصف في الملف", "الإفادة", "الوقت", "احسب المكالمة"
+                "رقم الصف في الملف", "الإفادة", "سبب المراجعة",
+                "الوقت", "احسب المكالمة"
             ],
             column_config={
                 "رقم الصف في الملف": st.column_config.NumberColumn(
@@ -6621,6 +6652,9 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload):
                 ),
                 "الإفادة": st.column_config.TextColumn(
                     "الإفادة", width="large"
+                ),
+                "سبب المراجعة": st.column_config.TextColumn(
+                    "سبب المراجعة", width="medium"
                 ),
                 "الوقت": st.column_config.TextColumn(
                     "الوقت", width="small"
@@ -6634,8 +6668,8 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload):
             },
             key="snb_activity_slash_rows_editor",
         )
-        approved = st.form_submit_button("✅ اعتماد تقييم صفوف / و //")
-    with st.expander("📋 عرض كل بيانات الصفوف الـ / و // كاملة", expanded=False):
+        approved = st.form_submit_button("✅ اعتماد تقييم الإفادات المحددة للمراجعة")
+    with st.expander("📋 عرض كل بيانات الإفادات المحددة للمراجعة", expanded=False):
         st.dataframe(
             full_rows, use_container_width=True, hide_index=True, height=420
         )
@@ -6759,10 +6793,10 @@ def render_snb_activity_report(model_upload, activity_upload, error_slot=None):
         )
         if not slash_reviewed:
             return
-        # Slash-marked rows have their own mandatory row-by-row rating;
-        # they must not also require note-level classification.
+        # Special-review rows use their own row-level manual decisions.
+        # Skip repeat note-level review for those rows.
         ordinary_notes = selected.loc[
-            ~selected[stats["notes"]].fillna("").astype(str).str.contains("/", regex=False),
+            ~_snb_special_review_mask(selected[stats["notes"]]),
             stats["notes"]
         ]
         similarity, fully_reviewed = _snb_review_new_notes(
@@ -6774,6 +6808,11 @@ def render_snb_activity_report(model_upload, activity_upload, error_slot=None):
         if not fully_reviewed:
             # Don't issue a report or download with unknown call evaluations.
             return
+
+        # Preserve a meaningful model-similarity percentage for reviewed notes.
+        for key in selected[stats["notes"]].map(_snb_normalize_note).unique():
+            if key not in similarity:
+                similarity[key] = _snb_model_similarity(key, list(model_mapping))
 
         result = _snb_add_evaluation(
             selected, stats["notes"], model_mapping,
@@ -6859,11 +6898,27 @@ def render_snb_activity_report(model_upload, activity_upload, error_slot=None):
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             final.to_excel(writer, sheet_name="Activity", index=False)
-            slash_mask = final[stats["notes"]].fillna("").astype(str).str.contains("/", regex=False)
-            if slash_mask.any():
-                final.loc[slash_mask].to_excel(
-                    writer, sheet_name="Slash_Notes_Review", index=False
+            special_mask = _snb_special_review_mask(final[stats["notes"]])
+            if special_mask.any():
+                flagged_export = final.loc[special_mask].copy()
+                flagged_export.insert(
+                    flagged_export.columns.get_loc(stats["notes"]) + 1,
+                    "سبب المراجعة",
+                    flagged_export[stats["notes"]].map(
+                        lambda note: "، ".join(_snb_review_trigger_reasons(note))
+                    )
                 )
+                flagged_export.to_excel(
+                    writer, sheet_name="Notes_Review", index=False
+                )
+                # Retain the existing slash-only sheet for compatibility.
+                slash_mask = final[stats["notes"]].fillna("").astype(str).str.contains(
+                    "/", regex=False
+                )
+                if slash_mask.any():
+                    final.loc[slash_mask].to_excel(
+                        writer, sheet_name="Slash_Notes_Review", index=False
+                    )
         st.download_button(
             "📥 تحميل نشاط SNB بعد المعالجة",
             data=output.getvalue(),
