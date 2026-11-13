@@ -5955,25 +5955,46 @@ def _prepare_snb_activity_file(uploaded_file):
         frame, "Created on", "Created_on", "CreatedOn"
     )
     # Merge CC and PF in the EXISTING product/finance column, not a new one.
+    # The real SNB export uses "نوع المنتج-التمويل/Claim".
+    # Prefer the finance/Claim column; never reject it merely because
+    # another similarly named product column also exists.
     product = _snb_find_column(
-        frame, "نوع المنتج-التمويل", "نوع المنتج - التمويل",
-        "نوع المتنج-التمويل", "نوع المنتج", "Product Type",
-        "ProductType", "Product Type - Finance", "Product Type - Financing"
+        frame,
+        "نوع المنتج-التمويل/Claim",
+        "نوع المنتج - التمويل/Claim",
+        "نوع المنتج-التمويل / Claim",
+        "Claim/نوع المنتج-التمويل",
+        "نوع المنتج-التمويل",
+        "نوع المنتج - التمويل",
+        "نوع المتنج-التمويل",
+        "نوع المنتج",
+        "Product Type - Finance",
+        "Product Type - Financing",
+        "Product Type/Claim",
+        "Product Type", "ProductType"
     )
     if product is None:
-        product_matches = [
-            col for col in frame.columns
-            if (
-                ("منتج" in _snb_header_key(col) and
-                 "تمويل" in _snb_header_key(col))
-                or (
-                    "product" in _snb_header_key(col)
-                    and "type" in _snb_header_key(col)
-                )
+        product_candidates = []
+        for col in frame.columns:
+            normalized = _snb_header_key(col)
+            is_finance_product = (
+                "منتج" in normalized and "تمويل" in normalized
             )
-        ]
-        if len(product_matches) == 1:
-            product = product_matches[0]
+            is_english_product = (
+                "product" in normalized and "type" in normalized
+            )
+            if not (is_finance_product or is_english_product):
+                continue
+            # Explicit Claim/product/finance names outrank generic fields.
+            score = (
+                4 * ("claim" in normalized)
+                + 2 * is_finance_product
+                + is_english_product
+            )
+            product_candidates.append((score, col))
+        if product_candidates:
+            product_candidates.sort(key=lambda item: item[0], reverse=True)
+            product = product_candidates[0][1]
     missing = [
         label for label, col in [
             ("Debitor", debitor), ("Notes (الإفادة)", notes),
@@ -6247,7 +6268,14 @@ def render_snb_activity_report(model_upload, activity_upload):
             )
         if stats["product"] is None:
             st.warning(
-                "لم أجد عمود نوع المنتج-التمويل، لذلك لم أطبّق دمج CC+PF."
+                "لم أتعرف على عمود نوع المنتج-التمويل/Claim؛ "
+                "يرجى مراجعة أسماء أعمدة ملف النشاط."
+            )
+        else:
+            st.caption(
+                f'عمود المنتج المعتمد: {stats["product"]} | '
+                f'عدد السجلات التي شملها تجميع CC+PF: '
+                f'{stats["combined_products"]:,} (قبل إزالة التكرارات).'
             )
         if conflicted_notes:
             st.warning(
