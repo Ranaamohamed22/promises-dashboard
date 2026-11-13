@@ -266,6 +266,7 @@ st.markdown(f"""
         direction: rtl !important;
         overflow-x: auto !important;
     }}
+    div.st-key-report_nav_group[data-testid="stVerticalBlock"],
     div.st-key-report_nav_group [data-testid="stVerticalBlock"] {{
         display: flex !important;
         flex-direction: row !important;
