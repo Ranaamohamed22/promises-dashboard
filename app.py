@@ -7,6 +7,8 @@ import base64
 import os
 import re
 import zipfile
+import hashlib
+from difflib import SequenceMatcher, get_close_matches
 from xml.sax.saxutils import escape as _xml_escape
 from openpyxl import Workbook, load_workbook
 from copy import copy
@@ -6147,15 +6149,140 @@ def _filter_snb_activity_period(frame, activity_kind, daily_period):
     return valid, hour_excluded
 
 
-def _snb_add_evaluation(frame, notes_col, mapping):
-    """Add new evaluation column IMMEDIATELY after Notes (= الإفادة)."""
+def _snb_model_similarity(note_key, model_keys):
+    """Return similarity to nearest model Notes, NEVER infer the call evaluation."""
+    if note_key in model_keys:
+        return 100, note_key
+    if not note_key or not model_keys:
+        return 0, ""
+    # Model sets are usually small. Narrow to comparable-length candidates when
+    # there are many notes to avoid a costly all-against-all comparison.
+    candidates = model_keys
+    if len(model_keys) > 600:
+        candidates = [
+            text for text in model_keys
+            if abs(len(text) - len(note_key)) <= max(7, len(note_key) // 2)
+        ]
+        if not candidates:
+            candidates = sorted(
+                model_keys, key=lambda text: abs(len(text) - len(note_key))
+            )[:50]
+    closest = get_close_matches(
+        note_key, candidates, n=1, cutoff=0
+    )
+    if not closest:
+        return 0, ""
+    match = closest[0]
+    percent = round(100 * SequenceMatcher(None, note_key, match).ratio())
+    return int(percent), match
+
+
+def _snb_manual_evaluations(model_upload):
+    """Decisions persist across reruns, but NEVER across a changed model."""
+    model_digest = hashlib.sha256(model_upload.getvalue()).hexdigest()
+    storage = st.session_state.get("snb_activity_manual_evaluations")
+    if not isinstance(storage, dict) or storage.get("model_digest") != model_digest:
+        storage = {"model_digest": model_digest, "ratings": {}}
+        st.session_state.snb_activity_manual_evaluations = storage
+    return storage["ratings"]
+
+
+def _snb_review_new_notes(notes, mapping, manual, conflicted=0):
+    """Ask the user to classify each Note missing from the model before export.
+
+    The text similarity is advisory ONLY. Until every distinct note is
+    classified, the processed report and download button are not shown.
+    """
+    normalized = notes.map(_snb_normalize_note)
+    unresolved_keys = set(normalized.unique()) - set(mapping) - set(manual)
+    similarity = {}
+    for key in normalized.unique():
+        similarity[key] = _snb_model_similarity(key, list(mapping))
+
+    if not unresolved_keys:
+        return similarity, True
+
+    counts = normalized.value_counts(dropna=False)
+    labels = (
+        pd.DataFrame({"label": notes.fillna("").astype(str), "key": normalized})
+        .drop_duplicates(subset=["key"], keep="first")
+        .set_index("key")["label"]
+        .to_dict()
+    )
+    pending = sorted(unresolved_keys, key=lambda key: (-counts.get(key, 0), key))
+    review = []
+    for key in pending:
+        score, closest = similarity[key]
+        review.append({
+            "الإفادة": labels.get(key, "") or "(إفادة فارغة)",
+            "عدد المكالمات": int(counts.get(key, 0)),
+            "أقرب إفادة في الموديل": closest or "لا يوجد",
+            "نسبة التشابه": f"{score}%",
+            "التقييم المطلوب": "اختاري التقييم"
+        })
+
+    st.warning(
+        f"يوجد {len(pending):,} إفادة جديدة أو غير محسومة في موديل النشاط. "
+        "حددي هل كل إفادة ناجحة أم غير ناجحة قبل اعتماد التقرير."
+    )
+    if conflicted:
+        st.caption(
+            "الإفادات التي لها تقييمان متعارضان في الموديل تعرض للمراجعة أيضًا."
+        )
+    st.caption(
+        "نسبة التشابه تقارن نص الإفادة بالموديل فقط؛ "
+        "لا يتم اعتبار التقييم ناجحًا أو غير ناجح بناءً على التشابه."
+    )
+    with st.form("snb_activity_new_notes_review_form"):
+        edited = st.data_editor(
+            pd.DataFrame(review),
+            use_container_width=True,
+            hide_index=True,
+            disabled=[
+                "الإفادة", "عدد المكالمات",
+                "أقرب إفادة في الموديل", "نسبة التشابه"
+            ],
+            column_config={
+                "التقييم المطلوب": st.column_config.SelectboxColumn(
+                    "هل الإفادة ناجحة أم غير ناجحة؟",
+                    options=["اختاري التقييم", "ناجحة", "غير ناجحة"],
+                    required=True
+                )
+            },
+            key="snb_activity_new_notes_editor"
+        )
+        approved = st.form_submit_button(
+            "اعتماد تقييم الإفادات المحددة"
+        )
+    if approved:
+        saved = 0
+        for i, row in edited.iterrows():
+            answer = row["التقييم المطلوب"]
+            if answer in ("ناجحة", "غير ناجحة"):
+                manual[pending[i]] = 1 if answer == "ناجحة" else 0
+                saved += 1
+        if saved:
+            st.rerun()
+        st.error("اختاري ناجحة أو غير ناجحة لإفادة واحدة على الأقل.")
+    return similarity, False
+
+
+def _snb_add_evaluation(frame, notes_col, mapping, manual, similarity):
+    """Place call evaluation and percentage match in adjacent columns after Notes."""
     output = frame.copy()
-    name = "تقييم المكالمات"
-    if name in output.columns:
-        output = output.drop(columns=[name])
-    scores = output[notes_col].map(_snb_normalize_note).map(mapping)
-    labels = scores.map({1: "ناجحة", 0: "غير ناجحة"}).fillna("غير مصنفة")
-    output.insert(output.columns.get_loc(notes_col) + 1, name, labels)
+    for name in ("تقييم المكالمات", "نسبة تطابق التقييم"):
+        if name in output.columns:
+            output = output.drop(columns=[name])
+    keys = output[notes_col].map(_snb_normalize_note)
+    # Only exact model matches or user-approved new Notes set the evaluation.
+    values = keys.map(mapping).combine_first(keys.map(manual))
+    labels = values.map({1: "ناجحة", 0: "غير ناجحة"}).fillna("غير مصنفة")
+    index = output.columns.get_loc(notes_col) + 1
+    output.insert(index, "تقييم المكالمات", labels)
+    output.insert(
+        index + 1, "نسبة تطابق التقييم",
+        keys.map(lambda key: f"{similarity.get(key, (0, ''))[0]}%")
+    )
     return output
 
 
@@ -6231,8 +6358,20 @@ def render_snb_activity_report(model_upload, activity_upload):
         selected, excluded_hour = _filter_snb_activity_period(
             prepared, activity_kind, period
         )
+        manual_decisions = _snb_manual_evaluations(model_upload)
+        similarity, fully_reviewed = _snb_review_new_notes(
+            selected[stats["notes"]],
+            model_mapping,
+            manual_decisions,
+            conflicted=conflicted_notes
+        )
+        if not fully_reviewed:
+            # Don't issue a report or download with unknown call evaluations.
+            return
+
         result = _snb_add_evaluation(
-            selected, stats["notes"], model_mapping
+            selected, stats["notes"], model_mapping,
+            manual_decisions, similarity
         )
         result = _snb_add_call_duration(
             result, stats["collector"]
@@ -6283,6 +6422,19 @@ def render_snb_activity_report(model_upload, activity_upload):
             st.caption(
                 f"تم تجاهل {invalid_model:,} صف غير صالح في موديل النشاط."
             )
+        model_matched = int(
+            selected[stats["notes"]].map(_snb_normalize_note)
+            .isin(model_mapping).sum()
+        )
+        model_coverage = (
+            100 * model_matched / len(selected) if len(selected) else 0
+        )
+        st.caption(
+            f"نسبة الإفادات المطابقة تمامًا لموديل النشاط: "
+            f"{model_coverage:.1f}% ({model_matched:,} من {len(selected):,}). "
+            "عمود «نسبة تطابق التقييم» يقيس تشابه نص الإفادة بأقرب نص "
+            "في الموديل، ولا يقيس صحة التقييم اليدوي."
+        )
         st.caption(
             "Notes = الإفادة. 0 = غير ناجحة، 1 = ناجحة. "
             "مده المكالمه محسوبة بالدقائق بين مكالمتين متتاليتين "
