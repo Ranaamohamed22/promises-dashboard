@@ -790,6 +790,10 @@ st.markdown(f"""
         align-items: center;
         justify-content: center;
     }}
+    [class*="st-key-report_upload_bar_"] [data-testid="stHorizontalBlock"]:has(.ejada-upload-name) {{
+        align-items: center !important;
+        flex-wrap: nowrap !important;
+    }}
     /* Dedicated report header: compact inline title, responsive upload box. */
     [class*="st-key-report_upload_bar_"] {{
         width: 100% !important;
@@ -874,8 +878,8 @@ st.markdown(f"""
 
     /* Compact promise diagnostic with smaller bold labels and centered heading. */
     div[class*="st-key-promise_diagnostic_"] {{
-        width: min(1050px, 96%) !important;
-        max-width: 1050px !important;
+        width: min(780px, 96%) !important;
+        max-width: 780px !important;
         margin: 8px auto 12px !important;
     }}
     div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] {{
@@ -911,23 +915,37 @@ st.markdown(f"""
         top: 50% !important;
         transform: translateY(-50%) !important;
     }}
+    div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] summary [data-testid="stMarkdownContainer"] {{
+        position: static !important;
+    }}
     div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] summary p {{
-        width: 100% !important;
-        margin: 0 auto !important;
+        position: absolute !important;
+        left: 50% !important;
+        top: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        width: max-content !important;
+        max-width: calc(100% - 74px) !important;
+        margin: 0 !important;
+        padding: 0 !important;
         font-size: 16px !important;
         font-weight: 900 !important;
         text-align: center !important;
+        direction: rtl !important;
         line-height: 1.45 !important;
+        white-space: normal !important;
         color: #1F4373 !important;
     }}
     div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] {{
         padding: 8px 10px !important;
     }}
     table.ejada-diagnostic-table {{
-        width: 100%;
+        width: max-content !important;
+        max-width: 100% !important;
+        margin-right: 0 !important;
+        margin-left: auto !important;
         border: 1px solid #B9C8DB !important;
         border-collapse: collapse !important;
-        table-layout: fixed;
+        table-layout: auto !important;
         direction: rtl;
         font-size: 13px;
         font-weight: 800;
@@ -951,16 +969,26 @@ st.markdown(f"""
     div[class*="st-key-promise_details_row_"] [data-testid="stHorizontalBlock"] {{
         align-items: flex-start !important;
     }}
+    table.ejada-diagnostic-table thead th {{
+        background: #2CA549 !important;
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+        font-weight: 900 !important;
+    }}
     table.ejada-diagnostic-table th:first-child,
     table.ejada-diagnostic-table td:first-child {{
-        width: 76%;
-        text-align: right;
+        width: auto !important;
+        min-width: 0 !important;
+        text-align: right !important;
     }}
     table.ejada-diagnostic-table th:last-child,
     table.ejada-diagnostic-table td:last-child {{
-        width: 24%;
-        text-align: left;
+        width: 100px !important;
+        min-width: 80px !important;
+        max-width: 100px !important;
+        text-align: left !important;
         font-variant-numeric: tabular-nums;
+        white-space: nowrap !important;
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -5406,7 +5434,9 @@ def render_report_upload_bar(page):
     with st.container(key=f"report_upload_bar_{selected_bank}_{page}"):
         # Equal left/right columns keep the report heading exactly centered.
         # In the current RTL layout, the first (upload) column is on the right.
-        upload_col, title_col, _rest = st.columns([2.9, 4.2, 2.9], gap='small')
+        upload_col, title_col, _rest = st.columns(
+            [2.9, 4.2, 2.9], gap='small', vertical_alignment='center'
+        )
 
         with upload_col:
             if current_files:
@@ -5457,7 +5487,7 @@ def render_report_upload_bar(page):
             title_font_size = 24 if page == 'Promises' else 20
             st.markdown(
                 f"""
-                <div style="min-height:130px;display:flex;align-items:center;
+                <div style="min-height:78px;display:flex;align-items:center;
                             justify-content:center;direction:rtl;width:100%;">
                     <div style="display:inline-flex;align-items:center;justify-content:center;
                                 background:{card_color};border:1px solid {border_color};
