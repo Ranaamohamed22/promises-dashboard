@@ -188,6 +188,16 @@ else:
     input_bg = "#FFFFFF"
     input_text = "#1F4373"
 
+_overview_upload_panel_bg = (
+    "#1F4373" if st.session_state.theme_choice == "ثيم إجادة (Navy)"
+    else "#222B39" if st.session_state.theme_choice == "الوضع الداكن (Black)"
+    else "#FFFFFF"
+)
+_overview_upload_caption_color = (
+    "#E7EEF8" if st.session_state.theme_choice != "التصميم الفاتح (Light)"
+    else "#64748B"
+)
+
 st.markdown(f"""
 <style>
     [data-testid="collapsedControl"] {{display: none !important;}}
@@ -1670,6 +1680,54 @@ st.markdown(f"""
         }}
     }}
 
+    /* Overview only: compact uploader row in place of report/home navigation. */
+    div.st-key-overview_upload_header {{
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }}
+    div.st-key-overview_upload_header [data-testid="stHorizontalBlock"]:has(.st-key-overview_activity_upload_card) {{
+        direction: rtl !important;
+        justify-content: flex-start !important;
+        align-items: flex-start !important;
+        flex-wrap: nowrap !important;
+        gap: 12px !important;
+        width: 100% !important;
+        margin: 0 !important;
+    }}
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-overview_activity_upload_card),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-overview_model_upload_card),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-overview_promises_upload_card) {{
+        box-sizing: border-box !important;
+        width: min(300px, 100%) !important;
+        max-width: 300px !important;
+        min-width: 0 !important;
+        height: 178px !important;
+        min-height: 178px !important;
+        max-height: 178px !important;
+        border: 1px solid {border_color} !important;
+        border-radius: 9px !important;
+        padding: 6px 8px !important;
+        margin-left: auto !important;
+        margin-right: 0 !important;
+        background-color: {_overview_upload_panel_bg} !important;
+        overflow: visible !important;
+    }}
+    div.st-key-overview_activity_upload_card [data-testid="stCaptionContainer"],
+    div.st-key-overview_model_upload_card [data-testid="stCaptionContainer"],
+    div.st-key-overview_promises_upload_card [data-testid="stCaptionContainer"],
+    div.st-key-overview_activity_upload_card [data-testid="stCaptionContainer"] p,
+    div.st-key-overview_model_upload_card [data-testid="stCaptionContainer"] p,
+    div.st-key-overview_promises_upload_card [data-testid="stCaptionContainer"] p {{
+        color: {_overview_upload_caption_color} !important;
+    }}
+    @media (max-width: 1040px) {{
+        div.st-key-overview_upload_header [data-testid="stHorizontalBlock"]:has(.st-key-overview_activity_upload_card) {{
+            flex-wrap: wrap !important;
+        }}
+    }}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -1728,6 +1786,9 @@ if st.session_state.current_page not in ('Overview', 'Home'):
 
     with nav_col:
         _render_ejada_main_navigation()
+elif st.session_state.current_page == 'Overview':
+    # Render original Overview upload widgets into the top navigation area.
+    _overview_upload_header = st.container(key="overview_upload_header")
 else:
     _render_ejada_main_navigation()
 
@@ -7441,7 +7502,6 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
 # صفحة النشاط: العنوان مع لوجو التليفون الكامل + الخانات التلاتة
 # ==========================================
 if curr_page == 'Overview':
-    st.markdown(f"<h3 style='text-align:center;color:{label_color};font-weight:900;margin:6px 0 12px;'>اختاري البنك</h3>", unsafe_allow_html=True)
     overview_snb_col, overview_stc_col, _overview_bank_spacer = st.columns([0.82, 0.82, 8.36], gap='small')
     with overview_snb_col:
         st.button(
@@ -7469,94 +7529,96 @@ if curr_page == 'Overview':
             args=('STC',)
         )
 
-    overview_versions = st.session_state.overview_uploader_versions[selected_bank]
-    # Three separate, equal-size upload panels aligned right in RTL.
-    upload_cols = st.columns([1, 1, 1, 2.7], gap='small')
-
-    with upload_cols[0]:
-        with st.container(border=True, key='overview_activity_upload_card'):
-            st.markdown(
-                "<div style='text-align:center;font-weight:900;color:#1F4373;"
-                "font-size:14px;margin:0 0 3px;'>📈 1) تقرير النشاط</div>"
-                "",
-                unsafe_allow_html=True
-            )
-            activity_widget_files = st.file_uploader(
-                'ارفعي ملف تقرير النشاط في هذه الخانة',
-                type=['xlsx', 'csv'],
-                label_visibility='collapsed',
-                accept_multiple_files=True,
-                key=f"overview_activity_{selected_bank}_{overview_versions['Activity']}"
-            )
-            if activity_widget_files:
-                st.session_state.overview_uploads[selected_bank]['Activity'] = activity_widget_files
-
-            saved_activity_files = st.session_state.overview_uploads[selected_bank]['Activity']
-            if saved_activity_files:
-                st.caption('المرفوع: ' + '، '.join(f.name for f in saved_activity_files))
-                st.button(
-                    'مسح تقرير النشاط',
-                    key=f'clear_overview_activity_{selected_bank}',
-                    on_click=clear_overview_upload,
-                    args=(selected_bank, 'Activity')
+    # Widgets live here only once. Their screen position is the earlier header.
+    with _overview_upload_header:
+        overview_versions = st.session_state.overview_uploader_versions[selected_bank]
+        # Three separate, equal-size upload panels aligned right in RTL.
+        upload_cols = st.columns([1, 1, 1, 2.7], gap='small')
+    
+        with upload_cols[0]:
+            with st.container(border=True, key='overview_activity_upload_card'):
+                st.markdown(
+                    f"<div style='text-align:center;font-weight:900;color:{label_color};"
+                    "font-size:14px;margin:0 0 3px;'>📈 1) تقرير النشاط</div>"
+                    "",
+                    unsafe_allow_html=True
                 )
-            else:
-                st.caption('لم يُرفع تقرير النشاط بعد.')
-
-    with upload_cols[1]:
-        with st.container(border=True, key='overview_model_upload_card'):
-            st.markdown(
-                "<div style='text-align:center;font-weight:900;color:#1F4373;"
-                "font-size:14px;margin:0 0 3px;'>🧩 2) موديل النشاط</div>"
-                "",
-                unsafe_allow_html=True
-            )
-            activity_model_file = st.file_uploader(
-                'ارفعي ملف موديل النشاط في هذه الخانة',
-                type=['xlsx'],
-                label_visibility='collapsed',
-                accept_multiple_files=False,
-                key=f"overview_activity_model_{selected_bank}_{overview_versions['ActivityModel']}"
-            )
-            if activity_model_file is not None:
-                st.session_state.overview_uploads[selected_bank]['ActivityModel'] = activity_model_file
-
-            saved_activity_model = st.session_state.overview_uploads[selected_bank].get('ActivityModel')
-            if saved_activity_model is not None:
-                st.caption(f'الموديل المرفوع: {saved_activity_model.name}')
-                st.button(
-                    'مسح موديل النشاط',
-                    key=f'clear_overview_activity_model_{selected_bank}',
-                    on_click=clear_overview_upload,
-                    args=(selected_bank, 'ActivityModel')
+                activity_widget_files = st.file_uploader(
+                    'ارفعي ملف تقرير النشاط في هذه الخانة',
+                    type=['xlsx', 'csv'],
+                    label_visibility='collapsed',
+                    accept_multiple_files=True,
+                    key=f"overview_activity_{selected_bank}_{overview_versions['Activity']}"
                 )
-            else:
-                st.caption('لم يُرفع موديل النشاط بعد.')
-
-    # العمود الثاني: تقرير الوعود والإهمال.
-    with upload_cols[2]:
-        with st.container(border=True, key='overview_promises_upload_card'):
-            st.markdown("<div style='text-align:center;font-weight:900;color:#1F4373;font-size:14px;margin-bottom:3px;'>🤝 تقرير الوعود والإهمال (Promises & Neglect)</div>", unsafe_allow_html=True)
-            promises_widget_files = st.file_uploader(
-                'ارفعي تقرير الوعود والإهمال هنا',
-                type=['xlsx', 'csv'],
-                label_visibility='collapsed',
-                accept_multiple_files=True,
-                key=f"overview_promises_{selected_bank}_{overview_versions['Promises']}"
-            )
-            if promises_widget_files:
-                st.session_state.overview_uploads[selected_bank]['Promises'] = promises_widget_files
-            saved_promises_files = st.session_state.overview_uploads[selected_bank]['Promises']
-            if saved_promises_files:
-                st.caption('الملفات المحفوظة: ' + '، '.join(f.name for f in saved_promises_files))
-                st.button(
-                    'مسح تقرير الوعود والإهمال',
-                    key=f'clear_overview_promises_{selected_bank}',
-                    on_click=clear_overview_upload,
-                    args=(selected_bank, 'Promises')
+                if activity_widget_files:
+                    st.session_state.overview_uploads[selected_bank]['Activity'] = activity_widget_files
+    
+                saved_activity_files = st.session_state.overview_uploads[selected_bank]['Activity']
+                if saved_activity_files:
+                    st.caption('المرفوع: ' + '، '.join(f.name for f in saved_activity_files))
+                    st.button(
+                        'مسح تقرير النشاط',
+                        key=f'clear_overview_activity_{selected_bank}',
+                        on_click=clear_overview_upload,
+                        args=(selected_bank, 'Activity')
+                    )
+                else:
+                    st.caption('لم يُرفع تقرير النشاط بعد.')
+    
+        with upload_cols[1]:
+            with st.container(border=True, key='overview_model_upload_card'):
+                st.markdown(
+                    f"<div style='text-align:center;font-weight:900;color:{label_color};"
+                    "font-size:14px;margin:0 0 3px;'>🧩 2) موديل النشاط</div>"
+                    "",
+                    unsafe_allow_html=True
                 )
-            else:
-                st.caption('لم يتم رفع تقرير الوعود والإهمال بعد.')
+                activity_model_file = st.file_uploader(
+                    'ارفعي ملف موديل النشاط في هذه الخانة',
+                    type=['xlsx'],
+                    label_visibility='collapsed',
+                    accept_multiple_files=False,
+                    key=f"overview_activity_model_{selected_bank}_{overview_versions['ActivityModel']}"
+                )
+                if activity_model_file is not None:
+                    st.session_state.overview_uploads[selected_bank]['ActivityModel'] = activity_model_file
+    
+                saved_activity_model = st.session_state.overview_uploads[selected_bank].get('ActivityModel')
+                if saved_activity_model is not None:
+                    st.caption(f'الموديل المرفوع: {saved_activity_model.name}')
+                    st.button(
+                        'مسح موديل النشاط',
+                        key=f'clear_overview_activity_model_{selected_bank}',
+                        on_click=clear_overview_upload,
+                        args=(selected_bank, 'ActivityModel')
+                    )
+                else:
+                    st.caption('لم يُرفع موديل النشاط بعد.')
+    
+        # العمود الثاني: تقرير الوعود والإهمال.
+        with upload_cols[2]:
+            with st.container(border=True, key='overview_promises_upload_card'):
+                st.markdown(f"<div style='text-align:center;font-weight:900;color:{label_color};font-size:14px;margin-bottom:3px;'>ارفعي المحفظة</div>", unsafe_allow_html=True)
+                promises_widget_files = st.file_uploader(
+                    'ارفعي تقرير الوعود والإهمال هنا',
+                    type=['xlsx', 'csv'],
+                    label_visibility='collapsed',
+                    accept_multiple_files=True,
+                    key=f"overview_promises_{selected_bank}_{overview_versions['Promises']}"
+                )
+                if promises_widget_files:
+                    st.session_state.overview_uploads[selected_bank]['Promises'] = promises_widget_files
+                saved_promises_files = st.session_state.overview_uploads[selected_bank]['Promises']
+                if saved_promises_files:
+                    st.caption('الملفات المحفوظة: ' + '، '.join(f.name for f in saved_promises_files))
+                    st.button(
+                        'مسح تقرير الوعود والإهمال',
+                        key=f'clear_overview_promises_{selected_bank}',
+                        on_click=clear_overview_upload,
+                        args=(selected_bank, 'Promises')
+                    )
+                else:
+                    st.caption('لم يتم رفع تقرير الوعود والإهمال بعد.')
 
     overview_activity_files = st.session_state.overview_uploads[selected_bank]['Activity']
     overview_promises_files = st.session_state.overview_uploads[selected_bank]['Promises']
