@@ -362,32 +362,70 @@ st.markdown(f"""
         color: {snb_green} !important;
     }}
 
-    /* Bank selectors: a short box around each larger bank name. */
-    div.st-key-bank_selector_group,
-    div.st-key-overview_bank_selector_group {{
-        max-width: 100% !important;
-        width: fit-content !important;
-        direction: rtl !important;
-        overflow-x: auto !important;
+    /* Header actions: white background and green Share, star, edit and GitHub icons. */
+    header[data-testid="stHeader"] [data-testid="stToolbar"],
+    header[data-testid="stHeader"] [data-testid="stToolbarActions"],
+    [data-testid="stToolbar"]:not(header),
+    [data-testid="stToolbarActions"]:not(header) {{
+        background: #FFFFFF !important;
+        border-radius: 9px !important;
+        padding: 3px 7px !important;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.12) !important;
     }}
-    div.st-key-bank_selector_group [data-testid="stVerticalBlock"],
-    div.st-key-overview_bank_selector_group [data-testid="stVerticalBlock"] {{
-        display: flex !important;
-        flex-direction: row !important;
+    header[data-testid="stHeader"] svg,
+    [data-testid="stToolbar"] svg,
+    [data-testid="stToolbarActions"] svg {{
+        filter: none !important;
+        color: {snb_green} !important;
+        stroke: {snb_green} !important;
+        fill: {snb_green} !important;
+    }}
+    header[data-testid="stHeader"] svg path,
+    header[data-testid="stHeader"] svg circle,
+    header[data-testid="stHeader"] svg rect,
+    header[data-testid="stHeader"] svg line,
+    header[data-testid="stHeader"] svg polyline,
+    header[data-testid="stHeader"] svg polygon,
+    [data-testid="stToolbar"] svg path,
+    [data-testid="stToolbar"] svg circle,
+    [data-testid="stToolbar"] svg rect,
+    [data-testid="stToolbar"] svg line,
+    [data-testid="stToolbar"] svg polyline,
+    [data-testid="stToolbar"] svg polygon,
+    [data-testid="stToolbarActions"] svg path,
+    [data-testid="stToolbarActions"] svg circle,
+    [data-testid="stToolbarActions"] svg rect,
+    [data-testid="stToolbarActions"] svg line,
+    [data-testid="stToolbarActions"] svg polyline,
+    [data-testid="stToolbarActions"] svg polygon {{
+        color: {snb_green} !important;
+        stroke: {snb_green} !important;
+        fill: {snb_green} !important;
+    }}
+    header[data-testid="stHeader"] svg [fill="none"],
+    [data-testid="stToolbar"] svg [fill="none"],
+    [data-testid="stToolbarActions"] svg [fill="none"] {{
+        fill: none !important;
+    }}
+
+    /* Bank selection: real two-column row aligned to screen left. */
+    .stApp [data-testid="stHorizontalBlock"]:has(.st-key-bank_SNB),
+    .stApp [data-testid="stHorizontalBlock"]:has(.st-key-overview_choose_SNB) {{
+        direction: ltr !important;
         flex-wrap: nowrap !important;
-        align-items: center !important;
         justify-content: flex-start !important;
-        direction: rtl !important;
-        gap: 16px !important;
-        width: fit-content !important;
-        min-width: max-content !important;
+        align-items: center !important;
+        gap: 8px !important;
     }}
-    div.st-key-bank_selector_group [data-testid="stElementContainer"],
-    div.st-key-overview_bank_selector_group [data-testid="stElementContainer"] {{
-        flex: 0 0 auto !important;
-        width: fit-content !important;
+    .stApp [data-testid="stHorizontalBlock"]:has(.st-key-bank_SNB) > [data-testid="stColumn"],
+    .stApp [data-testid="stHorizontalBlock"]:has(.st-key-overview_choose_SNB) > [data-testid="stColumn"] {{
         min-width: 0 !important;
-        margin: 0 !important;
+    }}
+    .stApp [data-testid="stHorizontalBlock"]:has(.st-key-bank_SNB) > [data-testid="stColumn"]:nth-child(-n+2),
+    .stApp [data-testid="stHorizontalBlock"]:has(.st-key-overview_choose_SNB) > [data-testid="stColumn"]:nth-child(-n+2) {{
+        flex: 0 0 118px !important;
+        width: 118px !important;
+        max-width: 118px !important;
     }}
     div.st-key-bank_SNB div[data-testid="stButton"],
     div.st-key-bank_STC div[data-testid="stButton"],
@@ -399,10 +437,10 @@ st.markdown(f"""
     div.st-key-bank_STC button,
     div.st-key-overview_choose_SNB button,
     div.st-key-overview_choose_STC button {{
-        width: auto !important;
+        width: 116px !important;
         min-width: 0 !important;
         min-height: 44px !important;
-        padding: 6px 15px !important;
+        padding: 6px 12px !important;
         border-radius: 9px !important;
         white-space: nowrap !important;
     }}
@@ -770,6 +808,50 @@ st.markdown(f"""
         align-items: center;
         justify-content: center;
     }}
+    /* Compact upload zone beside the title in dedicated report pages. */
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploader"] {{
+        width: 196px !important;
+        max-width: 100% !important;
+        margin: 3px auto 0 !important;
+    }}
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] {{
+        height: 48px !important;
+        min-height: 48px !important;
+        max-height: 48px !important;
+        width: 196px !important;
+        max-width: 100% !important;
+        border: 1px dashed {border_color} !important;
+        border-radius: 8px !important;
+        padding: 2px 5px !important;
+        background: #FFFFFF !important;
+    }}
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] > div {{
+        min-height: 40px !important;
+        height: 40px !important;
+        width: 100% !important;
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }}
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzoneInstructions"],
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] small {{
+        display: none !important;
+    }}
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] button {{
+        min-height: 32px !important;
+        height: 32px !important;
+        padding: 4px 12px !important;
+        font-size: 14px !important;
+        border-radius: 7px !important;
+        margin: 0 auto !important;
+    }}
+    @media (max-width: 950px) {{
+        [class*="st-key-report_upload_bar_"] [data-testid="stFileUploader"],
+        [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] {{
+            width: 100% !important;
+        }}
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -806,10 +888,12 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 if st.session_state.current_page not in ('Overview', 'Home'):
-    with st.container(key="bank_selector_group"):
+    bank_snb_col, bank_stc_col, _bank_spacer = st.columns([0.82, 0.82, 8.36], gap='small')
+    with bank_snb_col:
         st.button('🏦 SNB', key='bank_SNB',
                   type='primary' if st.session_state.selected_bank == 'SNB' else 'secondary',
                   use_container_width=False, on_click=set_bank, args=('SNB',))
+    with bank_stc_col:
         st.button('🏦 STC', key='bank_STC',
                   type='primary' if st.session_state.selected_bank == 'STC' else 'secondary',
                   use_container_width=False, on_click=set_bank, args=('STC',))
@@ -5079,6 +5163,7 @@ bank_files = st.session_state.page_files[selected_bank]
 curr_page = st.session_state.current_page
 
 def render_report_upload_bar(page):
+    """Keep the report title and its compact file uploader in the SAME row."""
     titles = {
         'Promises': '🤝 إدارة ومتابعة الوعود (القائمة والمكسورة)',
         'Neglect': '🚨 تقرير الإهمال',
@@ -5088,17 +5173,22 @@ def render_report_upload_bar(page):
     uploader_version = st.session_state.report_uploader_versions[selected_bank][page]
 
     with st.container(key=f"report_upload_bar_{selected_bank}_{page}"):
-        if page == 'Promises':
-            # العنوان يفضل في منتصف الصفحة وبحجم كبير.
+        # Real columns keep the title and uploader on the same horizontal row.
+        # Text box has fit-content width, not a page-wide border.
+        _right_gap, title_col, upload_col, action_col, _left_gap = st.columns(
+            [2.6, 3.4, 1.65, 0.95, 1.4], gap='small'
+        )
+        with title_col:
+            title_font_size = 24 if page == 'Promises' else 20
             st.markdown(
                 f"""
-                <div style="display:flex;justify-content:center;align-items:center;
-                            margin:4px 0 12px;direction:rtl;">
+                <div style="height:54px;display:flex;align-items:center;
+                            justify-content:center;direction:rtl;">
                     <div style="display:inline-flex;align-items:center;justify-content:center;
                                 background:{card_color};border:1px solid {border_color};
-                                border-radius:9px;padding:8px 16px;width:fit-content;
-                                white-space:nowrap;color:{text_color};
-                                font-weight:900;font-size:24px;">
+                                border-radius:9px;padding:8px 14px;width:fit-content;
+                                max-width:100%;white-space:nowrap;color:{text_color};
+                                font-weight:900;font-size:{title_font_size}px;">
                         {titles[page]}
                     </div>
                 </div>
@@ -5106,139 +5196,41 @@ def render_report_upload_bar(page):
                 unsafe_allow_html=True
             )
 
-            # خانة الرفع في أقصى يمين الصفحة. الرسالة تظهر مرة واحدة فقط فوقها.
-            upload_group, page_spacer = st.columns([3.0, 7.0], gap='small')
-
-            with upload_group:
-                if current_files:
-                    st.markdown(
-                        f"""
-                        <div style="text-align:center;direction:rtl;color:{label_color};
-                                    font-size:15px;font-weight:900;margin:0 0 6px;">
-                            الملف الحالي: {"، ".join(x.name for x in current_files)}
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
-                else:
-                    st.markdown(
-                        f"""
-                        <div style="text-align:center;direction:rtl;color:{label_color};
-                                    font-size:18px;font-weight:900;margin:0 0 7px;">
-                            مفيش ملف مرفوع لسه يا رنا
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
-
-                upload_col, action_col = st.columns([3.3, 1.25], gap='small')
-
-                with upload_col:
-                    new_files = st.file_uploader(
-                        f"رفع ملف {titles[page]}",
-                        type=['xlsx', 'csv'],
-                        accept_multiple_files=True,
-                        label_visibility='collapsed',
-                        key=f"report_uploader_{selected_bank}_{page}_{uploader_version}"
-                    )
-                    if new_files:
-                        new_sig = [(x.name, x.size) for x in new_files]
-                        current_sig = [(x.name, x.size) for x in current_files]
-                        if new_sig != current_sig:
-                            bank_files[page] = new_files
-                            st.rerun()
-                    elif current_files:
-                        # إزالة كل الملفات من علامة × داخل الـ uploader تمسح الحالة القديمة أيضاً.
-                        bank_files[page] = None
-                        st.session_state.report_uploader_versions[selected_bank][page] += 1
-                        st.rerun()
-
-                with action_col:
-                    if current_files:
-                        st.button(
-                            "🗑️ إزالة الملف",
-                            key=f"clear_report_file_{selected_bank}_{page}",
-                            on_click=clear_report_page_file,
-                            args=(selected_bank, page),
-                            use_container_width=True,
-                            help="إزالة الملف الحالي ورفع ملف آخر"
-                        )
-
-            return
-
-        # باقي التقارير تحتفظ بالتخطيط الحالي.
-        outer_left, center_group, outer_right = st.columns([1.1, 7.8, 1.1], gap='small')
-
-        with center_group:
-            action_col, upload_col, title_col = st.columns([1.4, 4.2, 3.2], gap='small')
-
-            with action_col:
-                if current_files:
-                    st.button(
-                        "🗑️ إزالة الملف",
-                        key=f"clear_report_file_{selected_bank}_{page}",
-                        on_click=clear_report_page_file,
-                        args=(selected_bank, page),
-                        use_container_width=True,
-                        help="إزالة الملف الحالي ورفع ملف آخر"
-                    )
-                else:
-                    st.markdown(
-                        "<div style='height:42px;display:flex;align-items:center;"
-                        "justify-content:center;font-weight:800;color:#586F8C;'>—</div>",
-                        unsafe_allow_html=True
-                    )
-
-            with upload_col:
-                new_files = st.file_uploader(
-                    f"رفع ملف {titles[page]}",
-                    type=['xlsx', 'csv'],
-                    accept_multiple_files=True,
-                    label_visibility='collapsed',
-                    key=f"report_uploader_{selected_bank}_{page}_{uploader_version}"
-                )
-                if new_files:
-                    new_sig = [(x.name, x.size) for x in new_files]
-                    current_sig = [(x.name, x.size) for x in current_files]
-                    if new_sig != current_sig:
-                        bank_files[page] = new_files
-                        st.rerun()
-                elif current_files:
-                    bank_files[page] = None
-                    st.session_state.report_uploader_versions[selected_bank][page] += 1
-                    st.rerun()
-
-                if current_files:
-                    st.caption("الملف الحالي: " + "، ".join(x.name for x in current_files))
-                else:
-                    st.caption("مفيش ملف مرفوع لسه يا رنا")
-
-            with title_col:
-                st.markdown(
-                    f"""
-                    <div style="height:52px;display:flex;align-items:center;justify-content:center;">
-                        <div style="display:inline-flex;align-items:center;justify-content:center;
-                                    background:{card_color};border:1px solid {border_color};
-                                    border-radius:9px;padding:7px 14px;width:fit-content;
-                                    max-width:100%;white-space:nowrap;color:{text_color};
-                                    font-weight:900;font-size:18px;direction:rtl;">
-                            {titles[page]}
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-        if not current_files:
-            st.markdown(
-                f"""
-                <div style="text-align:center;direction:rtl;color:{label_color};
-                            font-size:17px;font-weight:900;margin:6px 0 2px;">
-                    مفيش ملف مرفوع لسه يا رنا
-                </div>
-                """,
-                unsafe_allow_html=True
+        with upload_col:
+            new_files = st.file_uploader(
+                f"رفع ملف {titles[page]}",
+                type=['xlsx', 'csv'],
+                accept_multiple_files=True,
+                label_visibility='collapsed',
+                key=f"report_uploader_{selected_bank}_{page}_{uploader_version}"
             )
+            if new_files:
+                new_sig = [(x.name, x.size) for x in new_files]
+                current_sig = [(x.name, x.size) for x in current_files]
+                if new_sig != current_sig:
+                    bank_files[page] = new_files
+                    st.rerun()
+            elif current_files:
+                # Clearing uploader via X must also clear stored page files.
+                bank_files[page] = None
+                st.session_state.report_uploader_versions[selected_bank][page] += 1
+                st.rerun()
+
+            if current_files:
+                st.caption("الملف الحالي: " + "، ".join(x.name for x in current_files))
+            else:
+                st.caption("مفيش ملف مرفوع لسه يا رنا")
+
+        with action_col:
+            if current_files:
+                st.button(
+                    "🗑️ إزالة الملف",
+                    key=f"clear_report_file_{selected_bank}_{page}",
+                    on_click=clear_report_page_file,
+                    args=(selected_bank, page),
+                    use_container_width=False,
+                    help="إزالة الملف الحالي ورفع ملف آخر"
+                )
 
 # دالة معالجة بيانات أي صفحة
 
@@ -5632,7 +5624,8 @@ def render_activity_boxes(activity_base_df=None):
 
 if curr_page == 'Overview':
     st.markdown(f"<h3 style='text-align:center;color:{label_color};font-weight:900;margin:6px 0 12px;'>اختاري البنك</h3>", unsafe_allow_html=True)
-    with st.container(key="overview_bank_selector_group"):
+    overview_snb_col, overview_stc_col, _overview_bank_spacer = st.columns([0.82, 0.82, 8.36], gap='small')
+    with overview_snb_col:
         st.button(
             '🏦 SNB',
             key='overview_choose_SNB',
@@ -5641,6 +5634,7 @@ if curr_page == 'Overview':
             on_click=set_bank,
             args=('SNB',)
         )
+    with overview_stc_col:
         st.button(
             '🏦 STC',
             key='overview_choose_STC',
