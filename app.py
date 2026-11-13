@@ -259,21 +259,20 @@ st.markdown(f"""
         white-space: nowrap !important;
     }}
 
-    /* Compact report navigation: make each button fill its tight column so
-       there is no unused column space between neighboring buttons. */
+    /* Report navigation boxes should hug their text exactly. */
     div.st-key-nav_prom_btn div[data-testid="stButton"],
     div.st-key-nav_neg_btn div[data-testid="stButton"],
     div.st-key-nav_act_btn div[data-testid="stButton"] {{
-        width: 100% !important;
+        width: fit-content !important;
         margin: 0 !important;
     }}
     div.st-key-nav_prom_btn div[data-testid="stButton"] > button,
     div.st-key-nav_neg_btn div[data-testid="stButton"] > button,
     div.st-key-nav_act_btn div[data-testid="stButton"] > button {{
-        width: 100% !important;
+        width: auto !important;
         min-width: 0 !important;
-        min-height: 38px !important;
-        padding: 5px 8px !important;
+        min-height: 36px !important;
+        padding: 4px 10px !important;
         border-radius: 7px !important;
         margin: 0 !important;
     }}
@@ -361,17 +360,17 @@ st.markdown(f"""
         color: #FFFFFF !important;
     }}
 
-    /* Home navigation is intentionally icon-only and compact. */
+    /* Home navigation is intentionally icon-only and hugs the icon. */
     div.st-key-nav_home_btn div[data-testid="stButton"] {{
-        width: 100% !important;
+        width: fit-content !important;
         margin: 0 !important;
     }}
     div.st-key-nav_home_btn div[data-testid="stButton"] > button {{
-        min-width: 0 !important;
-        width: 100% !important;
-        min-height: 38px !important;
-        height: 38px !important;
-        padding: 4px 6px !important;
+        min-width: 38px !important;
+        width: 38px !important;
+        min-height: 36px !important;
+        height: 36px !important;
+        padding: 3px 6px !important;
         border-radius: 7px !important;
         margin: 0 !important;
     }}
@@ -773,16 +772,16 @@ with nav_group:
     nav_cols = st.columns([0.50, 0.30, 2.60, 0.30, 1.55, 0.30, 1.05], gap=None)
 
     with nav_cols[0]:
-        st.button("🏠", key="nav_home_btn", type="primary" if st.session_state.current_page == 'Home' else "secondary", use_container_width=True, on_click=set_page, args=('Home',), help="الرئيسية")
+        st.button("🏠", key="nav_home_btn", type="primary" if st.session_state.current_page == 'Home' else "secondary", use_container_width=False, on_click=set_page, args=('Home',), help="الرئيسية")
 
     with nav_cols[2]:
-        st.button("🤝 الوعود القائمة والمكسورة", key="nav_prom_btn", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=True, on_click=set_page, args=('Promises',))
+        st.button("🤝 الوعود القائمة والمكسورة", key="nav_prom_btn", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=False, on_click=set_page, args=('Promises',))
 
     with nav_cols[4]:
-        st.button("🚨 تقرير الإهمال", key="nav_neg_btn", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=True, on_click=set_page, args=('Neglect',))
+        st.button("🚨 تقرير الإهمال", key="nav_neg_btn", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=False, on_click=set_page, args=('Neglect',))
 
     with nav_cols[6]:
-        st.button("📈 النشاط", key="nav_act_btn", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=True, on_click=set_page, args=('Activity',))
+        st.button("📈 النشاط", key="nav_act_btn", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=False, on_click=set_page, args=('Activity',))
 
 with _nav_spacer:
     st.markdown("")
