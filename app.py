@@ -4873,20 +4873,20 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
                 normalized_portfolio_values = (
                     portfolio_values
                     .str.lower()
-                    .str.replace(r'\\s+', ' ', regex=True)
+                    .str.split()
+                    .str.join(' ')
+                )
+                compact_portfolio_values = normalized_portfolio_values.str.replace(
+                    ' ', '', regex=False
                 )
 
-                is_stc_portfolio = normalized_portfolio_values.str.fullmatch(
-                    r'stc\\s*bank',
-                    case=False,
-                    na=False
-                ).any()
+                is_stc_portfolio = compact_portfolio_values.eq('stcbank').any()
 
-                is_snb_portfolio = normalized_portfolio_values.str.contains(
-                    r'(^|\\b)snb($|\\b)|saudi national bank|البنك الأهلي السعودي|البنك الاهلي السعودي',
-                    case=False,
-                    regex=True,
-                    na=False
+                is_snb_portfolio = (
+                    normalized_portfolio_values.str.contains('snb', regex=False, na=False) |
+                    normalized_portfolio_values.str.contains('saudi national bank', regex=False, na=False) |
+                    normalized_portfolio_values.str.contains('البنك الأهلي السعودي', regex=False, na=False) |
+                    normalized_portfolio_values.str.contains('البنك الاهلي السعودي', regex=False, na=False)
                 ).any()
 
                 if bank == 'SNB' and is_stc_portfolio:
