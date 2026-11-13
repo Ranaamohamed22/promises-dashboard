@@ -4958,17 +4958,28 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
                     .replace('ة', 'ه')
                 )
 
+            def _stc_blank_mask(series):
+                cleaned = series.astype(str).str.strip().str.lower()
+                return series.isna() | cleaned.isin(['', 'nan', 'nat', 'none'])
+
+            # Expected Closing: fill ONLY blank cells from Follow up Due Date.
+            # Existing dates remain unchanged.
+            stc_expected_blank = _stc_blank_mask(stc_promises[stc_expected_col])
+            stc_promises.loc[stc_expected_blank, stc_expected_col] = (
+                stc_promises.loc[stc_expected_blank, stc_due_col]
+            )
+
+            # Follow up Last Date: exclude blank rows completely before any
+            # STC active-promises filtering.
+            stc_last_blank = _stc_blank_mask(stc_promises[stc_last_col])
+            stc_promises = stc_promises.loc[~stc_last_blank].copy()
+
             stc_due_date = pd.to_datetime(
                 stc_promises[stc_due_col], errors='coerce'
             ).dt.normalize()
             stc_expected_date = pd.to_datetime(
                 stc_promises[stc_expected_col], errors='coerce'
             ).dt.normalize()
-
-            # Fill blank Expected Closing values from Follow up Due Date.
-            stc_expected_date = stc_expected_date.fillna(stc_due_date)
-            stc_promises[stc_expected_col] = stc_expected_date
-
             stc_last_date = pd.to_datetime(
                 stc_promises[stc_last_col], errors='coerce'
             ).dt.normalize()
