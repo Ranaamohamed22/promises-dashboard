@@ -286,6 +286,14 @@ st.markdown(f"""
         white-space: nowrap !important;
     }}
 
+    /* Keep a fixed ~1 cm visual gap (38 px) between navigation boxes. */
+    div.st-key-nav_home_btn,
+    div.st-key-nav_prom_btn,
+    div.st-key-nav_neg_btn {{
+        padding-left: 38px !important;
+        box-sizing: border-box !important;
+    }}
+
     /* Move the Streamlit cloud toolbar (Share / star / edit / GitHub / menu)
        to the far-left and keep all of its icons/text white. */
     header[data-testid="stHeader"] [data-testid="stToolbar"],
