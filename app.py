@@ -6809,13 +6809,15 @@ def _infer_snb_daily_period(frame):
     second = ((minute_of_day >= 750) & (minute_of_day < 960)).any()
     outside = ((minute_of_day < 120) | (minute_of_day >= 960)).any()
 
-    if outside or (first and second):
+    # Full-day uploads must have activity in BOTH shift windows.
+    # An isolated out-of-shift/overtime call does not prove full-day coverage.
+    if first and second:
         return "full", False
     if first:
         return "first", False
     if second:
         return "second", False
-    # No reliable timing evidence: keep all hours to avoid losing calls.
+    # Without evidence for either shift we cannot assume a full-day file.
     return "full", True
 
 
@@ -7303,35 +7305,44 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
         period = "full"
         exclude_after_shift = True
         if activity_kind == "يومي":
-            suggestion, _ = _infer_snb_daily_period(prepared)
-            shift_labels = [
-                "الفترة الأولى (2:00 ص – 12:00 ظ)",
-                "الفترة الثانية (12:30 م – 4:00 م)",
-            ]
-            with st.container(key="snb_activity_daily_options"):
-                shift_col, last_hour_col, _controls_space = st.columns(
-                    [1.8, 1.3, 5.0], gap="small", vertical_alignment="bottom"
+            suggested_period, unsure = _infer_snb_daily_period(prepared)
+            if suggested_period == "full" and not unsure:
+                # Automatically honor a file containing both shift windows:
+                # no manual shift selector and no overtime checkbox.
+                period = "full"
+                st.caption(
+                    "✅ تم اكتشاف ملف اليوم الكامل (الفترتان الأولى والثانية). "
+                    "تم عرض جميع مكالمات اليوم بدون اختيار فترة أو حذف ساعة."
                 )
-                with shift_col:
-                    shift_choice = st.selectbox(
-                        "اختاري الفترة اليومية",
-                        shift_labels,
-                        index=1 if suggestion == "second" else 0,
-                        key="snb_activity_daily_shift"
+            else:
+                shift_labels = [
+                    "الفترة الأولى (2:00 ص – 12:00 ظ)",
+                    "الفترة الثانية (12:30 م – 4:00 م)",
+                ]
+                with st.container(key="snb_activity_daily_options"):
+                    shift_col, last_hour_col, _controls_space = st.columns(
+                        [1.8, 1.3, 5.0], gap="small", vertical_alignment="bottom"
                     )
-                with last_hour_col:
-                    exclude_after_shift = st.checkbox(
-                        "استبعاد الساعة الزيادة بعد نهاية الفترة",
-                        value=True,
-                        key="snb_activity_exclude_after_shift"
-                    )
-            period = "first" if shift_choice == shift_labels[0] else "second"
-            st.caption(
-                "البريك من 12:00 إلى 12:30. "
-                "لو فعلتي الاستبعاد: هتتحذف تسجيلات الساعة 12:00–1:00 ظهرًا "
-                "للفترة الأولى، أو 4:00–5:00 عصرًا للفترة الثانية. "
-                "آخر ساعة داخل الشيفت نفسه هتفضل محسوبة."
-            )
+                    with shift_col:
+                        shift_choice = st.selectbox(
+                            "اختاري الفترة اليومية",
+                            shift_labels,
+                            index=1 if suggested_period == "second" else 0,
+                            key="snb_activity_daily_shift"
+                        )
+                    with last_hour_col:
+                        exclude_after_shift = st.checkbox(
+                            "استبعاد الساعة الزيادة بعد نهاية الفترة",
+                            value=True,
+                            key="snb_activity_exclude_after_shift"
+                        )
+                period = "first" if shift_choice == shift_labels[0] else "second"
+                st.caption(
+                    "البريك من 12:00 إلى 12:30. "
+                    "لو فعلتي الاستبعاد: هتتحذف تسجيلات الساعة 12:00–1:00 ظهرًا "
+                    "للفترة الأولى، أو 4:00–5:00 عصرًا للفترة الثانية. "
+                    "آخر ساعة داخل الشيفت نفسه هتفضل محسوبة."
+                )
 
         selected, excluded_after_shift = _filter_snb_activity_period(
             prepared, activity_kind, period,
