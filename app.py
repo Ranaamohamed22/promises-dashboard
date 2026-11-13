@@ -259,20 +259,23 @@ st.markdown(f"""
         white-space: nowrap !important;
     }}
 
-    /* Compact report navigation: smaller boxes with larger report names. */
+    /* Compact report navigation: make each button fill its tight column so
+       there is no unused column space between neighboring buttons. */
     div.st-key-nav_prom_btn div[data-testid="stButton"],
     div.st-key-nav_neg_btn div[data-testid="stButton"],
     div.st-key-nav_act_btn div[data-testid="stButton"] {{
-        width: fit-content !important;
+        width: 100% !important;
+        margin: 0 !important;
     }}
     div.st-key-nav_prom_btn div[data-testid="stButton"] > button,
     div.st-key-nav_neg_btn div[data-testid="stButton"] > button,
     div.st-key-nav_act_btn div[data-testid="stButton"] > button {{
-        width: auto !important;
+        width: 100% !important;
         min-width: 0 !important;
         min-height: 38px !important;
-        padding: 5px 10px !important;
+        padding: 5px 8px !important;
         border-radius: 7px !important;
+        margin: 0 !important;
     }}
     div.st-key-nav_prom_btn div[data-testid="stButton"] > button p,
     div.st-key-nav_neg_btn div[data-testid="stButton"] > button p,
@@ -360,15 +363,17 @@ st.markdown(f"""
 
     /* Home navigation is intentionally icon-only and compact. */
     div.st-key-nav_home_btn div[data-testid="stButton"] {{
-        width: fit-content !important;
+        width: 100% !important;
+        margin: 0 !important;
     }}
     div.st-key-nav_home_btn div[data-testid="stButton"] > button {{
-        min-width: 42px !important;
-        width: 42px !important;
+        min-width: 0 !important;
+        width: 100% !important;
         min-height: 38px !important;
         height: 38px !important;
-        padding: 4px 7px !important;
+        padding: 4px 6px !important;
         border-radius: 7px !important;
+        margin: 0 !important;
     }}
     div.st-key-nav_home_btn div[data-testid="stButton"] > button p {{
         font-size: 19px !important;
@@ -761,22 +766,22 @@ if st.session_state.current_page not in ('Overview', 'Home'):
 # 2. شريط التنقل
 # ==========================================
 # نجمع أزرار التقارير في كتلة واحدة متراصة بدل توزيعها على عرض الصفحة.
-nav_group, _nav_spacer = st.columns([3.45, 6.55], gap="small")
+nav_group, _nav_spacer = st.columns([3.2, 6.8], gap=None)
 
 with nav_group:
-    nav_cols = st.columns([0.52, 2.55, 1.55, 1.05], gap="small")
+    nav_cols = st.columns([0.50, 2.45, 1.45, 1.00], gap=None)
 
     with nav_cols[0]:
-        st.button("🏠", key="nav_home_btn", type="primary" if st.session_state.current_page == 'Home' else "secondary", use_container_width=False, on_click=set_page, args=('Home',), help="الرئيسية")
+        st.button("🏠", key="nav_home_btn", type="primary" if st.session_state.current_page == 'Home' else "secondary", use_container_width=True, on_click=set_page, args=('Home',), help="الرئيسية")
 
     with nav_cols[1]:
-        st.button("🤝 الوعود القائمة والمكسورة", key="nav_prom_btn", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=False, on_click=set_page, args=('Promises',))
+        st.button("🤝 الوعود القائمة والمكسورة", key="nav_prom_btn", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=True, on_click=set_page, args=('Promises',))
 
     with nav_cols[2]:
-        st.button("🚨 تقرير الإهمال", key="nav_neg_btn", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=False, on_click=set_page, args=('Neglect',))
+        st.button("🚨 تقرير الإهمال", key="nav_neg_btn", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=True, on_click=set_page, args=('Neglect',))
 
     with nav_cols[3]:
-        st.button("📈 النشاط", key="nav_act_btn", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=False, on_click=set_page, args=('Activity',))
+        st.button("📈 النشاط", key="nav_act_btn", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=True, on_click=set_page, args=('Activity',))
 
 with _nav_spacer:
     st.markdown("")
