@@ -5109,6 +5109,53 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
                 (stc_last_date != today)
             ].copy()
 
+            # STC broken-promises logic:
+            # 1) exclude processing status = معالج
+            # 2) keep only the three requested Classification values
+            # 3) Expected Closing blanks were already filled from Follow up Due Date
+            # 4) keep Expected Closing dates before today
+            # 5) calculate Follow up Last Date - Expected Closing
+            # 6) keep only negative differences
+            stc_broken_allowed_classifications = {
+                _normalize_stc_filter_text('اقساط شهريه'),
+                _normalize_stc_filter_text('ايجابي'),
+                _normalize_stc_filter_text('وعود السداد قيد التنفيذ'),
+            }
+
+            stc_broken_condition = (
+                (stc_processing != _normalize_stc_filter_text('معالج')) &
+                (stc_classification.isin(stc_broken_allowed_classifications)) &
+                (stc_expected_date < today)
+            )
+
+            broken_promises_df = stc_promises[stc_broken_condition].copy()
+            if not broken_promises_df.empty:
+                stc_broken_diff = (
+                    stc_last_date.loc[broken_promises_df.index] -
+                    stc_expected_date.loc[broken_promises_df.index]
+                ).dt.days
+
+                negative_diff_mask = stc_broken_diff < 0
+                broken_promises_df = broken_promises_df.loc[
+                    negative_diff_mask[negative_diff_mask].index
+                ].copy()
+                stc_broken_diff = stc_broken_diff.loc[broken_promises_df.index]
+
+                broken_promises_df = broken_promises_df.drop(
+                    columns=['الفرق '],
+                    errors='ignore'
+                )
+                insert_at = (
+                    broken_promises_df.columns.get_loc(stc_last_col) + 1
+                    if stc_last_col in broken_promises_df.columns
+                    else len(broken_promises_df.columns)
+                )
+                broken_promises_df.insert(
+                    insert_at,
+                    'الفرق ',
+                    stc_broken_diff.astype(int)
+                )
+
             total_unhandled = int(stc_base_condition.sum())
 
     output_buffer = build_report_xlsx(active_promises_df, broken_promises_df, neglect_df, bank=bank)
