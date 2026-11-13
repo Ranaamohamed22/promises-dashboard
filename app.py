@@ -315,8 +315,8 @@ st.markdown(f"""
         white-space: nowrap !important;
     }}
 
-    /* Move the Streamlit cloud toolbar (Share / star / edit / GitHub / menu)
-       to the far-left and keep all of its icons/text white. */
+    /* Streamlit cloud toolbar: Share, star, edit, GitHub and menu.
+       Green stays visible against Light, Navy, and Dark backgrounds. */
     header[data-testid="stHeader"] [data-testid="stToolbar"],
     header[data-testid="stHeader"] [data-testid="stToolbarActions"] {{
         position: absolute !important;
@@ -328,66 +328,92 @@ st.markdown(f"""
         justify-content: flex-start !important;
     }}
 
+    header[data-testid="stHeader"] [data-testid="stToolbar"],
+    header[data-testid="stHeader"] [data-testid="stToolbarActions"],
     header[data-testid="stHeader"] [data-testid="stToolbar"] *,
     header[data-testid="stHeader"] [data-testid="stToolbarActions"] *,
     header[data-testid="stHeader"] button,
-    header[data-testid="stHeader"] a {{
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
-    }}
-
-    header[data-testid="stHeader"] [data-testid="stToolbar"] svg,
-    header[data-testid="stHeader"] [data-testid="stToolbarActions"] svg,
-    header[data-testid="stHeader"] button svg,
-    header[data-testid="stHeader"] a svg {{
-        color: #FFFFFF !important;
-        fill: #FFFFFF !important;
-        stroke: #FFFFFF !important;
-    }}
-
-    /* Streamlit icons draw their visible color on inner SVG shapes.
-       Force those inner paths/shapes to white as well. */
-    header[data-testid="stHeader"] [data-testid="stToolbar"] svg path,
-    header[data-testid="stHeader"] [data-testid="stToolbar"] svg circle,
-    header[data-testid="stHeader"] [data-testid="stToolbar"] svg rect,
-    header[data-testid="stHeader"] [data-testid="stToolbar"] svg line,
-    header[data-testid="stHeader"] [data-testid="stToolbar"] svg polyline,
-    header[data-testid="stHeader"] [data-testid="stToolbar"] svg polygon,
-    header[data-testid="stHeader"] [data-testid="stToolbarActions"] svg path,
-    header[data-testid="stHeader"] [data-testid="stToolbarActions"] svg circle,
-    header[data-testid="stHeader"] [data-testid="stToolbarActions"] svg rect,
-    header[data-testid="stHeader"] [data-testid="stToolbarActions"] svg line,
-    header[data-testid="stHeader"] [data-testid="stToolbarActions"] svg polyline,
-    header[data-testid="stHeader"] [data-testid="stToolbarActions"] svg polygon {{
-        color: #FFFFFF !important;
-        fill: #FFFFFF !important;
-        stroke: #FFFFFF !important;
-    }}
-
-    /* Hard-force toolbar glyphs to white across current Streamlit variants. */
-    [data-testid="stToolbar"] svg,
-    [data-testid="stToolbar"] img,
-    [data-testid="stToolbarActions"] svg,
-    [data-testid="stToolbarActions"] img,
-    header[data-testid="stHeader"] svg,
-    header[data-testid="stHeader"] img {{
-        filter: brightness(0) invert(1) !important;
-        opacity: 1 !important;
-    }}
-
-    [data-testid="stToolbar"] span,
-    [data-testid="stToolbarActions"] span,
+    header[data-testid="stHeader"] a,
     header[data-testid="stHeader"] span,
     header[data-testid="stHeader"] [role="button"],
     header[data-testid="stHeader"] [aria-label] {{
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
+        color: {snb_green} !important;
+        -webkit-text-fill-color: {snb_green} !important;
+        opacity: 1 !important;
     }}
 
-    /* Keep the main menu / overflow control aligned with the left toolbar too. */
+    /* A filter recolors both filled and outlined SVG icons without
+       destroying their original shapes (unlike forcing fill on paths). */
+    header[data-testid="stHeader"] [data-testid="stToolbar"] svg,
+    header[data-testid="stHeader"] [data-testid="stToolbarActions"] svg,
+    header[data-testid="stHeader"] button svg,
+    header[data-testid="stHeader"] a svg,
+    header[data-testid="stHeader"] img,
+    header[data-testid="stHeader"] [data-testid="stToolbar"] img,
+    header[data-testid="stHeader"] [data-testid="stToolbarActions"] img {{
+        filter: brightness(0) saturate(100%) invert(48%) sepia(70%)
+                saturate(570%) hue-rotate(86deg) brightness(91%) contrast(92%) !important;
+        opacity: 1 !important;
+        color: {snb_green} !important;
+    }}
+
     header[data-testid="stHeader"] [data-testid="stMainMenu"],
     header[data-testid="stHeader"] button[aria-label*="menu" i] {{
-        color: #FFFFFF !important;
+        color: {snb_green} !important;
+    }}
+
+    /* Bank selectors: a short box around each larger bank name. */
+    div.st-key-bank_selector_group,
+    div.st-key-overview_bank_selector_group {{
+        max-width: 100% !important;
+        width: fit-content !important;
+        direction: rtl !important;
+        overflow-x: auto !important;
+    }}
+    div.st-key-bank_selector_group [data-testid="stVerticalBlock"],
+    div.st-key-overview_bank_selector_group [data-testid="stVerticalBlock"] {{
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        direction: rtl !important;
+        gap: 16px !important;
+        width: fit-content !important;
+        min-width: max-content !important;
+    }}
+    div.st-key-bank_selector_group [data-testid="stElementContainer"],
+    div.st-key-overview_bank_selector_group [data-testid="stElementContainer"] {{
+        flex: 0 0 auto !important;
+        width: fit-content !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+    }}
+    div.st-key-bank_SNB div[data-testid="stButton"],
+    div.st-key-bank_STC div[data-testid="stButton"],
+    div.st-key-overview_choose_SNB div[data-testid="stButton"],
+    div.st-key-overview_choose_STC div[data-testid="stButton"] {{
+        width: fit-content !important;
+    }}
+    div.st-key-bank_SNB button,
+    div.st-key-bank_STC button,
+    div.st-key-overview_choose_SNB button,
+    div.st-key-overview_choose_STC button {{
+        width: auto !important;
+        min-width: 0 !important;
+        min-height: 44px !important;
+        padding: 6px 15px !important;
+        border-radius: 9px !important;
+        white-space: nowrap !important;
+    }}
+    div.st-key-bank_SNB button p,
+    div.st-key-bank_STC button p,
+    div.st-key-overview_choose_SNB button p,
+    div.st-key-overview_choose_STC button p {{
+        font-size: 21px !important;
+        font-weight: 900 !important;
+        line-height: 1.15 !important;
+        white-space: nowrap !important;
     }}
 
     /* Home navigation is intentionally icon-only and hugs the icon. */
@@ -763,7 +789,7 @@ with top_cols[1]:
 # ==========================================
 # وضع اسم البنك على يسار الشاشة مباشرة، بعيداً عن انعكاس أعمدة RTL.
 # الشعار في منتصف الصفحة، ولا نستخدم وسوماً غير مغلقة.
-_bank_title = 'SNB البنك الأهلي السعودي' if st.session_state.selected_bank == 'SNB' else 'STC'
+_bank_title = 'SNB' if st.session_state.selected_bank == 'SNB' else ''
 _bank_subtitle = '(30-60-NPL)' if st.session_state.selected_bank == 'SNB' else ''
 st.markdown(f"""
 <div class="ejada-header" style="position:relative;width:100%;height:72px;margin-top:-54px;direction:ltr;pointer-events:none;z-index:1;">
@@ -780,15 +806,13 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 if st.session_state.current_page not in ('Overview', 'Home'):
-    _bank_spacer, bank_col1, bank_col2 = st.columns([7.4, 1.3, 1.3], gap='small')
-    with bank_col1:
-        st.button('🏦 SNB | البنك الأهلي السعودي', key='bank_SNB',
+    with st.container(key="bank_selector_group"):
+        st.button('🏦 SNB', key='bank_SNB',
                   type='primary' if st.session_state.selected_bank == 'SNB' else 'secondary',
-                  use_container_width=True, on_click=set_bank, args=('SNB',))
-    with bank_col2:
+                  use_container_width=False, on_click=set_bank, args=('SNB',))
         st.button('🏦 STC', key='bank_STC',
                   type='primary' if st.session_state.selected_bank == 'STC' else 'secondary',
-                  use_container_width=True, on_click=set_bank, args=('STC',))
+                  use_container_width=False, on_click=set_bank, args=('STC',))
 
 
 # ==========================================
@@ -5608,22 +5632,20 @@ def render_activity_boxes(activity_base_df=None):
 
 if curr_page == 'Overview':
     st.markdown(f"<h3 style='text-align:center;color:{label_color};font-weight:900;margin:6px 0 12px;'>اختاري البنك</h3>", unsafe_allow_html=True)
-    overview_bank_cols = st.columns(2, gap='large')
-    with overview_bank_cols[0]:
+    with st.container(key="overview_bank_selector_group"):
         st.button(
-            '🏦 SNB | البنك الأهلي السعودي',
+            '🏦 SNB',
             key='overview_choose_SNB',
             type='primary' if selected_bank == 'SNB' else 'secondary',
-            use_container_width=True,
+            use_container_width=False,
             on_click=set_bank,
             args=('SNB',)
         )
-    with overview_bank_cols[1]:
         st.button(
             '🏦 STC',
             key='overview_choose_STC',
             type='primary' if selected_bank == 'STC' else 'secondary',
-            use_container_width=True,
+            use_container_width=False,
             on_click=set_bank,
             args=('STC',)
         )
