@@ -990,6 +990,86 @@ st.markdown(f"""
         font-variant-numeric: tabular-nums;
         white-space: nowrap !important;
     }}
+
+    /* Fixed-row header for all three report pages. Filename has its own row.
+       Both bordered boxes share the same top coordinate and 112px height. */
+    [class*="st-key-report_upload_bar_"] [data-testid="stHorizontalBlock"]:has(.ejada-report-title-holder) {{
+        direction: rtl !important;
+        align-items: flex-start !important;
+        flex-wrap: nowrap !important;
+    }}
+    [class*="st-key-report_upload_bar_"] [data-testid="stHorizontalBlock"]:has(.ejada-report-title-holder) > [data-testid="stColumn"] {{
+        align-self: flex-start !important;
+        min-width: 0 !important;
+    }}
+    [class*="st-key-report_upload_bar_"] .ejada-report-title-holder {{
+        display: flex !important;
+        align-items: flex-start !important;
+        justify-content: center !important;
+        width: 100% !important;
+        height: 112px !important;
+        min-height: 112px !important;
+        max-height: 112px !important;
+        box-sizing: border-box !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        direction: rtl !important;
+    }}
+    [class*="st-key-report_upload_bar_"] .ejada-report-title {{
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+        width: fit-content !important;
+        max-width: 100% !important;
+        height: 112px !important;
+        min-height: 112px !important;
+        max-height: 112px !important;
+        box-sizing: border-box !important;
+        padding: 8px 14px !important;
+        border: 1px solid !important;
+        border-radius: 9px !important;
+        font-weight: 900 !important;
+        line-height: 1.3 !important;
+        white-space: normal !important;
+        margin: 0 !important;
+    }}
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploader"] {{
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }}
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] {{
+        box-sizing: border-box !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin: 0 !important;
+        padding: 8px !important;
+        width: 100% !important;
+        height: 112px !important;
+        min-height: 112px !important;
+        max-height: 112px !important;
+        border: 1px dashed {border_color} !important;
+        border-radius: 9px !important;
+        overflow: hidden !important;
+    }}
+    [class*="st-key-report_upload_bar_"] [data-testid="stFileUploaderDropzone"] > div {{
+        min-height: 0 !important;
+        max-height: 100% !important;
+        height: auto !important;
+    }}
+    [class*="st-key-report_upload_bar_"] .ejada-upload-name {{
+        margin: 0 !important;
+        min-height: 25px !important;
+        line-height: 25px !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        direction: rtl !important;
+        text-align: right !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -5422,7 +5502,7 @@ def render_promise_filter_diagnostics(bank, kind):
 
 
 def render_report_upload_bar(page):
-    """Render uploader at right and its report-title box directly beside it."""
+    """Title and upload boxes share one fixed-height, top-aligned row."""
     titles = {
         'Promises': '🤝 إدارة ومتابعة الوعود (القائمة والمكسورة)',
         'Neglect': '🚨 تقرير الإهمال',
@@ -5430,28 +5510,30 @@ def render_report_upload_bar(page):
     }
     current_files = bank_files.get(page) or []
     uploader_version = st.session_state.report_uploader_versions[selected_bank][page]
-
     with st.container(key=f"report_upload_bar_{selected_bank}_{page}"):
-        # Equal left/right columns keep the report heading exactly centered.
-        # In the current RTL layout, the first (upload) column is on the right.
-        upload_col, title_col, _rest = st.columns(
-            [2.9, 4.2, 2.9], gap='small', vertical_alignment='center'
-        )
+        if current_files:
+            names = "، ".join(x.name for x in current_files)
+            message = f"الملف الحالي: {names}"
+        else:
+            message = "مفيش ملف مرفوع لسه يا رنا"
 
-        with upload_col:
-            if current_files:
-                file_names = "، ".join(x.name for x in current_files)
-                upload_message = f"الملف الحالي: {file_names}"
-            else:
-                upload_message = "مفيش ملف مرفوع لسه يا رنا"
-
+        # Keep filename ABOVE both boxes, outside their shared controls row.
+        status_col, _, _ = st.columns([2.9, 4.2, 2.9], gap='small')
+        with status_col:
             st.markdown(
-                f'<div class="ejada-upload-name" title="{_xml_escape(upload_message)}" '
-                f'style="color:{label_color};">{_xml_escape(upload_message)}</div>',
+                f'<div class="ejada-upload-name" title="{_xml_escape(message)}" '
+                f'style="color:{label_color};">{_xml_escape(message)}</div>',
                 unsafe_allow_html=True
             )
 
-            clear_col, picker_col = st.columns([0.13, 0.87], gap='small')
+        # The two actual boxes start on the SAME horizontal line.
+        upload_col, title_col, _ = st.columns(
+            [2.9, 4.2, 2.9], gap='small', vertical_alignment='top'
+        )
+        with upload_col:
+            clear_col, picker_col = st.columns(
+                [0.13, 0.87], gap='small', vertical_alignment='top'
+            )
             with clear_col:
                 if current_files:
                     st.button(
@@ -5462,7 +5544,6 @@ def render_report_upload_bar(page):
                         help="مسح الملف المرفوع",
                         use_container_width=False
                     )
-
             with picker_col:
                 new_files = st.file_uploader(
                     f"رفع ملف {titles[page]}",
@@ -5478,7 +5559,6 @@ def render_report_upload_bar(page):
                         bank_files[page] = new_files
                         st.rerun()
                 elif current_files:
-                    # Native remove controls also clear this page's stored files.
                     bank_files[page] = None
                     st.session_state.report_uploader_versions[selected_bank][page] += 1
                     st.rerun()
@@ -5487,13 +5567,10 @@ def render_report_upload_bar(page):
             title_font_size = 24 if page == 'Promises' else 20
             st.markdown(
                 f"""
-                <div style="min-height:78px;display:flex;align-items:center;
-                            justify-content:center;direction:rtl;width:100%;">
-                    <div style="display:inline-flex;align-items:center;justify-content:center;
-                                background:{card_color};border:1px solid {border_color};
-                                border-radius:9px;padding:8px 14px;width:fit-content;
-                                max-width:100%;color:{text_color};
-                                font-weight:900;font-size:{title_font_size}px;">
+                <div class="ejada-report-title-holder">
+                    <div class="ejada-report-title"
+                         style="background:{card_color};border-color:{border_color};
+                                color:{text_color};font-size:{title_font_size}px;">
                         {titles[page]}
                     </div>
                 </div>
