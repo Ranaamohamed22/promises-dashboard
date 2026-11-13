@@ -282,6 +282,25 @@ st.markdown(f"""
         stroke: #FFFFFF !important;
     }}
 
+    /* Streamlit icons draw their visible color on inner SVG shapes.
+       Force those inner paths/shapes to white as well. */
+    header[data-testid="stHeader"] [data-testid="stToolbar"] svg path,
+    header[data-testid="stHeader"] [data-testid="stToolbar"] svg circle,
+    header[data-testid="stHeader"] [data-testid="stToolbar"] svg rect,
+    header[data-testid="stHeader"] [data-testid="stToolbar"] svg line,
+    header[data-testid="stHeader"] [data-testid="stToolbar"] svg polyline,
+    header[data-testid="stHeader"] [data-testid="stToolbar"] svg polygon,
+    header[data-testid="stHeader"] [data-testid="stToolbarActions"] svg path,
+    header[data-testid="stHeader"] [data-testid="stToolbarActions"] svg circle,
+    header[data-testid="stHeader"] [data-testid="stToolbarActions"] svg rect,
+    header[data-testid="stHeader"] [data-testid="stToolbarActions"] svg line,
+    header[data-testid="stHeader"] [data-testid="stToolbarActions"] svg polyline,
+    header[data-testid="stHeader"] [data-testid="stToolbarActions"] svg polygon {{
+        color: #FFFFFF !important;
+        fill: #FFFFFF !important;
+        stroke: #FFFFFF !important;
+    }}
+
     /* Keep the main menu / overflow control aligned with the left toolbar too. */
     header[data-testid="stHeader"] [data-testid="stMainMenu"],
     header[data-testid="stHeader"] button[aria-label*="menu" i] {{
