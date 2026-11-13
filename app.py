@@ -1482,7 +1482,29 @@ with st.container(key="report_nav_group"):
     st.button("🚨 تقرير الإهمال", key="nav_neg_btn", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=False, on_click=set_page, args=('Neglect',))
     st.button("📈 النشاط", key="nav_act_btn", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=False, on_click=set_page, args=('Activity',))
 
-st.markdown(f"<hr style='margin: 10px 0 20px 0; border-color: {border_color}; clear: both;'>", unsafe_allow_html=True)
+# Activity header sits ABOVE the navigation separator, about half a centimeter
+# from the rule. Only the title and telephone icon remain on the Activity page.
+if st.session_state.current_page == 'Activity':
+    st.markdown(f"""
+    <div style="display:flex;align-items:center;justify-content:center;
+                direction:rtl;width:100%;margin:0;padding:0;">
+        <div style="display:inline-flex;align-items:center;justify-content:center;
+                    gap:12px;padding:12px 24px;width:fit-content;max-width:100%;
+                    background:{card_color};border:1px solid {border_color};
+                    border-radius:10px;color:{text_color};font-weight:900;
+                    font-size:26px;text-align:center;">
+            {PHONE_HEADER_SVG}
+            <span>تقرير نشاط المحصلين</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# Roughly 0.5 cm (~19 CSS px) from the title to the horizontal separator.
+_separator_top = '3px' if st.session_state.current_page == 'Activity' else '10px'
+st.markdown(
+    f"<hr style='margin: {_separator_top} 0 20px 0; border-color: {border_color}; clear: both;'>",
+    unsafe_allow_html=True
+)
 
 # Click on empty canvas to close the current report and return Home.
 # All controls, file uploads, charts and actual report content are excluded.
@@ -6408,22 +6430,6 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
 # ==========================================
 # صفحة النشاط: العنوان مع لوجو التليفون الكامل + الخانات التلاتة
 # ==========================================
-def render_activity_header():
-    """Only the Activity report title is visible until the page is redesigned."""
-    st.markdown(f"""
-    <div style="display:flex;justify-content:center;align-items:center;
-                width:100%;padding:12px 0 18px;direction:rtl;">
-        <div style="display:inline-flex;align-items:center;justify-content:center;
-                    padding:12px 24px;width:fit-content;max-width:100%;
-                    background:{card_color};border:1px solid {border_color};
-                    border-radius:10px;color:{text_color};
-                    font-weight:900;font-size:26px;text-align:center;">
-            تقرير نشاط المحصلين
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-
 if curr_page == 'Overview':
     st.markdown(f"<h3 style='text-align:center;color:{label_color};font-weight:900;margin:6px 0 12px;'>اختاري البنك</h3>", unsafe_allow_html=True)
     overview_snb_col, overview_stc_col, _overview_bank_spacer = st.columns([0.82, 0.82, 8.36], gap='small')
@@ -6587,8 +6593,8 @@ if page_uploaded is None:
         </div>
         """, unsafe_allow_html=True)
     elif curr_page == 'Activity':
-        # The only element in the Activity page until redesigned.
-        render_activity_header()
+        # Header already rendered directly ABOVE the navigation separator.
+        pass
     else:
         st.markdown(f"<p style='color:{label_color};font-weight:800;font-size:15px;text-align:right;direction:rtl;margin-top:8px;'>ارفعي الملف من الخانة اللي فوق لعرض التقرير.</p>", unsafe_allow_html=True)
 else:
