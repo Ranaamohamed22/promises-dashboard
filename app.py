@@ -229,16 +229,53 @@ st.markdown(f"""
 
     div.st-key-theme_toggle div[data-testid="stButton"] > button {{
         background: linear-gradient(90deg, {ejada_navy_dark} 50%, {ejada_grey_blue} 50%) !important;
-        border: 2px solid #FFFFFF !important;
-        border-radius: 50% !important; 
-        width: 40px !important;
-        height: 40px !important;
-        min-width: 40px !important;
-        min-height: 40px !important;
+        border: 2px solid {header_logo_color} !important;
+        border-radius: 50% !important;
+        width: 44px !important;
+        height: 44px !important;
+        min-width: 44px !important;
+        min-height: 44px !important;
         padding: 0 !important;
-        color: transparent !important; 
-        box-shadow: 0 2px 6px rgba(0,0,0,0.4) !important;
+        color: transparent !important;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.28) !important;
         cursor: pointer !important;
+    }}
+
+    /* Overview button: larger and more prominent. */
+    div.st-key-top_overview_btn div[data-testid="stButton"] > button {{
+        min-height: 46px !important;
+        padding: 8px 18px !important;
+    }}
+    div.st-key-top_overview_btn div[data-testid="stButton"] > button p {{
+        font-size: 19px !important;
+        font-weight: 900 !important;
+        line-height: 1.15 !important;
+    }}
+
+    /* Streamlit top toolbar icons (GitHub / share / edit / star / menu)
+       follow the active dashboard theme instead of keeping a fixed color. */
+    header[data-testid="stHeader"] [data-testid="stToolbar"] svg,
+    header[data-testid="stHeader"] button svg,
+    header[data-testid="stHeader"] a svg {{
+        color: {header_logo_color} !important;
+        fill: {header_logo_color} !important;
+        stroke: {header_logo_color} !important;
+    }}
+    header[data-testid="stHeader"] [data-testid="stToolbar"] button,
+    header[data-testid="stHeader"] [data-testid="stToolbar"] a {{
+        color: {header_logo_color} !important;
+    }}
+
+    /* Home navigation is intentionally icon-only. */
+    div.st-key-nav_home_btn div[data-testid="stButton"] > button {{
+        min-width: 56px !important;
+        width: 56px !important;
+        padding: 8px 10px !important;
+        font-size: 22px !important;
+    }}
+    div.st-key-nav_home_btn div[data-testid="stButton"] > button p {{
+        font-size: 22px !important;
+        line-height: 1 !important;
     }}
 
     div[data-testid="stVerticalBlockBorderWrapper"] {{
@@ -580,9 +617,9 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 0. الصف العلوي: زر القمر + Overview
+# 0. الصف العلوي: Overview وبجواره زر القمر
 # ==========================================
-top_cols = st.columns([0.6, 1.6, 7.8], gap="small")
+top_cols = st.columns([0.48, 1.55, 7.97], gap="small")
 
 with top_cols[0]:
     st.button("🌓", key="theme_toggle", on_click=toggle_theme, help="تغيير الثيم (كحلي / أسود / أبيض)")
@@ -629,7 +666,7 @@ if st.session_state.current_page not in ('Overview', 'Home'):
 nav_cols = st.columns([0.9, 1.5, 1.05, 0.85, 5.7], gap="small") 
 
 with nav_cols[0]:
-    st.button("🏠 الرئيسية", key="nav_home_btn", type="primary" if st.session_state.current_page == 'Home' else "secondary", use_container_width=True, on_click=set_page, args=('Home',))
+    st.button("🏠", key="nav_home_btn", type="primary" if st.session_state.current_page == 'Home' else "secondary", use_container_width=True, on_click=set_page, args=('Home',), help="الرئيسية")
 
 with nav_cols[1]:
     st.button("🤝 الوعود القائمة والمكسورة", key="nav_prom_btn", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=True, on_click=set_page, args=('Promises',))
@@ -5414,7 +5451,8 @@ if page_uploaded is None:
     if curr_page == 'Home':
         st.markdown(f"""
         <div style="background-color:{card_color};border:1px solid {border_color};border-radius:15px;padding:42px 24px;margin:28px 0 18px;text-align:center;direction:rtl;box-shadow:0 4px 14px rgba(0,0,0,0.08);">
-            <h2 style="color:{text_color};margin:0;font-weight:900;font-size:30px;">أهلاً بيكي يا رنا في تقارير شركة إجادة لتحصيل الديون</h2>
+            <h2 style="color:{text_color};margin:0 0 12px;font-weight:900;font-size:30px;">أهلاً بيكي يا رنا في تقارير شركة إجادة لتحصيل الديون</h2>
+            <p style="color:{kpi_title_color};margin:0;font-weight:800;font-size:18px;line-height:1.7;">تابعي أداء التحصيل والوعود والنشاط بسهولة من مكان واحد.</p>
         </div>
         """, unsafe_allow_html=True)
     elif curr_page == 'Overview':
