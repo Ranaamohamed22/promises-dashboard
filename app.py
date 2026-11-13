@@ -1734,6 +1734,64 @@ st.markdown(f"""
         }}
     }}
 
+    /* SNB Activity: uploader, report title, and small kind dropdown share one line. */
+    div.st-key-snb_activity_header_row {{
+        box-sizing: border-box !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }}
+    div.st-key-snb_activity_header_row [data-testid="stHorizontalBlock"]:has(.st-key-activity_file_upload_card) {{
+        direction: rtl !important;
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 12px !important;
+        width: 100% !important;
+    }}
+    div.st-key-snb_activity_kind_compact {{
+        box-sizing: border-box !important;
+        width: 172px !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+    }}
+    div.st-key-snb_activity_kind_compact [data-testid="stSelectbox"] {{
+        width: 172px !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+    }}
+    div.st-key-snb_activity_kind_compact [data-testid="stSelectbox"] > div {{
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+    }}
+    div.st-key-snb_activity_header_row div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-activity_file_upload_card),
+    div.st-key-snb_activity_header_row div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-activity_model_upload_card) {{
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        width: min(315px, 100%) !important;
+        max-width: 315px !important;
+        padding: 7px 8px !important;
+        margin: 0 !important;
+    }}
+    div.st-key-snb_activity_daily_options [data-testid="stHorizontalBlock"] {{
+        direction: rtl !important;
+        align-items: flex-end !important;
+        justify-content: flex-start !important;
+        gap: 14px !important;
+    }}
+    div.st-key-snb_activity_daily_options [data-testid="stCheckbox"] {{
+        margin-bottom: 10px !important;
+    }}
+    @media (max-width: 1060px) {{
+        div.st-key-snb_activity_header_row [data-testid="stHorizontalBlock"]:has(.st-key-activity_file_upload_card) {{
+            flex-wrap: wrap !important;
+        }}
+    }}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -6122,6 +6180,10 @@ def save_activity_page_upload(bank, kind, widget_key):
     st.session_state.activity_page_uploads[bank][kind] = st.session_state.get(
         widget_key
     )
+    if bank == 'SNB' and kind == "activity":
+        # A different upload should not silently keep its predecessor's shift.
+        st.session_state.pop("snb_activity_daily_shift", None)
+        st.session_state.pop("snb_activity_exclude_last_hour", None)
     if bank == 'SNB':
         uploads = st.session_state.activity_page_uploads[bank]
         st.session_state.snb_activity_screen = (
@@ -6733,7 +6795,7 @@ def _prepare_snb_activity_file(uploaded_file):
 
 
 def _infer_snb_daily_period(frame):
-    """Infer SNB shift from Created on: 02:00–12:00 / 12:00–16:00 / full day."""
+    """Infer shift suggestion: 02:00–12:00 / 12:30–16:00 / full day."""
     times = frame["__ejada_parsed_created"].dropna()
     if times.empty:
         return "full", True
@@ -6742,7 +6804,7 @@ def _infer_snb_daily_period(frame):
     current_day = times[times.dt.normalize() == latest_day]
     minute_of_day = current_day.dt.hour * 60 + current_day.dt.minute
     first = ((minute_of_day >= 120) & (minute_of_day < 720)).any()
-    second = ((minute_of_day >= 720) & (minute_of_day < 960)).any()
+    second = ((minute_of_day >= 750) & (minute_of_day < 960)).any()
     outside = ((minute_of_day < 120) | (minute_of_day >= 960)).any()
 
     if outside or (first and second):
@@ -6755,8 +6817,12 @@ def _infer_snb_daily_period(frame):
     return "full", True
 
 
-def _filter_snb_activity_period(frame, activity_kind, daily_period):
-    """Apply corrected daily shifts; exclude the last hour of partial shifts only."""
+def _filter_snb_activity_period(frame, activity_kind, daily_period, exclude_last_hour=False):
+    """Use user-selected daily shift; remove the fixed last clock-hour ONLY on request.
+
+    First shift: 02:00–12:00. Break: 12:00–12:30.
+    Second shift: 12:30–16:00. Endpoints are exclusive.
+    """
     valid = frame.dropna(subset=["__ejada_parsed_created"]).copy()
     if valid.empty:
         return valid, 0
@@ -6766,43 +6832,113 @@ def _filter_snb_activity_period(frame, activity_kind, daily_period):
 
     if activity_kind == "يومي":
         if daily_period == "first":
-            # First period: 2 AM inclusive up to 12 PM (noon) exclusive.
             lower = day_start + pd.Timedelta(hours=2)
             upper = day_start + pd.Timedelta(hours=12)
-            valid = valid[
-                (timestamps >= lower) & (timestamps < upper)
-            ].copy()
         elif daily_period == "second":
-            # Second period: noon inclusive up to 4 PM exclusive.
-            lower = day_start + pd.Timedelta(hours=12)
+            lower = day_start + pd.Timedelta(hours=12, minutes=30)
             upper = day_start + pd.Timedelta(hours=16)
-            valid = valid[
-                (timestamps >= lower) & (timestamps < upper)
-            ].copy()
         else:
-            # Full day includes ALL hours; do NOT remove its last hour.
-            lower = day_start
-            upper = day_start + pd.Timedelta(days=1)
-            valid = valid[
-                (timestamps >= lower) & (timestamps < upper)
-            ].copy()
+            lower, upper = day_start, day_start + pd.Timedelta(days=1)
 
-        if daily_period in ("first", "second") and not valid.empty:
-            latest_period_call = valid["__ejada_parsed_created"].max()
-            last_hour_start = latest_period_call - pd.Timedelta(hours=1)
-            keep = valid["__ejada_parsed_created"] < last_hour_start
-            hour_excluded = int((~keep).sum())
-            valid = valid.loc[keep].copy()
+        valid = valid.loc[(timestamps >= lower) & (timestamps < upper)].copy()
+        if exclude_last_hour and daily_period in ("first", "second"):
+            # Unlike the old implementation, never remove "one hour before
+            # the last observed call". This is the shift's actual final hour.
+            last_hour_start = upper - pd.Timedelta(hours=1)
+            excluded = valid["__ejada_parsed_created"] >= last_hour_start
+            hour_excluded = int(excluded.sum())
+            valid = valid.loc[~excluded].copy()
     elif activity_kind == "أسبوعي":
-        valid = valid[
+        valid = valid.loc[
             timestamps >= day_start - pd.Timedelta(days=6)
         ].copy()
     elif activity_kind == "شهري":
-        valid = valid[
+        valid = valid.loc[
             timestamps >= day_start - pd.Timedelta(days=29)
         ].copy()
     return valid, hour_excluded
 
+
+def _snb_after_break_notes(prepared, selected, notes_col, collector_col,
+                           activity_kind, exclude_last_hour=False):
+    """Audit all collector Notes after the 12:00–12:30 break.
+
+    One sheet contains each actual Note from 12:30 to 16:00 and flags
+    the first Note per collector/day. Collectors with no post-break Note
+    get an explicit status row. The source is the complete uploaded activity,
+    not the selected shift, so this sheet also works for first-shift reports.
+    No unapproved evaluation is inferred or added.
+    """
+    columns = [
+        "التاريخ", "المحصل", "وقت الإفادة بعد البريك", "الإفادة",
+        "أول إفادة بعد البريك", "دقائق من نهاية البريك", "الحالة"
+    ]
+    if prepared.empty or selected.empty:
+        return pd.DataFrame(columns=columns)
+    stamp_col = "__ejada_parsed_created"
+    days = selected[stamp_col].dropna().dt.normalize().unique()
+    source = prepared.dropna(subset=[stamp_col]).copy()
+    source["__day"] = source[stamp_col].dt.normalize()
+    source = source.loc[source["__day"].isin(days)].copy()
+    if source.empty:
+        return pd.DataFrame(columns=columns)
+    source["__collector"] = (
+        source[collector_col].fillna("(بدون اسم)").astype(str)
+        .str.strip().replace("", "(بدون اسم)")
+    )
+    minute = (
+        source[stamp_col].dt.hour * 60
+        + source[stamp_col].dt.minute
+    )
+    upper = 900 if (activity_kind == "يومي" and exclude_last_hour) else 960
+    after = source.loc[(minute >= 750) & (minute < upper)].copy()
+    after = after.sort_values(
+        ["__day", "__collector", stamp_col], kind="stable"
+    )
+    grouped = {
+        key: group
+        for key, group in after.groupby(
+            ["__day", "__collector"], sort=False, dropna=False
+        )
+    }
+    participants = (
+        source[["__day", "__collector"]].drop_duplicates()
+        .sort_values(["__day", "__collector"], kind="stable")
+    )
+    rows = []
+    for day, collector in participants.itertuples(index=False, name=None):
+        day = pd.Timestamp(day)
+        group = grouped.get((day, collector))
+        date_label = day.strftime("%Y-%m-%d")
+        if group is None or group.empty:
+            rows.append({
+                "التاريخ": date_label,
+                "المحصل": collector,
+                "وقت الإفادة بعد البريك": "",
+                "الإفادة": "",
+                "أول إفادة بعد البريك": "",
+                "دقائق من نهاية البريك": "",
+                "الحالة": "لم تسجل إفادة بعد البريك",
+            })
+            continue
+        break_end = day + pd.Timedelta(hours=12, minutes=30)
+        for ix, (_, record) in enumerate(group.iterrows()):
+            when = record[stamp_col]
+            rows.append({
+                "التاريخ": date_label,
+                "المحصل": collector,
+                "وقت الإفادة بعد البريك": when.strftime("%I:%M:%S %p"),
+                "الإفادة": (
+                    "" if pd.isna(record[notes_col])
+                    else str(record[notes_col])
+                ),
+                "أول إفادة بعد البريك": "نعم" if ix == 0 else "",
+                "دقائق من نهاية البريك": round(
+                    (when - break_end).total_seconds() / 60, 2
+                ),
+                "الحالة": "سجل إفادة بعد البريك",
+            })
+    return pd.DataFrame(rows, columns=columns)
 
 def _snb_model_similarity(note_key, model_keys):
     """Return similarity to nearest model Notes, NEVER infer the call evaluation."""
@@ -7109,7 +7245,7 @@ def _snb_add_call_duration(frame, collector):
     return output
 
 
-def render_snb_activity_report(model_upload, activity_upload, error_slot=None):
+def render_snb_activity_report(model_upload, activity_upload, activity_kind="يومي", error_slot=None):
     """Report screen opens with both upload boxes still visible above."""
     if activity_upload is None:
         return
@@ -7117,12 +7253,7 @@ def render_snb_activity_report(model_upload, activity_upload, error_slot=None):
         return
 
     with st.container(key="snb_activity_work_area"):
-        # The report title now lives in the phone header above the upload cards.
-        activity_kind = st.selectbox(
-            "نوع النشاط",
-            options=["يومي", "أسبوعي", "شهري"],
-            key="snb_activity_kind_selector"
-        )
+        # The activity kind is selected in the compact header row above.
         try:
             prepared, stats = _prepare_snb_activity_file(activity_upload)
             if _snb_secret("SNB_MODEL_ENCRYPTED"):
@@ -7155,29 +7286,40 @@ def render_snb_activity_report(model_upload, activity_upload, error_slot=None):
             )
 
         period = "full"
-        ambiguous = False
+        exclude_last_hour = False
         if activity_kind == "يومي":
-            period, ambiguous = _infer_snb_daily_period(prepared)
-            names = {
-                "first": "الفترة الأولى (2 فجرًا – 12 ظهرًا)",
-                "second": "الفترة الثانية (12 ظهرًا – 4 عصرًا)",
-                "full": "اليوم الكامل"
-            }
-            st.markdown(
-                f'<p style="color:{label_color};font-size:17px;'
-                'font-weight:900;text-align:center;">'
-                f'الفترة المكتشفة تلقائيًا من Created on: {names[period]}'
-                '</p>',
-                unsafe_allow_html=True
-            )
-            if ambiguous:
-                st.warning(
-                    "تعذر تحديد الفترة بثقة من أوقات Created on. "
-                    "تم الاحتفاظ باليوم الكامل دون استبعاد آخر ساعة لحماية البيانات."
+            suggestion, _ = _infer_snb_daily_period(prepared)
+            shift_labels = [
+                "الفترة الأولى (2:00 ص – 12:00 ظ)",
+                "الفترة الثانية (12:30 م – 4:00 م)",
+            ]
+            with st.container(key="snb_activity_daily_options"):
+                shift_col, last_hour_col, _controls_space = st.columns(
+                    [1.8, 1.3, 5.0], gap="small", vertical_alignment="bottom"
                 )
+                with shift_col:
+                    shift_choice = st.selectbox(
+                        "اختاري الفترة اليومية",
+                        shift_labels,
+                        index=1 if suggestion == "second" else 0,
+                        key="snb_activity_daily_shift"
+                    )
+                with last_hour_col:
+                    exclude_last_hour = st.checkbox(
+                        "استبعاد آخر ساعة",
+                        value=False,
+                        key="snb_activity_exclude_last_hour"
+                    )
+            period = "first" if shift_choice == shift_labels[0] else "second"
+            st.caption(
+                "البريك من 12:00 إلى 12:30. "
+                "اختيار استبعاد آخر ساعة يحذف 11:00–12:00 من الفترة الأولى "
+                "أو 3:00–4:00 من الفترة الثانية."
+            )
 
         selected, excluded_hour = _filter_snb_activity_period(
-            prepared, activity_kind, period
+            prepared, activity_kind, period,
+            exclude_last_hour=exclude_last_hour
         )
         manual_decisions = _snb_manual_evaluations(model_upload)
         slash_row_decisions, slash_reviewed = _snb_review_slash_rows(
@@ -7287,6 +7429,21 @@ def render_snb_activity_report(model_upload, activity_upload, error_slot=None):
             final, use_container_width=True, hide_index=True,
             height=460
         )
+        after_break = _snb_after_break_notes(
+            prepared, selected, stats["notes"], stats["collector"],
+            activity_kind, exclude_last_hour=exclude_last_hour
+        )
+        with st.expander(
+            "🕧 إفادات كل محصل بعد البريك (12:30 م)", expanded=False
+        ):
+            st.caption(
+                "يعرض جميع الإفادات بعد البريك، ويحدد أول إفادة لكل محصل "
+                "والدقائق من 12:30. يظهر المحصل بلا إفادة بحالة واضحة."
+            )
+            st.dataframe(
+                after_break, use_container_width=True, hide_index=True,
+                height=360
+            )
         _snb_render_model_management(
             selected[stats["notes"]], model_mapping,
             manual_decisions, slash_row_decisions
@@ -7294,6 +7451,9 @@ def render_snb_activity_report(model_upload, activity_upload, error_slot=None):
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             final.to_excel(writer, sheet_name="Activity", index=False)
+            after_break.to_excel(
+                writer, sheet_name="After_Break_Notes", index=False
+            )
             special_mask = _snb_special_review_mask(final[stats["notes"]])
             if special_mask.any():
                 flagged_export = final.loc[special_mask].copy()
@@ -8115,84 +8275,83 @@ if page_uploaded is None:
         </div>
         """, unsafe_allow_html=True)
     elif curr_page == 'Activity':
-        # Reserve an error slot ABOVE the title/uploaders, even when report rendering happens below.
+        # Put file uploader, title and compact activity-type selector on ONE row.
         activity_error_slot = st.empty()
-        st.markdown(f"""
-        <div style="display:flex;justify-content:center;align-items:center;
-                    direction:rtl;width:100%;margin:0 0 20px;padding:0;">
-            <div style="display:inline-flex;align-items:center;justify-content:center;
-                        gap:12px;padding:12px 24px;width:fit-content;max-width:100%;
-                        background:{card_color};border:1px solid {border_color};
-                        border-radius:10px;color:{text_color};font-weight:900;
-                        font-size:26px;text-align:center;">
-                {PHONE_HEADER_SVG}
-                <span>تقرير نشاط المحصلين | {selected_bank}</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # The encrypted model is private and auto-loaded: upload only Activity.
         _snb_secret_model_ready = (
             selected_bank == "SNB" and bool(_snb_secret("SNB_MODEL_ENCRYPTED"))
         )
-        if _snb_secret_model_ready:
-            activity_col, _left_space = st.columns(
-                [1.0, 4.7], gap="small", vertical_alignment="top"
-            )
-            st.caption("موديل النشاط الأساسي: محفوظ تلقائيًا بشكل مشفّر.")
-        else:
-            model_col, activity_col, _left_space = st.columns(
-                [1.0, 1.0, 3.7], gap="small", vertical_alignment="top"
-            )
-            with model_col:
-                with st.container(border=True, key="activity_model_upload_card"):
+        with st.container(key="snb_activity_header_row"):
+            if _snb_secret_model_ready:
+                activity_col, header_col, kind_col, _left_space = st.columns(
+                    [1.6, 2.2, 1.0, 4.0],
+                    gap="small", vertical_alignment="center"
+                )
+            else:
+                activity_col, header_col, kind_col, model_col, _left_space = st.columns(
+                    [1.6, 2.2, 1.0, 1.6, 2.4],
+                    gap="small", vertical_alignment="center"
+                )
+
+            with activity_col:
+                with st.container(border=True, key="activity_file_upload_card"):
                     st.markdown(
                         f'<div style="color:{label_color};direction:rtl;text-align:center;'
                         'font-size:18px;font-weight:900;margin-bottom:8px;">'
-                        'خانة رفع موديل النشاط</div>',
+                        'رفع ملف النشاط</div>',
                         unsafe_allow_html=True
                     )
-                    model_key = (
-                        f"activity_model_file_{selected_bank}_"
-                        f"{st.session_state.activity_upload_versions[selected_bank]['model']}"
+                    activity_key = (
+                        f"activity_data_file_{selected_bank}_"
+                        f"{st.session_state.activity_upload_versions[selected_bank]['activity']}"
                     )
-                    model_file = st.file_uploader(
-                        "خانة رفع موديل النشاط",
-                        type=["xlsx"],
+                    st.file_uploader(
+                        "رفع ملف النشاط", type=["xlsx", "csv"],
                         accept_multiple_files=False,
-                        label_visibility="collapsed",
-                        key=model_key,
+                        label_visibility="collapsed", key=activity_key,
                         on_change=save_activity_page_upload,
-                        args=(selected_bank, "model", model_key)
+                        args=(selected_bank, "activity", activity_key)
                     )
-                    saved_model = st.session_state.activity_page_uploads[
-                        selected_bank
-                    ]["model"]
-
-        with activity_col:
-            with st.container(border=True, key="activity_file_upload_card"):
-                st.markdown(
-                    f'<div style="color:{label_color};direction:rtl;text-align:center;'
-                    'font-size:18px;font-weight:900;margin-bottom:8px;">'
-                    'رفع ملف النشاط</div>',
-                    unsafe_allow_html=True
-                )
-                activity_key = (
-                    f"activity_data_file_{selected_bank}_"
-                    f"{st.session_state.activity_upload_versions[selected_bank]['activity']}"
-                )
-                activity_file = st.file_uploader(
-                    "رفع ملف النشاط",
-                    type=["xlsx", "csv"],
-                    accept_multiple_files=False,
-                    label_visibility="collapsed",
-                    key=activity_key,
-                    on_change=save_activity_page_upload,
-                    args=(selected_bank, "activity", activity_key)
-                )
-                saved_activity = st.session_state.activity_page_uploads[
-                    selected_bank
-                ]["activity"]
+            with header_col:
+                st.markdown(f"""
+                <div style="display:flex;justify-content:center;
+                            align-items:center;direction:rtl;width:100%;margin:0;">
+                    <div style="display:inline-flex;align-items:center;
+                                justify-content:center;gap:10px;padding:11px 14px;
+                                width:fit-content;max-width:100%;
+                                background:{card_color};border:1px solid {border_color};
+                                border-radius:10px;color:{text_color};font-weight:900;
+                                font-size:23px;text-align:center;white-space:nowrap;">
+                        {PHONE_HEADER_SVG}
+                        <span>تقرير نشاط المحصلين | {selected_bank}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            with kind_col:
+                with st.container(key="snb_activity_kind_compact"):
+                    activity_kind = st.selectbox(
+                        "نوع النشاط", options=["يومي", "أسبوعي", "شهري"],
+                        key="snb_activity_kind_selector"
+                    )
+            if not _snb_secret_model_ready:
+                with model_col:
+                    with st.container(border=True, key="activity_model_upload_card"):
+                        st.markdown(
+                            f'<div style="color:{label_color};direction:rtl;'
+                            'text-align:center;font-size:18px;font-weight:900;'
+                            'margin-bottom:8px;">خانة رفع موديل النشاط</div>',
+                            unsafe_allow_html=True
+                        )
+                        model_key = (
+                            f"activity_model_file_{selected_bank}_"
+                            f"{st.session_state.activity_upload_versions[selected_bank]['model']}"
+                        )
+                        st.file_uploader(
+                            "خانة رفع موديل النشاط", type=["xlsx"],
+                            accept_multiple_files=False,
+                            label_visibility="collapsed", key=model_key,
+                            on_change=save_activity_page_upload,
+                            args=(selected_bank, "model", model_key)
+                        )
 
         # Auto-switch to the report screen when BOTH files have been uploaded.
         # Same two upload controls remain visible above in the report screen.
@@ -8206,6 +8365,7 @@ if page_uploaded is None:
             if st.session_state.get('snb_activity_screen') == 'report':
                 render_snb_activity_report(
                     _uploaded['model'], _uploaded['activity'],
+                    activity_kind=activity_kind,
                     error_slot=activity_error_slot
                 )
     else:
