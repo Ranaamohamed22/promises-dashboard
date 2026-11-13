@@ -6566,9 +6566,9 @@ def _snb_review_trigger_reasons(note):
     if "/" in value:
         reasons.append("/ أو //")
     # Boundary checks use Unicode-aware word characters (including Arabic).
-    if re.search(r"(?<!\\w)معالج(?!\\w)", value):
+    if re.search(r"(?<!\w)معالج(?!\w)", value):
         reasons.append("معالج")
-    if re.search(r"(?<!\\w)تم(?!\\w)", value):
+    if re.search(r"(?<!\w)تم(?!\w)", value):
         reasons.append("تم")
     return reasons
 
