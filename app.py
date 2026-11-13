@@ -241,15 +241,46 @@ st.markdown(f"""
         cursor: pointer !important;
     }}
 
-    /* Overview button: larger and more prominent. */
+    /* Compact Overview: border hugs the label instead of filling the column. */
+    div.st-key-top_overview_btn div[data-testid="stButton"] {{
+        width: fit-content !important;
+    }}
     div.st-key-top_overview_btn div[data-testid="stButton"] > button {{
-        min-height: 46px !important;
-        padding: 8px 18px !important;
+        width: auto !important;
+        min-width: 0 !important;
+        min-height: 42px !important;
+        padding: 6px 14px !important;
+        border-radius: 8px !important;
     }}
     div.st-key-top_overview_btn div[data-testid="stButton"] > button p {{
         font-size: 19px !important;
         font-weight: 900 !important;
-        line-height: 1.15 !important;
+        line-height: 1.1 !important;
+        white-space: nowrap !important;
+    }}
+
+    /* Compact report navigation: smaller boxes with larger report names. */
+    div.st-key-nav_prom_btn div[data-testid="stButton"],
+    div.st-key-nav_neg_btn div[data-testid="stButton"],
+    div.st-key-nav_act_btn div[data-testid="stButton"] {{
+        width: fit-content !important;
+    }}
+    div.st-key-nav_prom_btn div[data-testid="stButton"] > button,
+    div.st-key-nav_neg_btn div[data-testid="stButton"] > button,
+    div.st-key-nav_act_btn div[data-testid="stButton"] > button {{
+        width: auto !important;
+        min-width: 0 !important;
+        min-height: 38px !important;
+        padding: 5px 10px !important;
+        border-radius: 7px !important;
+    }}
+    div.st-key-nav_prom_btn div[data-testid="stButton"] > button p,
+    div.st-key-nav_neg_btn div[data-testid="stButton"] > button p,
+    div.st-key-nav_act_btn div[data-testid="stButton"] > button p {{
+        font-size: 17px !important;
+        font-weight: 900 !important;
+        line-height: 1.1 !important;
+        white-space: nowrap !important;
     }}
 
     /* Move the Streamlit cloud toolbar (Share / star / edit / GitHub / menu)
@@ -327,15 +358,20 @@ st.markdown(f"""
         color: #FFFFFF !important;
     }}
 
-    /* Home navigation is intentionally icon-only. */
+    /* Home navigation is intentionally icon-only and compact. */
+    div.st-key-nav_home_btn div[data-testid="stButton"] {{
+        width: fit-content !important;
+    }}
     div.st-key-nav_home_btn div[data-testid="stButton"] > button {{
-        min-width: 56px !important;
-        width: 56px !important;
-        padding: 8px 10px !important;
-        font-size: 22px !important;
+        min-width: 42px !important;
+        width: 42px !important;
+        min-height: 38px !important;
+        height: 38px !important;
+        padding: 4px 7px !important;
+        border-radius: 7px !important;
     }}
     div.st-key-nav_home_btn div[data-testid="stButton"] > button p {{
-        font-size: 22px !important;
+        font-size: 19px !important;
         line-height: 1 !important;
     }}
 
@@ -686,7 +722,7 @@ with top_cols[0]:
     st.button("🌓", key="theme_toggle", on_click=toggle_theme, help="تغيير الثيم (كحلي / أسود / أبيض)")
 
 with top_cols[1]:
-    st.button("📊 Overview", key="top_overview_btn", type="primary" if st.session_state.current_page == 'Overview' else "secondary", use_container_width=True, on_click=set_page, args=('Overview',))
+    st.button("📊 Overview", key="top_overview_btn", type="primary" if st.session_state.current_page == 'Overview' else "secondary", use_container_width=False, on_click=set_page, args=('Overview',))
 
 # ==========================================
 # 1. الهيدر الرئيسي
@@ -724,19 +760,19 @@ if st.session_state.current_page not in ('Overview', 'Home'):
 # ==========================================
 # 2. شريط التنقل
 # ==========================================
-nav_cols = st.columns([0.9, 1.5, 1.05, 0.85, 5.7], gap="small") 
+nav_cols = st.columns([0.55, 1.65, 1.05, 0.8, 5.95], gap="small") 
 
 with nav_cols[0]:
-    st.button("🏠", key="nav_home_btn", type="primary" if st.session_state.current_page == 'Home' else "secondary", use_container_width=True, on_click=set_page, args=('Home',), help="الرئيسية")
+    st.button("🏠", key="nav_home_btn", type="primary" if st.session_state.current_page == 'Home' else "secondary", use_container_width=False, on_click=set_page, args=('Home',), help="الرئيسية")
 
 with nav_cols[1]:
-    st.button("🤝 الوعود القائمة والمكسورة", key="nav_prom_btn", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=True, on_click=set_page, args=('Promises',))
+    st.button("🤝 الوعود القائمة والمكسورة", key="nav_prom_btn", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=False, on_click=set_page, args=('Promises',))
 
 with nav_cols[2]:
-    st.button("🚨 تقرير الإهمال", key="nav_neg_btn", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=True, on_click=set_page, args=('Neglect',))
+    st.button("🚨 تقرير الإهمال", key="nav_neg_btn", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=False, on_click=set_page, args=('Neglect',))
 
 with nav_cols[3]:
-    st.button("📈 النشاط", key="nav_act_btn", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=True, on_click=set_page, args=('Activity',))
+    st.button("📈 النشاط", key="nav_act_btn", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=False, on_click=set_page, args=('Activity',))
 
 with nav_cols[4]:
     st.markdown("")
@@ -5513,7 +5549,8 @@ if page_uploaded is None:
         st.markdown(f"""
         <div style="background-color:{card_color};border:1px solid {border_color};border-radius:15px;padding:42px 24px;margin:28px 0 18px;text-align:center;direction:rtl;box-shadow:0 4px 14px rgba(0,0,0,0.08);">
             <h2 style="color:{text_color};margin:0 0 12px;font-weight:900;font-size:30px;">أهلاً بيكي يا رنا في تقارير شركة إجادة لتحصيل الديون</h2>
-            <p style="color:{kpi_title_color};margin:0;font-weight:800;font-size:18px;line-height:1.7;">تابعي أداء التحصيل والوعود والنشاط بسهولة من مكان واحد.</p>
+            <p style="color:{kpi_title_color};margin:0 0 10px;font-weight:800;font-size:18px;line-height:1.7;">تابعي أداء التحصيل والوعود والنشاط بسهولة من مكان واحد.</p>
+            <p style="color:{snb_green};margin:0;font-weight:900;font-size:17px;line-height:1.7;">🏦 اختاري البنك لعرض التقارير الخاصة به.</p>
         </div>
         """, unsafe_allow_html=True)
     elif curr_page == 'Overview':
