@@ -8,6 +8,10 @@ import os
 import re
 import zipfile
 import hashlib
+import hmac
+import json
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 from difflib import SequenceMatcher, get_close_matches
 from xml.sax.saxutils import escape as _xml_escape
 from openpyxl import Workbook, load_workbook
@@ -6166,6 +6170,297 @@ def _snb_normalize_note(value):
     return re.sub(r"\s+", " ", str(value)).strip().casefold()
 
 
+
+# ---------------------------------------------------------------------------
+# Persistent user-approved SNB note evaluations.
+# Only the JSON reference file is editable from Streamlit. The app.py source,
+# passwords, uploaded portfolios and individual debtor rows are never saved.
+# ---------------------------------------------------------------------------
+_SNB_MODEL_OVERRIDES_PATH = "data/snb_activity_model_overrides.json"
+
+
+def _snb_secret(name, default=""):
+    try:
+        return str(st.secrets.get(name, default) or "").strip()
+    except (FileNotFoundError, KeyError, AttributeError):
+        return default
+
+
+def _snb_model_git_settings():
+    return {
+        "token": _snb_secret("GITHUB_TOKEN"),
+        "repo": _snb_secret("GITHUB_REPO", "Ranaamohamed22/promises-dashboard"),
+        "branch": _snb_secret("GITHUB_BRANCH", "main"),
+        "admin_password": _snb_secret("MODEL_ADMIN_PASSWORD"),
+    }
+
+
+def _snb_github_model_request(settings, method="GET", payload=None):
+    """Read/write exactly one reference file via GitHub Contents API."""
+    from urllib.parse import quote
+    repo_name = settings["repo"]
+    repo_parts = repo_name.split("/")
+    if len(repo_parts) != 2 or any(not part for part in repo_parts):
+        raise ValueError("إعداد GITHUB_REPO يجب أن يكون owner/repository.")
+    path = quote(_SNB_MODEL_OVERRIDES_PATH, safe="/")
+    url = (
+        "https://api.github.com/repos/"
+        + quote(repo_parts[0], safe="")
+        + "/" + quote(repo_parts[1], safe="")
+        + "/contents/" + path
+    )
+    if method == "GET":
+        url += "?ref=" + quote(settings["branch"], safe="")
+    data = None if payload is None else json.dumps(
+        payload, ensure_ascii=False
+    ).encode("utf-8")
+    request = Request(
+        url, data=data, method=method,
+        headers={
+            "Authorization": "Bearer " + settings["token"],
+            "Accept": "application/vnd.github+json",
+            "Content-Type": "application/json",
+            "User-Agent": "EJADA-Dashboard-Model-Manager",
+        },
+    )
+    try:
+        with urlopen(request, timeout=12) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        if exc.code == 404 and method == "GET":
+            return None
+        if exc.code in (401, 403):
+            raise RuntimeError(
+                "GitHub رفض صلاحية الحفظ أو انتهت صلاحية الرمز؛ راجعي Streamlit Secrets."
+            ) from None
+        if exc.code == 409:
+            raise RuntimeError(
+                "تم تعديل الموديل في جلسة أخرى؛ أعيدي تحميل الصفحة ثم احفظي مرة أخرى."
+            ) from None
+        raise RuntimeError("تعذّر الاتصال بملف الموديل على GitHub (HTTP %s)." % exc.code) from None
+    except (URLError, TimeoutError) as exc:
+        raise RuntimeError("تعذّر الاتصال بخدمة حفظ موديل النشاط على GitHub.") from exc
+
+
+def _snb_load_saved_model_notes(settings):
+    """Return normalized mapping, original labels, and current file SHA."""
+    if not settings["token"]:
+        return {}, {}, None
+    response = _snb_github_model_request(settings)
+    if response is None:
+        return {}, {}, None
+    if not isinstance(response, dict) or response.get("type") != "file":
+        raise ValueError("ملف موديل النشاط على GitHub غير صالح.")
+    encoded = response.get("content", "")
+    if not encoded:
+        raise ValueError("ملف الموديل المحفوظ لا يحتوي على بيانات قابلة للقراءة.")
+    raw = base64.b64decode(encoded).decode("utf-8")
+    document = json.loads(raw)
+    if not isinstance(document, dict) or not isinstance(document.get("entries", []), list):
+        raise ValueError("صيغة ملف الموديل المحفوظ غير صحيحة.")
+    ratings, labels = {}, {}
+    for entry in document.get("entries", []):
+        if not isinstance(entry, dict):
+            continue
+        note = str(entry.get("notes", "")).strip()
+        key = _snb_normalize_note(note)
+        value = entry.get("evaluation")
+        if key and type(value) is int and value in (0, 1):
+            if key in ratings and ratings[key] != value:
+                raise ValueError("موديل النشاط المحفوظ يحتوي على تقييمين متعارضين.")
+            ratings[key], labels[key] = value, note
+    return ratings, labels, response.get("sha")
+
+
+def _snb_save_model_notes(settings, additions):
+    """Merge entries using a fresh SHA; do not overwrite concurrent updates."""
+    if not settings["token"]:
+        raise RuntimeError("لم يتم إعداد GITHUB_TOKEN داخل Streamlit Secrets.")
+    current, labels, sha = _snb_load_saved_model_notes(settings)
+    for note, rating in additions:
+        key = _snb_normalize_note(note)
+        if not key or rating not in (0, 1):
+            raise ValueError("لا يمكن حفظ إفادة فارغة أو تقييم غير صالح.")
+        if _snb_special_review_mask(pd.Series([note])).iloc[0]:
+            raise ValueError(
+                "الإفادات التي تحتوي على / أو // أو «معالج» أو «تم» "
+                "تحتاج مراجعة لكل صف، ولا تُحفظ كتقييم عام."
+            )
+        current[key] = int(rating)
+        labels[key] = str(note).strip()
+    entries = [
+        {"notes": labels[key], "evaluation": current[key]}
+        for key in sorted(current)
+    ]
+    raw = json.dumps(
+        {"schema_version": 1, "entries": entries},
+        ensure_ascii=False, indent=2
+    ).encode("utf-8")
+    payload = {
+        "message": "Update approved EJADA SNB activity note evaluations",
+        "branch": settings["branch"],
+        "content": base64.b64encode(raw).decode("ascii"),
+    }
+    if sha:
+        payload["sha"] = sha
+    _snb_github_model_request(settings, method="PUT", payload=payload)
+    return len(additions)
+
+
+def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
+    """Visible INSIDE Activity only after all required note ratings are approved."""
+    settings = _snb_model_git_settings()
+    st.markdown("### إدارة موديل النشاط")
+    st.caption(
+        "تظهر هنا الإفادات الجديدة بعد اعتماد تقييماتها. "
+        "الحفظ يضيف الإفادات العادية فقط إلى ملف مرجعي دائم على GitHub؛ "
+        "الإفادات الخاصة (/ أو // أو معالج أو تم) تظل للمراجعة في كل تقرير."
+    )
+    previous_notice = st.session_state.pop("snb_model_manager_saved", None)
+    if previous_notice:
+        st.success(previous_notice)
+    if not settings["token"]:
+        st.info("فعّلي GITHUB_TOKEN من Streamlit Secrets لتشغيل الحفظ الدائم.")
+        return
+    if not settings["admin_password"]:
+        st.warning("أضيفي MODEL_ADMIN_PASSWORD إلى Streamlit Secrets قبل السماح بتعديل الموديل.")
+        return
+
+    if not st.session_state.get("snb_model_manager_is_admin", False):
+        with st.form("snb_model_manager_admin_login"):
+            password = st.text_input(
+                "كلمة مرور إدارة موديل النشاط", type="password"
+            )
+            login = st.form_submit_button("فتح إدارة موديل النشاط")
+        if login:
+            if hmac.compare_digest(password, settings["admin_password"]):
+                st.session_state.snb_model_manager_is_admin = True
+                st.rerun()
+            else:
+                st.error("كلمة مرور الإدارة غير صحيحة.")
+        return
+
+    if st.button("قفل إدارة موديل النشاط", key="snb_model_manager_logout"):
+        st.session_state.snb_model_manager_is_admin = False
+        st.rerun()
+
+    try:
+        persisted, _, _ = _snb_load_saved_model_notes(settings)
+    except (RuntimeError, ValueError, json.JSONDecodeError) as exc:
+        st.error(str(exc))
+        return
+
+    display_labels = {}
+    candidates = {}
+    conflicted = set()
+    normalized = notes.map(_snb_normalize_note)
+    for index, (note, key) in enumerate(zip(notes, normalized)):
+        if not key or _snb_special_review_mask(pd.Series([note])).iloc[0]:
+            continue  # Special notes require per-row review, never a generic rating.
+        # The original model's ratings are already known. Only approved manual
+        # ratings are eligible to be added to the persistent additions file.
+        if key not in manual:
+            continue
+        value = manual[key]
+        if value not in (0, 1):
+            continue
+        if key in candidates and candidates[key] != value:
+            conflicted.add(key)
+        candidates[key] = value
+        display_labels.setdefault(key, str(note).strip())
+    for key in conflicted:
+        candidates.pop(key, None)
+    rows = [
+        {
+            "إضافة للموديل": False,
+            "الإفادة المعتمدة": display_labels[key],
+            "التقييم": "ناجحة" if rating == 1 else "غير ناجحة",
+            "الحالة": (
+                "موجودة بنفس التقييم" if persisted.get(key) == rating
+                else "تحديث تقييم محفوظ" if key in persisted
+                else "تحديث الموديل الأساسي" if key in base_mapping
+                else "جديدة"
+            ),
+        }
+        for key, rating in sorted(candidates.items())
+        if persisted.get(key) != rating
+    ]
+    st.caption(f"الإفادات المعتمدة المتاحة للإضافة: {len(rows)}")
+    if not rows:
+        st.info("لا توجد إفادات جديدة معتمدة لإضافتها حاليًا.")
+    with st.form("snb_model_manager_approved_form"):
+        if rows:
+            edited = st.data_editor(
+                pd.DataFrame(rows),
+                hide_index=True,
+                use_container_width=True,
+                disabled=["الإفادة المعتمدة", "التقييم", "الحالة"],
+                column_config={
+                    "إضافة للموديل": st.column_config.CheckboxColumn(
+                        "إضافة للموديل", default=False
+                    )
+                },
+                key="snb_model_manager_editor",
+            )
+        else:
+            edited = pd.DataFrame()
+        add_note = st.text_input("إضافة إفادة جديدة يدويًا (اختياري)")
+        add_rating = st.selectbox(
+            "تقييم الإفادة الجديدة",
+            ["ناجحة", "غير ناجحة"],
+            key="snb_model_manager_new_rating",
+        )
+        overwrite = st.checkbox(
+            "أوافق على استبدال التقييم القديم لو الإفادة موجودة",
+            value=False,
+        )
+        save = st.form_submit_button("💾 حفظ الإفادات المحددة في الموديل")
+    if not save:
+        return
+    additions = []
+    if not edited.empty:
+        for _, row in edited.iterrows():
+            if bool(row["إضافة للموديل"]):
+                additions.append((
+                    row["الإفادة المعتمدة"],
+                    1 if row["التقييم"] == "ناجحة" else 0
+                ))
+    if add_note.strip():
+        additions.append((add_note.strip(), 1 if add_rating == "ناجحة" else 0))
+    if not additions:
+        st.warning("حددي إفادة معتمدة أو اكتبي إفادة جديدة للحفظ.")
+        return
+    batch = {}
+    for note, rating in additions:
+        key = _snb_normalize_note(note)
+        if not key:
+            st.error("لا يمكن حفظ إفادة فارغة.")
+            return
+        if _snb_special_review_mask(pd.Series([note])).iloc[0]:
+            st.error("هذه الإفادة من الحالات الخاصة التي تتطلب مراجعة كل صف؛ لن تُضاف كتقييم عام.")
+            return
+        if key in batch and batch[key] != rating:
+            st.error("نفس الإفادة موجودة بتقييمين مختلفين.")
+            return
+        existing = persisted.get(key, base_mapping.get(key))
+        if existing is not None and existing != rating and not overwrite:
+            st.warning("فيه إفادة بتقييم مختلف عن الموديل؛ فعّلي الموافقة على الاستبدال أولًا.")
+            return
+        batch[key] = rating
+    try:
+        count = _snb_save_model_notes(
+            settings,
+            [(display_labels.get(key, key), rating) for key, rating in batch.items()]
+        )
+    except (RuntimeError, ValueError) as exc:
+        st.error(f"تعذّر الحفظ على GitHub: {exc}")
+        return
+    st.session_state.snb_model_manager_saved = (
+        f"اتحفظت {count} إفادة في موديل النشاط الدائم على GitHub."
+    )
+    st.rerun()
+
+
 def _snb_model_evaluations(uploaded_model):
     """Map model Notes -> 0/1; conflicts and unrecognized values are not guessed."""
     try:
@@ -6754,6 +7049,11 @@ def render_snb_activity_report(model_upload, activity_upload, error_slot=None):
             model_mapping, conflicted_notes, invalid_model = (
                 _snb_model_evaluations(model_upload)
             )
+            # Apply previously approved, persistent additions on top of the Excel model.
+            saved_model_mapping, _, _ = _snb_load_saved_model_notes(
+                _snb_model_git_settings()
+            )
+            model_mapping.update(saved_model_mapping)
         except Exception as exc:
             message = f"تعذر تجهيز التقرير: {exc}"
             if error_slot is not None:
@@ -6894,6 +7194,10 @@ def render_snb_activity_report(model_upload, activity_upload, error_slot=None):
         st.dataframe(
             final, use_container_width=True, hide_index=True,
             height=460
+        )
+        _snb_render_model_management(
+            selected[stats["notes"]], model_mapping,
+            manual_decisions, slash_row_decisions
         )
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
