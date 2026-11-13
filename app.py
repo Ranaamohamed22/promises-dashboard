@@ -1793,6 +1793,19 @@ st.markdown(f"""
         }}
     }}
 
+    /* Clickable dashboard toggle in the Activity header. */
+    div[class*="st-key-activity_dashboard_toggle_"] button {{
+        border-radius: 9px !important;
+        min-height: 46px !important;
+        width: 100% !important;
+        font-weight: 900 !important;
+        white-space: nowrap !important;
+    }}
+    div[class*="st-key-ejada_activity_dashboard_"] {{
+        margin-top: 10px !important;
+        margin-bottom: 16px !important;
+    }}
+
     /* Activity summary: visibly distinct KPI cards in both SNB and STC. */
     div.st-key-ejada_activity_kpi_panel {{
         width: 100% !important;
@@ -7325,34 +7338,48 @@ def _snb_add_call_duration(frame, collector):
     return output
 
 
+def _ejada_activity_dashboard_is_open(bank):
+    """Track whether the Activity KPI and chart dashboard is open per bank."""
+    return bool(st.session_state.get(f"ejada_activity_dashboard_open_{bank}", False))
+
+
+def _ejada_toggle_activity_dashboard(bank):
+    key = f"ejada_activity_dashboard_open_{bank}"
+    st.session_state[key] = not bool(st.session_state.get(key, False))
+
+
 def _ejada_activity_kpis(bank, covered, successful=None,
                            unsuccessful=None, unresolved=0):
-    """A compact activity dashboard; unknown outcomes remain unclassified."""
-    st.markdown(
-        f'<div style="color:{label_color};font-weight:900;'
-        'font-size:20px;text-align:center;margin:12px 0 8px;">'
-        f'📊 لوحة مؤشرات النشاط | {bank}</div>',
-        unsafe_allow_html=True
-    )
-    with st.container(key="ejada_activity_kpi_panel"):
-        left, center, right = st.columns(3, gap="small")
-        with left:
-            st.metric("📞 إجمالي المكالمات المغطاة", f"{int(covered):,}")
-        with center:
-            st.metric(
-                "✅ إجمالي المكالمات الناجحة",
-                f"{int(successful):,}" if successful is not None else "—"
-            )
-        with right:
-            st.metric(
-                "❌ إجمالي المكالمات غير الناجحة",
-                f"{int(unsuccessful):,}" if unsuccessful is not None else "—"
-            )
-    if unresolved:
-        st.caption(
-            f"يوجد {int(unresolved):,} مكالمة لم تُعتمد نتيجتها بعد؛ "
-            "لا تُحتسب ناجحة ولا غير ناجحة."
+    """Dashboard section for call KPIs and future Activity charts."""
+    if not _ejada_activity_dashboard_is_open(bank):
+        return
+    with st.container(key=f"ejada_activity_dashboard_{bank}"):
+        st.markdown(
+            f'<div style="color:{label_color};font-weight:900;'
+            'font-size:20px;text-align:center;margin:12px 0 8px;">'
+            f'📊 لوحة مؤشرات النشاط | {bank}</div>',
+            unsafe_allow_html=True
         )
+        with st.container(key="ejada_activity_kpi_panel"):
+            left, center, right = st.columns(3, gap="small")
+            with left:
+                st.metric("📞 إجمالي المكالمات المغطاة", f"{int(covered):,}")
+            with center:
+                st.metric(
+                    "✅ إجمالي المكالمات الناجحة",
+                    f"{int(successful):,}" if successful is not None else "—"
+                )
+            with right:
+                st.metric(
+                    "❌ إجمالي المكالمات غير الناجحة",
+                    f"{int(unsuccessful):,}" if unsuccessful is not None else "—"
+                )
+        if unresolved:
+            st.caption(
+                f"يوجد {int(unresolved):,} مكالمة لم تُعتمد نتيجتها بعد؛ "
+                "لا تُحتسب ناجحة ولا غير ناجحة."
+            )
+        # Future chart widgets are added beneath the KPI panel here.
 
 
 def _snb_kpi_counts(selected, notes_col, mapping, manual, row_decisions):
@@ -7513,11 +7540,12 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
         )
         manual_decisions = _snb_manual_evaluations(model_upload)
         slash_row_decisions = _snb_slash_row_decisions(activity_upload)
-        counts = _snb_kpi_counts(
-            selected, stats["notes"], model_mapping,
-            manual_decisions, slash_row_decisions
-        )
-        _ejada_activity_kpis("SNB", *counts)
+        if _ejada_activity_dashboard_is_open("SNB"):
+            counts = _snb_kpi_counts(
+                selected, stats["notes"], model_mapping,
+                manual_decisions, slash_row_decisions
+            )
+            _ejada_activity_kpis("SNB", *counts)
         slash_row_decisions, slash_reviewed = _snb_review_slash_rows(
             selected, stats["notes"], activity_upload,
             model_mapping, manual_decisions
@@ -8480,8 +8508,8 @@ if page_uploaded is None:
         )
         with st.container(key="snb_activity_header_row"):
             # Rightmost uploader, compact adjacent activity type, free space left.
-            activity_col, kind_col, _left_space = st.columns(
-                [1.8, 1.15, 6.65], gap="small",
+            activity_col, kind_col, dashboard_col, _left_space = st.columns(
+                [1.8, 1.15, 1.25, 5.4], gap="small",
                 vertical_alignment="center"
             )
             with activity_col:
@@ -8509,6 +8537,17 @@ if page_uploaded is None:
                         "نوع النشاط", options=["يومي", "أسبوعي", "شهري"],
                         key="snb_activity_kind_selector"
                     )
+            with dashboard_col:
+                is_open = _ejada_activity_dashboard_is_open(selected_bank)
+                st.button(
+                    "📊 إخفاء الداشبورد" if is_open else "📊 عرض الداشبورد",
+                    key=f"activity_dashboard_toggle_{selected_bank}",
+                    help="فتح وإغلاق لوحة مؤشرات النشاط والشارتات القادمة",
+                    use_container_width=True,
+                    type="primary" if is_open else "secondary",
+                    on_click=_ejada_toggle_activity_dashboard,
+                    args=(selected_bank,),
+                )
 
         # Legacy fallback: no encrypted model configured, allow a model upload
         # below the main header without moving the centred title.
@@ -8534,8 +8573,8 @@ if page_uploaded is None:
                         args=(selected_bank, "model", model_key)
                     )
 
-        # Bank-specific dashboard KPIs are shown as soon as Activity opens.
-        if selected_bank == "STC":
+        # Bank KPIs render only when the dashboard button is open.
+        if selected_bank == "STC" and _ejada_activity_dashboard_is_open("STC"):
             _stc_file = st.session_state.activity_page_uploads["STC"]["activity"]
             try:
                 _stc_metrics = _ejada_stc_activity_kpi_counts(_stc_file)
@@ -8549,8 +8588,11 @@ if page_uploaded is None:
             except Exception as exc:
                 st.error(f"تعذر قراءة بيانات نشاط STC: {exc}")
                 _ejada_activity_kpis("STC", 0)
-        elif not _snb_secret_model_ready and (
-            st.session_state.activity_page_uploads["SNB"]["model"] is None
+        elif (
+            selected_bank == "SNB"
+            and _ejada_activity_dashboard_is_open("SNB")
+            and not _snb_secret_model_ready
+            and st.session_state.activity_page_uploads["SNB"]["model"] is None
         ):
             # No baseline model available yet: count coverage, but never guess.
             _waiting = st.session_state.activity_page_uploads["SNB"]["activity"]
