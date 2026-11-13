@@ -5064,7 +5064,83 @@ def render_report_upload_bar(page):
     uploader_version = st.session_state.report_uploader_versions[selected_bank][page]
 
     with st.container(key=f"report_upload_bar_{selected_bank}_{page}"):
-        # نخلي مجموعة العنوان + الرفع + الإزالة في منتصف الصفحة.
+        if page == 'Promises':
+            # العنوان في منتصف الصفحة وبحجم أكبر.
+            st.markdown(
+                f"""
+                <div style="display:flex;justify-content:center;align-items:center;
+                            margin:4px 0 12px;direction:rtl;">
+                    <div style="display:inline-flex;align-items:center;justify-content:center;
+                                background:{card_color};border:1px solid {border_color};
+                                border-radius:9px;padding:8px 16px;width:fit-content;
+                                white-space:nowrap;color:{text_color};
+                                font-weight:900;font-size:24px;">
+                        {titles[page]}
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            # خانة الرفع أصغر ومتمركزة، وزر الإزالة بجانبها.
+            left_space, compact_group, right_space = st.columns([3.1, 3.8, 3.1], gap='small')
+            with compact_group:
+                upload_col, action_col = st.columns([3.2, 1.2], gap='small')
+
+                with upload_col:
+                    new_files = st.file_uploader(
+                        f"رفع ملف {titles[page]}",
+                        type=['xlsx', 'csv'],
+                        accept_multiple_files=True,
+                        label_visibility='collapsed',
+                        key=f"report_uploader_{selected_bank}_{page}_{uploader_version}"
+                    )
+                    if new_files:
+                        new_sig = [(x.name, x.size) for x in new_files]
+                        current_sig = [(x.name, x.size) for x in current_files]
+                        if new_sig != current_sig:
+                            bank_files[page] = new_files
+                            st.rerun()
+                    elif current_files:
+                        bank_files[page] = None
+                        st.session_state.report_uploader_versions[selected_bank][page] += 1
+                        st.rerun()
+
+                    if current_files:
+                        st.caption("الملف الحالي: " + "، ".join(x.name for x in current_files))
+                    else:
+                        st.caption("مفيش ملف مرفوع لسه يا رنا")
+
+                with action_col:
+                    if current_files:
+                        st.button(
+                            "🗑️ إزالة الملف",
+                            key=f"clear_report_file_{selected_bank}_{page}",
+                            on_click=clear_report_page_file,
+                            args=(selected_bank, page),
+                            use_container_width=True,
+                            help="إزالة الملف الحالي ورفع ملف آخر"
+                        )
+                    else:
+                        st.markdown(
+                            "<div style='height:42px;display:flex;align-items:center;"
+                            "justify-content:center;font-weight:800;color:#586F8C;'>—</div>",
+                            unsafe_allow_html=True
+                        )
+
+            if not current_files:
+                st.markdown(
+                    f"""
+                    <div style="text-align:center;direction:rtl;color:{label_color};
+                                font-size:17px;font-weight:900;margin:4px 0 2px;">
+                        مفيش ملف مرفوع لسه يا رنا
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            return
+
+        # باقي التقارير تحتفظ بالتخطيط الحالي.
         outer_left, center_group, outer_right = st.columns([1.1, 7.8, 1.1], gap='small')
 
         with center_group:
@@ -5102,8 +5178,6 @@ def render_report_upload_bar(page):
                         bank_files[page] = new_files
                         st.rerun()
                 elif current_files:
-                    # لو المستخدم شال كل الملفات من علامة × داخل الـ uploader،
-                    # امسح النسخة القديمة المخزنة فوراً حتى لا تظل الـ KPIs تعرض أرقاماً قديمة.
                     bank_files[page] = None
                     st.session_state.report_uploader_versions[selected_bank][page] += 1
                     st.rerun()
