@@ -4773,6 +4773,56 @@ def build_report_xlsx(active_df, broken_df, neglect_df=None, bank="SNB"):
     buf.seek(0)
     return buf
 
+
+def build_single_promise_report_xlsx(df, report_kind="active", bank="STC"):
+    """Build one standalone promises workbook (active OR broken) with its summary."""
+    is_active = report_kind == "active"
+    data_sheet = 'تقرير الوعود القائمة' if is_active else 'تقرير الوعود المكسورة'
+    summary_sheet = 'ملخص تقرير الوعود القائمة' if is_active else 'ملخص تقرير الوعود المكسورة'
+    order = 'first' if is_active else 'desc'
+
+    if bank == 'SNB':
+        title = (
+            'تقرير الوعود القائمة البنك الاهلي السعودي SNB (NPL&60Dpd)'
+            if is_active
+            else 'تقرير الوعود المكسورة البنك الاهلي SNB (NPL&60Dpd)'
+        )
+    else:
+        title = (
+            f'تقرير الوعود القائمة {BANKS[bank]} {bank}'
+            if is_active
+            else f'تقرير الوعود المكسورة {BANKS[bank]} {bank}'
+        )
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = data_sheet
+    _write_df_sheet(ws, df)
+
+    can_pv = _can_pivot(df)
+    pivot_df = build_pivot(df, order=order)
+    ws = wb.create_sheet(summary_sheet)
+    _write_pivot_sheet(ws, pivot_df, title, is_real_pivot=can_pv)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+
+    if can_pv:
+        return inject_pivot_tables(
+            buf.getvalue(),
+            [{
+                'summary_sheet': summary_sheet,
+                'data_sheet': data_sheet,
+                'data_df': df,
+                'pivot': pivot_df,
+                'order': order,
+            }]
+        )
+
+    buf.seek(0)
+    return buf
+
+
 # ==========================================
 # إدارة الملفات لكل صفحة تقرير بشكل منفصل تماماً
 # ==========================================
@@ -5592,7 +5642,45 @@ else:
             st.dataframe(broken_promises_df, use_container_width=True, height=400)
             
         st.markdown("<br>", unsafe_allow_html=True)
-        st.download_button("📥 تحميل التقرير الشامل (الإكسيل بالملخصات).xlsx", data=report_bytes, file_name=f"{selected_bank}_Daily_Promises_Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key=f"dl_promises_all_{selected_bank}")
+        if selected_bank == 'STC':
+            stc_active_report = build_single_promise_report_xlsx(
+                active_promises_df,
+                report_kind='active',
+                bank='STC'
+            ).getvalue()
+            stc_broken_report = build_single_promise_report_xlsx(
+                broken_promises_df,
+                report_kind='broken',
+                bank='STC'
+            ).getvalue()
+
+            dl_active_col, dl_broken_col = st.columns(2, gap='medium')
+            with dl_active_col:
+                st.download_button(
+                    "📥 تحميل تقرير الوعود القائمة STC.xlsx",
+                    data=stc_active_report,
+                    file_name="STC_Active_Promises_Report.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="dl_stc_active_promises",
+                    use_container_width=True
+                )
+            with dl_broken_col:
+                st.download_button(
+                    "📥 تحميل تقرير الوعود المكسورة STC.xlsx",
+                    data=stc_broken_report,
+                    file_name="STC_Broken_Promises_Report.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="dl_stc_broken_promises",
+                    use_container_width=True
+                )
+        else:
+            st.download_button(
+                "📥 تحميل التقرير الشامل (الإكسيل بالملخصات).xlsx",
+                data=report_bytes,
+                file_name=f"{selected_bank}_Daily_Promises_Report.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key=f"dl_promises_all_{selected_bank}"
+            )
         
     elif curr_page == 'Neglect':
         st.markdown(f"""
