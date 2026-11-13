@@ -5955,11 +5955,13 @@ def _prepare_snb_activity_file(uploaded_file):
         frame, "Created on", "Created_on", "CreatedOn"
     )
     # Merge CC and PF in the EXISTING product/finance column, not a new one.
-    # The real SNB export uses "نوع المنتج-التمويل/Claim".
-    # Prefer the finance/Claim column; never reject it merely because
-    # another similarly named product column also exists.
+    # The actual SNB activity column is "Claim/نوع المتنج-التمويل".
+    # Exact matching has priority; keep the original header unchanged.
     product = _snb_find_column(
         frame,
+        "Claim/نوع المتنج-التمويل",
+        "Claim/نوع المنتج-التمويل",
+        "نوع المتنج-التمويل/Claim",
         "نوع المنتج-التمويل/Claim",
         "نوع المنتج - التمويل/Claim",
         "نوع المنتج-التمويل / Claim",
@@ -5978,7 +5980,8 @@ def _prepare_snb_activity_file(uploaded_file):
         for col in frame.columns:
             normalized = _snb_header_key(col)
             is_finance_product = (
-                "منتج" in normalized and "تمويل" in normalized
+                ("منتج" in normalized or "متنج" in normalized)
+                and "تمويل" in normalized
             )
             is_english_product = (
                 "product" in normalized and "type" in normalized
@@ -6015,27 +6018,21 @@ def _prepare_snb_activity_file(uploaded_file):
     for key, name in zip(key_columns, [debitor, notes, collector]):
         frame[key] = frame[name].fillna("").astype(str).str.strip()
 
-    # If CC and PF appear in one product cell OR across otherwise duplicated
-    # calls for the same debtor/note/collector, retain them as CC+PF.
+    # Updated rule: any CC OR PF product becomes CC+PF in the SAME column,
+    # even when only one of the two codes is present. Preserve other values.
     combined_products = 0
     if product is not None:
         product_text = frame[product].fillna("").astype(str)
-        cc = product_text.str.contains(
-            r"(?<![A-Za-z0-9])CC(?![A-Za-z0-9])",
+        has_cc_or_pf = product_text.str.contains(
+            r"(?<![A-Za-z0-9])(?:CC|PF)(?![A-Za-z0-9])",
             case=False, regex=True
         )
-        pf = product_text.str.contains(
-            r"(?<![A-Za-z0-9])PF(?![A-Za-z0-9])",
-            case=False, regex=True
+        needs_change = (
+            has_cc_or_pf
+            & product_text.str.strip().str.upper().ne("CC+PF")
         )
-        groups = [frame[key] for key in key_columns]
-        cc_per_call = cc.groupby(groups, sort=False).transform("max")
-        pf_per_call = pf.groupby(groups, sort=False).transform("max")
-        both = cc_per_call & pf_per_call
-        combined_products = int(
-            (both & product_text.ne("CC+PF")).sum()
-        )
-        frame.loc[both, product] = "CC+PF"
+        combined_products = int(needs_change.sum())
+        frame.loc[has_cc_or_pf, product] = "CC+PF"
 
     frame = (
         frame.loc[~frame.duplicated(subset=key_columns, keep="first")]
@@ -6268,13 +6265,13 @@ def render_snb_activity_report(model_upload, activity_upload):
             )
         if stats["product"] is None:
             st.warning(
-                "لم أتعرف على عمود نوع المنتج-التمويل/Claim؛ "
+                "لم أتعرف على عمود Claim/نوع المتنج-التمويل؛ "
                 "يرجى مراجعة أسماء أعمدة ملف النشاط."
             )
         else:
             st.caption(
                 f'عمود المنتج المعتمد: {stats["product"]} | '
-                f'عدد السجلات التي شملها تجميع CC+PF: '
+                f'عدد القيم التي تم تحويلها إلى CC+PF (من CC أو PF): '
                 f'{stats["combined_products"]:,} (قبل إزالة التكرارات).'
             )
         if conflicted_notes:
