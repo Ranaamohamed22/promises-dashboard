@@ -5840,18 +5840,93 @@ else:
 
 
 def save_activity_page_upload(bank, kind, widget_key):
-    """Save independently for each bank; None means the upload was cleared."""
+    """Keep both uploads per bank, and open the new SNB report screen automatically."""
     st.session_state.activity_page_uploads[bank][kind] = st.session_state.get(
         widget_key
     )
+    if bank == 'SNB':
+        uploads = st.session_state.activity_page_uploads[bank]
+        st.session_state.snb_activity_screen = (
+            'report'
+            if uploads.get('model') is not None
+            and uploads.get('activity') is not None
+            else 'upload'
+        )
+
+
+def _snb_header_key(value):
+    """Normalize labels for robust English/Arabic column lookup."""
+    return re.sub(
+        r"[\s_\-–—]+", "", str(value or "")
+    ).casefold().strip()
+
+
+def _snb_find_column(frame, *names):
+    available = {_snb_header_key(col): col for col in frame.columns}
+    for name in names:
+        hit = available.get(_snb_header_key(name))
+        if hit is not None:
+            return hit
+    return None
+
+
+def _snb_normalize_note(value):
+    """Normalize Notes (= إفادة) for exact matching to the uploaded model."""
+    if pd.isna(value):
+        return ""
+    return re.sub(r"\s+", " ", str(value)).strip().casefold()
+
+
+def _snb_model_evaluations(uploaded_model):
+    """Map model Notes -> 0/1; conflicts and unrecognized values are not guessed."""
+    try:
+        model = pd.read_excel(io.BytesIO(uploaded_model.getvalue()), dtype=str)
+    except Exception as exc:
+        raise ValueError(f"تعذر قراءة موديل النشاط Excel: {exc}") from exc
+    model.columns = model.columns.astype(str).str.strip()
+    notes_col = _snb_find_column(
+        model, "Notes", "Note", "الإفادة", "افادة"
+    )
+    evaluation_col = _snb_find_column(
+        model, "التقيم", "التقييم", "تقييم", "Evaluation", "Rating", "Score"
+    )
+    missing = [
+        label for label, col in [
+            ("Notes", notes_col), ("التقيم", evaluation_col)
+        ] if col is None
+    ]
+    if missing:
+        raise ValueError(
+            "موديل النشاط لازم يحتوي على العمودين Notes والتقيم. "
+            "الناقص: " + "، ".join(missing)
+        )
+
+    model["__key"] = model[notes_col].map(_snb_normalize_note)
+    model["__value"] = pd.to_numeric(
+        model[evaluation_col].astype(str).str.strip(),
+        errors="coerce"
+    )
+    valid = model[
+        model["__key"].ne("") & model["__value"].isin([0, 1])
+    ].copy()
+
+    # If identical Notes have both 0 and 1 in the model, leave them unclassified.
+    conflicts = valid.groupby("__key")["__value"].nunique()
+    conflict_keys = set(conflicts[conflicts > 1].index)
+    valid = valid[
+        ~valid["__key"].isin(conflict_keys)
+    ].drop_duplicates(subset=["__key"], keep="first")
+    mapping = dict(
+        zip(valid["__key"], valid["__value"].astype(int))
+    )
+    rejected = int(
+        (model["__key"].eq("") | ~model["__value"].isin([0, 1])).sum()
+    )
+    return mapping, len(conflict_keys), rejected
 
 
 def _prepare_snb_activity_file(uploaded_file):
-    """Read SNB activity and deduplicate on Debitor+Notes+Collector as a unit.
-
-    Notes is the "إفادة" field. Preserve Created on and insert a 12-hour Time
-    column immediately after it. No original file is modified.
-    """
+    """Deduplicate Debitor+Notes+Collector, create Time, and combine CC/PF."""
     file_name = uploaded_file.name
     file_bytes = uploaded_file.getvalue()
     if file_name.lower().endswith(".csv"):
@@ -5867,26 +5942,23 @@ def _prepare_snb_activity_file(uploaded_file):
             )
     else:
         frame = pd.read_excel(io.BytesIO(file_bytes), dtype=str)
-
     frame.columns = frame.columns.astype(str).str.strip()
 
-    def resolve(*aliases):
-        column_map = {
-            re.sub(r"[\s_]+", "", str(col)).casefold(): col
-            for col in frame.columns
-        }
-        for alias in aliases:
-            actual = column_map.get(
-                re.sub(r"[\s_]+", "", alias).casefold()
-            )
-            if actual is not None:
-                return actual
-        return None
-
-    debitor = resolve("Debitor", "Debtor")
-    notes = resolve("Notes", "Note", "الإفادة", "افادة")
-    collector = resolve("Collector", "Collecter")
-    created = resolve("Created on", "Created_on", "CreatedOn")
+    debitor = _snb_find_column(frame, "Debitor", "Debtor")
+    notes = _snb_find_column(
+        frame, "Notes", "Note", "الإفادة", "افادة"
+    )
+    collector = _snb_find_column(
+        frame, "Collector", "Collecter"
+    )
+    created = _snb_find_column(
+        frame, "Created on", "Created_on", "CreatedOn"
+    )
+    product = _snb_find_column(
+        frame, "نوع المنتج-التمويل", "نوع المنتج - التمويل",
+        "نوع المتنج-التمويل", "نوع المنتج", "Product Type",
+        "ProductType"
+    )
     missing = [
         label for label, col in [
             ("Debitor", debitor), ("Notes (الإفادة)", notes),
@@ -5894,82 +5966,122 @@ def _prepare_snb_activity_file(uploaded_file):
         ] if col is None
     ]
     if missing:
-        raise ValueError("الأعمدة المطلوبة غير موجودة: " + "، ".join(missing))
+        raise ValueError(
+            "الأعمدة المطلوبة في ملف النشاط غير موجودة: "
+            + "، ".join(missing)
+        )
 
-    source_count = len(frame)
-    # Key normalization is used for comparison ONLY; original values remain.
+    initial_rows = len(frame)
     key_columns = [
         "__ejada_key_debitor", "__ejada_key_notes",
         "__ejada_key_collector"
     ]
-    for key, col in zip(key_columns, [debitor, notes, collector]):
-        frame[key] = frame[col].fillna("").astype(str).str.strip()
+    for key, name in zip(key_columns, [debitor, notes, collector]):
+        frame[key] = frame[name].fillna("").astype(str).str.strip()
+
+    # If CC and PF appear in one product cell OR across otherwise duplicated
+    # calls for the same debtor/note/collector, retain them as CC+PF.
+    combined_products = 0
+    if product is not None:
+        product_text = frame[product].fillna("").astype(str)
+        cc = product_text.str.contains(
+            r"(?<![A-Za-z0-9])CC(?![A-Za-z0-9])",
+            case=False, regex=True
+        )
+        pf = product_text.str.contains(
+            r"(?<![A-Za-z0-9])PF(?![A-Za-z0-9])",
+            case=False, regex=True
+        )
+        groups = [frame[key] for key in key_columns]
+        cc_per_call = cc.groupby(groups, sort=False).transform("max")
+        pf_per_call = pf.groupby(groups, sort=False).transform("max")
+        both = cc_per_call & pf_per_call
+        combined_products = int(
+            (both & product_text.ne("CC+PF")).sum()
+        )
+        frame.loc[both, product] = "CC+PF"
+
     frame = (
         frame.loc[~frame.duplicated(subset=key_columns, keep="first")]
         .drop(columns=key_columns)
         .copy()
     )
-    duplicate_count = source_count - len(frame)
+    duplicates = initial_rows - len(frame)
 
     parsed = pd.to_datetime(frame[created], errors="coerce")
+    # Pandas 2+ can parse heterogeneous export timestamp formats with "mixed".
+    # Only apply that fallback when it actually recovers more timestamps.
+    if parsed.isna().any():
+        try:
+            mixed = pd.to_datetime(
+                frame[created], errors="coerce", format="mixed"
+            )
+            if mixed.notna().sum() > parsed.notna().sum():
+                parsed = mixed
+        except (ValueError, TypeError):
+            pass
+
     if len(frame) and parsed.notna().sum() == 0:
-        raise ValueError(
-            "تعذر قراءة أي تاريخ أو وقت من عمود Created on."
-        )
-    if "Time" in frame.columns:
-        frame = frame.drop(columns=["Time"])
+        raise ValueError("تعذر قراءة وقت Created on من ملف النشاط.")
+
+    for name in ("Time", "مده المكالمه", "مدة المكالمة"):
+        if name in frame.columns:
+            frame = frame.drop(columns=[name])
     frame.insert(
         frame.columns.get_loc(created) + 1,
         "Time",
         parsed.dt.strftime("%I:%M:%S %p").fillna("")
     )
     frame["__ejada_parsed_created"] = parsed
-    return frame, source_count, duplicate_count
+    return frame, {
+        "original": initial_rows, "duplicates": duplicates,
+        "created": created, "notes": notes,
+        "collector": collector, "product": product,
+        "combined_products": combined_products,
+        "bad_created": int(parsed.isna().sum())
+    }
 
 
 def _infer_snb_daily_period(frame):
-    """Infer from Created on timestamps; ambiguous 14:00-16:00 is flagged."""
-    timestamps = frame["__ejada_parsed_created"].dropna()
-    if timestamps.empty:
-        return "full", False
-    latest_date = timestamps.max().normalize()
-    relevant = timestamps[
-        (timestamps >= latest_date - pd.Timedelta(days=1))
-    ]
+    """Choose a daily shift from Created on, avoiding guesses on overlaps."""
+    times = frame["__ejada_parsed_created"].dropna()
+    if times.empty:
+        return "full", True
+    latest = times.max().normalize()
+    # Include the previous day's evening calls if the shift crosses midnight.
+    relevant = times[times >= latest - pd.Timedelta(days=1)]
     minutes = relevant.dt.hour * 60 + relevant.dt.minute
-    # The first shift runs 14:00 -> midnight. A record at exactly
-    # 00:00 can belong to its preceding evening shift.
-    has_morning = ((minutes > 0) & (minutes < 720)).any()
-    has_noon = ((minutes >= 720) & (minutes < 840)).any()
-    has_evening = (minutes > 960).any()
+    has_early_day = ((minutes > 0) & (minutes < 720)).any()
+    has_second_only = ((minutes >= 720) & (minutes < 840)).any()
+    has_first_only = (minutes >= 960).any()
     has_midnight = (minutes == 0).any()
-    if has_morning:
+
+    if has_early_day or (has_second_only and has_first_only):
         return "full", False
-    if has_noon and has_evening:
-        return "full", False
-    if has_noon:
+    if has_second_only and not has_first_only:
         return "second", False
-    if has_evening or has_midnight:
+    if has_first_only or has_midnight:
         return "first", False
-    # 14:00-16:00 belongs to both periods. Make it editable in the UI.
-    return "second", True
+    # Only 14:00–16:00 is fundamentally ambiguous for two overlapping shifts.
+    # Keep the entire file rather than drop a potentially wrong last hour.
+    return "full", True
 
 
 def _filter_snb_activity_period(frame, activity_kind, daily_period):
-    """Use the latest Created on day as anchor; return data and exclusion count."""
+    """Filter using Created on, and exclude last hour only for partial shifts."""
     valid = frame.dropna(subset=["__ejada_parsed_created"]).copy()
     if valid.empty:
         return valid, 0
     timestamps = valid["__ejada_parsed_created"]
-    latest = timestamps.max()
-    day_start = latest.normalize()
-    excluded_final_hour = 0
+    day_start = timestamps.max().normalize()
+    hour_excluded = 0
 
     if activity_kind == "يومي":
         if daily_period == "first":
-            # Midnight at the END of the first shift can belong to yesterday.
+            # At midnight, a 14:00–00:00 shift began on the PREVIOUS day.
+            max_time = timestamps.max()
             if (
-                latest.hour == 0 and latest.minute == 0
+                max_time.hour == 0 and max_time.minute == 0
                 and (
                     (timestamps >= day_start - pd.Timedelta(hours=10))
                     & (timestamps < day_start)
@@ -5994,13 +6106,11 @@ def _filter_snb_activity_period(frame, activity_kind, daily_period):
                 (timestamps >= lower) & (timestamps < upper)
             ].copy()
 
-        # ONLY the first and second daily periods lose their last hour.
-        # The "full day" selection retains every hour.
         if daily_period in ("first", "second") and not valid.empty:
-            latest_period_call = valid["__ejada_parsed_created"].max()
-            last_hour_start = latest_period_call - pd.Timedelta(hours=1)
-            keep = valid["__ejada_parsed_created"] < last_hour_start
-            excluded_final_hour = int((~keep).sum())
+            last_timestamp = valid["__ejada_parsed_created"].max()
+            last_hour = last_timestamp - pd.Timedelta(hours=1)
+            keep = valid["__ejada_parsed_created"] < last_hour
+            hour_excluded = int((~keep).sum())
             valid = valid.loc[keep].copy()
     elif activity_kind == "أسبوعي":
         valid = valid[
@@ -6010,15 +6120,45 @@ def _filter_snb_activity_period(frame, activity_kind, daily_period):
         valid = valid[
             timestamps >= day_start - pd.Timedelta(days=29)
         ].copy()
+    return valid, hour_excluded
 
-    return valid, excluded_final_hour
+
+def _snb_add_evaluation(frame, notes_col, mapping):
+    """Add new evaluation column IMMEDIATELY after Notes (= الإفادة)."""
+    output = frame.copy()
+    name = "تقييم المكالمات"
+    if name in output.columns:
+        output = output.drop(columns=[name])
+    scores = output[notes_col].map(_snb_normalize_note).map(mapping)
+    labels = scores.map({1: "ناجحة", 0: "غير ناجحة"}).fillna("غير مصنفة")
+    output.insert(output.columns.get_loc(notes_col) + 1, name, labels)
+    return output
+
+
+def _snb_add_call_duration(frame, collector):
+    """Gap in MINUTES from prior chronological call by SAME collector."""
+    output = frame.copy()
+    name = "مده المكالمه"
+    if name in output.columns:
+        output = output.drop(columns=[name])
+    ordered = output.sort_values(
+        [collector, "__ejada_parsed_created"], kind="stable"
+    )
+    gaps = (
+        ordered.groupby(collector, dropna=False)["__ejada_parsed_created"]
+        .diff().dt.total_seconds().div(60)
+        .fillna(0).clip(lower=0).round(2)
+    )
+    output.insert(
+        output.columns.get_loc("Time") + 1,
+        name, gaps.reindex(output.index).fillna(0)
+    )
+    return output
 
 
 def render_snb_activity_report(model_upload, activity_upload):
-    """New minimal report: user period choice, deduplicated rows and Time column."""
-    # Both files are required before any SNB report controls are shown.
+    """Report screen opens with both upload boxes still visible above."""
     if model_upload is None or activity_upload is None:
-        st.info("ارفعي موديل النشاط وملف النشاط أولًا لعرض إعدادات التقرير.")
         return
 
     with st.container(key="snb_activity_work_area"):
@@ -6028,91 +6168,112 @@ def render_snb_activity_report(model_upload, activity_upload):
             'تقرير نشاط المحصلين | SNB</h3>',
             unsafe_allow_html=True
         )
-
         activity_kind = st.selectbox(
             "نوع النشاط",
             options=["يومي", "أسبوعي", "شهري"],
             key="snb_activity_kind_selector"
         )
         try:
-            prepared, original_rows, duplicates = _prepare_snb_activity_file(
-                activity_upload
+            prepared, stats = _prepare_snb_activity_file(activity_upload)
+            model_mapping, conflicted_notes, invalid_model = (
+                _snb_model_evaluations(model_upload)
             )
         except Exception as exc:
-            st.error(f"تعذر تجهيز ملف النشاط: {exc}")
+            st.error(f"تعذر تجهيز التقرير: {exc}")
             return
 
-        valid_dates = int(
-            prepared["__ejada_parsed_created"].notna().sum()
-        )
-        invalid_dates = len(prepared) - valid_dates
         period = "full"
+        ambiguous = False
         if activity_kind == "يومي":
-            inferred, ambiguous = _infer_snb_daily_period(prepared)
-            options = {
-                "تلقائي حسب Created on": "auto",
-                "الفترة الأولى: 2:00 مساءً – 12:00 منتصف الليل": "first",
-                "الفترة الثانية: 12:00 ظهرًا – 4:00 عصرًا": "second",
-                "اليوم كله": "full"
-            }
-            choice = st.selectbox(
-                "الفترة اليومية",
-                options=list(options),
-                key="snb_activity_daily_period_selector"
-            )
-            period = inferred if options[choice] == "auto" else options[choice]
-            period_names = {
+            period, ambiguous = _infer_snb_daily_period(prepared)
+            names = {
                 "first": "الفترة الأولى (2 مساءً – 12 منتصف الليل)",
                 "second": "الفترة الثانية (12 ظهرًا – 4 عصرًا)",
-                "full": "اليوم كله"
+                "full": "اليوم الكامل"
             }
-            st.caption(
-                "الفترة المحددة من Created on: "
-                + period_names[period]
-                + " — استبعاد آخر ساعة"
-                if period in ("first", "second")
-                else "الفترة المحددة من Created on: اليوم كله — بدون استبعاد آخر ساعة"
+            st.markdown(
+                f'<p style="color:{label_color};font-size:17px;'
+                'font-weight:900;text-align:center;">'
+                f'الفترة المكتشفة تلقائيًا من Created on: {names[period]}'
+                '</p>',
+                unsafe_allow_html=True
             )
-            if ambiguous and options[choice] == "auto":
+            if ambiguous:
                 st.warning(
-                    "أوقات الملف بين 2 و4 عصرًا تصلح للفترتين؛ "
-                    "راجعي اختيار الفترة اليومية وعدّليه عند الحاجة."
+                    "أوقات المكالمات تقع في نطاق يتداخل بين فترتين، "
+                    "ولا يمكن معرفة الفترة بيقين من Created on وحده. "
+                    "احتفظت باليوم الكامل دون حذف آخر ساعة لحماية البيانات."
                 )
 
-        filtered, hour_excluded = _filter_snb_activity_period(
+        selected, excluded_hour = _filter_snb_activity_period(
             prepared, activity_kind, period
         )
+        result = _snb_add_evaluation(
+            selected, stats["notes"], model_mapping
+        )
+        result = _snb_add_call_duration(
+            result, stats["collector"]
+        )
+        successful = int(
+            (result["تقييم المكالمات"] == "ناجحة").sum()
+        )
+        unsuccessful = int(
+            (result["تقييم المكالمات"] == "غير ناجحة").sum()
+        )
+        unknown = len(result) - successful - unsuccessful
+
         st.markdown(
             f'<p style="color:{label_color};font-weight:800;direction:rtl;'
-            'text-align:right;font-size:15px;">'
-            f'صفوف الملف الأصلية: {original_rows:,} | '
-            f'التكرارات المحذوفة (Debitor + Notes + Collector): {duplicates:,} | '
-            f'صفوف الفترة: {len(filtered):,} | '
-            f'المستبعد من آخر ساعة: {hour_excluded:,} '
-            f'| تواريخ Created on غير الصالحة: {invalid_dates:,}'
+            'text-align:right;font-size:15px;line-height:1.9;">'
+            f'صفوف الملف: {stats["original"]:,} | '
+            f'التكرارات المحذوفة: {stats["duplicates"]:,} | '
+            f'بعد الفترة: {len(result):,} | '
+            f'المستبعد من آخر ساعة: {excluded_hour:,} | '
+            f'ناجحة: {successful:,} | غير ناجحة: {unsuccessful:,} | '
+            f'غير مصنفة: {unknown:,}'
             '</p>',
             unsafe_allow_html=True
         )
-        st.caption("Notes = الإفادة. عمود Time مستخرج من Created on بصيغة AM/PM.")
-        result = filtered.drop(
+
+        if stats["bad_created"]:
+            st.warning(
+                f'عدد السجلات ذات Created on غير صالح: '
+                f'{stats["bad_created"]:,}'
+            )
+        if stats["product"] is None:
+            st.warning(
+                "لم أجد عمود نوع المنتج-التمويل، لذلك لم أطبّق دمج CC+PF."
+            )
+        if conflicted_notes:
+            st.warning(
+                f'موديل النشاط يحتوي على {conflicted_notes} إفادة لها '
+                'تقييمان متعارضان (0 و1)؛ تركت هذه الإفادات غير مصنفة.'
+            )
+        if invalid_model:
+            st.caption(
+                f"تم تجاهل {invalid_model:,} صف غير صالح في موديل النشاط."
+            )
+        st.caption(
+            "Notes = الإفادة. 0 = غير ناجحة، 1 = ناجحة. "
+            "مده المكالمه محسوبة بالدقائق بين مكالمتين متتاليتين "
+            "لنفس المحصل؛ أول مكالمة = صفر."
+        )
+        final = result.drop(
             columns=["__ejada_parsed_created"], errors="ignore"
         )
-        if result.empty:
-            st.warning("لا توجد مكالمات ضمن الفترة المحددة بعد تطبيق القواعد.")
+        if final.empty:
+            st.warning("لا توجد بيانات صالحة للفترة المكتشفة.")
             return
-
         st.dataframe(
-            result,
-            use_container_width=True,
-            height=430,
-            hide_index=True
+            final, use_container_width=True, hide_index=True,
+            height=460
         )
-        buffer = io.BytesIO()
-        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-            result.to_excel(writer, index=False, sheet_name="Activity")
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            final.to_excel(writer, sheet_name="Activity", index=False)
         st.download_button(
-            "📥 تحميل ملف النشاط بعد إزالة التكرارات وإضافة Time",
-            data=buffer.getvalue(),
+            "📥 تحميل نشاط SNB بعد المعالجة",
+            data=output.getvalue(),
             file_name=f"SNB_Activity_{activity_kind}_Processed.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="download_snb_activity_processed"
@@ -6975,12 +7136,19 @@ if page_uploaded is None:
                 if activity_file is None and saved_activity is not None:
                     st.caption(f"الملف المحفوظ: {saved_activity.name}")
 
-        # The new Activity report is limited to SNB until STC rules are defined.
+        # Auto-switch to the report screen when BOTH files have been uploaded.
+        # Same two upload controls remain visible above in the report screen.
         if selected_bank == 'SNB':
-            render_snb_activity_report(
-                st.session_state.activity_page_uploads[selected_bank]["model"],
-                st.session_state.activity_page_uploads[selected_bank]["activity"]
-            )
+            _uploaded = st.session_state.activity_page_uploads['SNB']
+            if (
+                _uploaded['model'] is not None
+                and _uploaded['activity'] is not None
+            ):
+                st.session_state.snb_activity_screen = 'report'
+            if st.session_state.get('snb_activity_screen') == 'report':
+                render_snb_activity_report(
+                    _uploaded['model'], _uploaded['activity']
+                )
     else:
         st.markdown(f"<p style='color:{label_color};font-weight:800;font-size:15px;text-align:right;direction:rtl;margin-top:8px;'>ارفعي الملف من الخانة اللي فوق لعرض التقرير.</p>", unsafe_allow_html=True)
 else:
