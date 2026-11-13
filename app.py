@@ -885,14 +885,35 @@ st.markdown(f"""
         box-sizing: border-box !important;
     }}
     div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] summary {{
+        position: relative !important;
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
         direction: rtl !important;
         text-align: center !important;
         min-height: 44px !important;
+        padding-right: 34px !important;
+        padding-left: 34px !important;
+    }}
+    /* Streamlit places the collapse arrow and title inside separate elements.
+       Center the title independently of the arrow on both open and closed states. */
+    div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] summary [data-testid="stExpanderToggleContent"] {{
+        flex: 1 1 auto !important;
+        width: 100% !important;
+        text-align: center !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }}
+    div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] summary [data-testid="stExpanderToggleIcon"] {{
+        position: absolute !important;
+        right: 10px !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
     }}
     div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] summary p {{
+        width: 100% !important;
+        margin: 0 auto !important;
         font-size: 16px !important;
         font-weight: 900 !important;
         text-align: center !important;
@@ -904,7 +925,8 @@ st.markdown(f"""
     }}
     table.ejada-diagnostic-table {{
         width: 100%;
-        border-collapse: collapse;
+        border: 1px solid #B9C8DB !important;
+        border-collapse: collapse !important;
         table-layout: fixed;
         direction: rtl;
         font-size: 13px;
@@ -915,11 +937,19 @@ st.markdown(f"""
     table.ejada-diagnostic-table th,
     table.ejada-diagnostic-table td {{
         padding: 7px 10px;
-        border-bottom: 1px solid #D5DEEB;
+        border: 1px solid #B9C8DB !important;
         font-size: 13px;
         font-weight: 800;
         white-space: normal;
         overflow-wrap: anywhere;
+    }}
+    div[class*="st-key-promise_details_row_"] [class*="st-key-promise_diagnostic_"] {{
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+    }}
+    div[class*="st-key-promise_details_row_"] [data-testid="stHorizontalBlock"] {{
+        align-items: flex-start !important;
     }}
     table.ejada-diagnostic-table th:first-child,
     table.ejada-diagnostic-table td:first-child {{
@@ -5374,8 +5404,9 @@ def render_report_upload_bar(page):
     uploader_version = st.session_state.report_uploader_versions[selected_bank][page]
 
     with st.container(key=f"report_upload_bar_{selected_bank}_{page}"):
-        # RTL: first column is the rightmost, followed immediately by the title.
-        upload_col, title_col, _rest = st.columns([2.2, 3.5, 4.3], gap='small')
+        # Equal left/right columns keep the report heading exactly centered.
+        # In the current RTL layout, the first (upload) column is on the right.
+        upload_col, title_col, _rest = st.columns([2.9, 4.2, 2.9], gap='small')
 
         with upload_col:
             if current_files:
@@ -5426,8 +5457,8 @@ def render_report_upload_bar(page):
             title_font_size = 24 if page == 'Promises' else 20
             st.markdown(
                 f"""
-                <div style="min-height:112px;display:flex;align-items:center;
-                            justify-content:flex-start;direction:rtl;">
+                <div style="min-height:130px;display:flex;align-items:center;
+                            justify-content:center;direction:rtl;width:100%;">
                     <div style="display:inline-flex;align-items:center;justify-content:center;
                                 background:{card_color};border:1px solid {border_color};
                                 border-radius:9px;padding:8px 14px;width:fit-content;
@@ -6253,7 +6284,7 @@ else:
         tab_active, tab_broken = st.tabs([f"✅ الوعود القائمة ({active_count:,})", f"⚠️ الوعود المكسورة ({broken_count:,})"])
         
         with tab_active:
-            render_promise_filter_diagnostics(selected_bank, 'active')
+            # Diagnostics and sheet details are displayed together below the KPIs.
 
             # مؤشرات رئيسية لملخص الوعود: صناديق صغيرة على قد النص وعناوين أكبر.
             st.markdown(
@@ -6297,7 +6328,7 @@ else:
 
             st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
 
-            # في STC نخفي ملخص الـ Pivot بالكامل، ونخلي تفاصيل القائمة قابلة للفتح والغلق.
+            # Preserve SNB's original Pivot summary; STC has no active Pivot.
             if selected_bank != 'STC':
                 st.markdown(
                     f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900;'>📊 ملخص تقرير الوعود القائمة (Pivot)</h4>",
@@ -6308,19 +6339,23 @@ else:
                     use_container_width=True,
                     hide_index=True
                 )
-                st.markdown(
-                    f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900; margin-top:20px;'>📋 تفاصيل شيت الوعود القائمة</h4>",
-                    unsafe_allow_html=True
-                )
-                st.dataframe(active_promises_df, use_container_width=True, height=400)
-            else:
-                with st.expander("📋 تفاصيل شيت الوعود القائمة", expanded=False):
-                    st.dataframe(
-                        active_promises_df,
-                        use_container_width=True,
-                        height=400,
-                        hide_index=True
-                    )
+
+            # Matching horizontal cards: diagnostic on the right, sheet on the left.
+            with st.container(key=f"promise_details_row_{selected_bank}"):
+                diag_col, details_col = st.columns([1, 1], gap='medium')
+                with diag_col:
+                    render_promise_filter_diagnostics(selected_bank, 'active')
+                with details_col:
+                    with st.expander(
+                        "📋 تفاصيل شيت الوعود القائمة",
+                        expanded=(selected_bank != 'STC')
+                    ):
+                        st.dataframe(
+                            active_promises_df,
+                            use_container_width=True,
+                            height=400,
+                            hide_index=True
+                        )
             
         with tab_broken:
             render_promise_filter_diagnostics(selected_bank, 'broken')
