@@ -878,9 +878,11 @@ st.markdown(f"""
 
     /* Compact promise diagnostic with smaller bold labels and centered heading. */
     div[class*="st-key-promise_diagnostic_"] {{
-        width: min(780px, 96%) !important;
-        max-width: 780px !important;
+        width: min(1400px, 100%) !important;
+        max-width: 1400px !important;
+        min-width: 0 !important;
         margin: 8px auto 12px !important;
+        box-sizing: border-box !important;
     }}
     div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] {{
         width: 100% !important;
@@ -1332,6 +1334,93 @@ st.markdown(f"""
         }}
         [class*="st-key-report_upload_bar_"] .ejada-mini-kpi span {{
             font-size: 11px !important;
+        }}
+    }}
+
+    /* Layout repair: diagnostic columns must never overflow their white expander. */
+    div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] details {{
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+    }}
+    div[class*="st-key-promise_diagnostic_"] .ejada-diagnostic-dual {{
+        display: grid !important;
+        grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr) !important;
+        align-items: start !important;
+        gap: 12px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
+        direction: rtl !important;
+    }}
+    div[class*="st-key-promise_diagnostic_"] .ejada-diagnostic-dual > div {{
+        min-width: 0 !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }}
+    div[class*="st-key-promise_diagnostic_"] .ejada-diagnostic-caption-spacer,
+    div[class*="st-key-promise_diagnostic_"] .ejada-diagnostic-dual .ejada-diagnostic-small-caption {{
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+        height: 32px !important;
+        min-height: 32px !important;
+        max-height: 32px !important;
+        box-sizing: border-box !important;
+        padding: 0 3px !important;
+        margin: 0 !important;
+        font-size: 12px !important;
+        line-height: 1.25 !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+    }}
+    div[class*="st-key-promise_diagnostic_"] .ejada-diagnostic-dual table.ejada-diagnostic-table {{
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        table-layout: fixed !important;
+        border-collapse: collapse !important;
+        box-sizing: border-box !important;
+        margin: 0 !important;
+    }}
+    div[class*="st-key-promise_diagnostic_"] .ejada-diagnostic-dual table.ejada-diagnostic-table th,
+    div[class*="st-key-promise_diagnostic_"] .ejada-diagnostic-dual table.ejada-diagnostic-table td {{
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: normal !important;
+        box-sizing: border-box !important;
+        min-width: 0 !important;
+    }}
+    div[class*="st-key-promise_diagnostic_"] .ejada-diagnostic-dual table.ejada-diagnostic-table th:last-child,
+    div[class*="st-key-promise_diagnostic_"] .ejada-diagnostic-dual table.ejada-diagnostic-table td:last-child {{
+        width: 86px !important;
+        max-width: 86px !important;
+    }}
+    /* STC active and broken export buttons: far right, one under the other. */
+    div.st-key-promise_downloads_STC [data-testid="stDownloadButton"] {{
+        display: flex !important;
+        direction: rtl !important;
+        justify-content: flex-start !important;
+        width: 100% !important;
+        margin: 0 0 8px 0 !important;
+    }}
+    div.st-key-promise_downloads_STC [data-testid="stDownloadButton"] button {{
+        width: fit-content !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+    }}
+    @media (max-width: 780px) {{
+        div[class*="st-key-promise_diagnostic_"] .ejada-diagnostic-dual {{
+            gap: 7px !important;
+        }}
+        div[class*="st-key-promise_diagnostic_"] .ejada-diagnostic-dual table.ejada-diagnostic-table {{
+            font-size: 11px !important;
+        }}
+        div[class*="st-key-promise_diagnostic_"] .ejada-diagnostic-dual table.ejada-diagnostic-table th,
+        div[class*="st-key-promise_diagnostic_"] .ejada-diagnostic-dual table.ejada-diagnostic-table td {{
+            padding: 5px 4px !important;
         }}
     }}
 </style>
@@ -5737,19 +5826,17 @@ def render_promise_filter_diagnostics(bank, kind):
             class_rows = payload.get('classification_counts') or []
 
             if rows and class_rows:
-                # Single flex/grid row removes Streamlit's per-column markdown
-                # spacing: both green table headers now share an exact top edge.
-                st.markdown(
-                    "<div class='ejada-diagnostic-small-caption'>"
-                    "قيم Classification بعد فلترة حالة المعالجة"
-                    "</div>",
-                    unsafe_allow_html=True
-                )
+                # Matched caption rows keep both green table headers level.
+                # The Classification caption belongs to its own table only.
                 diagnostic_tables = (
                     '<div class="ejada-diagnostic-dual" dir="rtl">'
                     '<div class="ejada-diagnostic-steps">'
+                    '<div class="ejada-diagnostic-caption-spacer" aria-hidden="true"></div>'
                     + _table_html(rows, 'الخطوة')
                     + '</div><div class="ejada-diagnostic-classes">'
+                    '<div class="ejada-diagnostic-small-caption">'
+                    'قيم Classification بعد فلترة حالة المعالجة'
+                    '</div>'
                     + _table_html(class_rows, 'Classification')
                     + '</div></div>'
                 )
@@ -6721,7 +6808,7 @@ else:
 
             # Matching horizontal cards: diagnostic on the right, sheet on the left.
             with st.container(key=f"promise_details_row_{selected_bank}"):
-                diag_col, details_col = st.columns([1, 1], gap='medium')
+                diag_col, details_col = st.columns([3.1, 1], gap='small')
                 with diag_col:
                     render_promise_filter_diagnostics(selected_bank, 'active')
                 with details_col:
@@ -6771,27 +6858,23 @@ else:
             ).getvalue()
 
             with st.container(key="promise_downloads_STC"):
-                # Both downloads in one centered column: active above broken.
-                _download_right_gap, download_center, _download_left_gap = st.columns(
-                    [1, 1.8, 1], gap='small'
+                # Full-width RTL container: buttons stacked at the far right.
+                st.download_button(
+                    "📥 تحميل تقرير الوعود القائمة STC.xlsx",
+                    data=stc_active_report,
+                    file_name="STC_Active_Promises_Report.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="dl_stc_active_promises",
+                    use_container_width=False
                 )
-                with download_center:
-                    st.download_button(
-                        "📥 تحميل تقرير الوعود القائمة STC.xlsx",
-                        data=stc_active_report,
-                        file_name="STC_Active_Promises_Report.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key="dl_stc_active_promises",
-                        use_container_width=False
-                    )
-                    st.download_button(
-                        "📥 تحميل تقرير الوعود المكسورة STC.xlsx",
-                        data=stc_broken_report,
-                        file_name="STC_Broken_Promises_Report.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key="dl_stc_broken_promises",
-                        use_container_width=False
-                    )
+                st.download_button(
+                    "📥 تحميل تقرير الوعود المكسورة STC.xlsx",
+                    data=stc_broken_report,
+                    file_name="STC_Broken_Promises_Report.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="dl_stc_broken_promises",
+                    use_container_width=False
+                )
         else:
             with st.container(key="promise_downloads_SNB"):
                 _left_spacer, center_download, _right_spacer = st.columns(
