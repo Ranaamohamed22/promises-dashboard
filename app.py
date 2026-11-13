@@ -5873,15 +5873,49 @@ else:
                     )
 
             st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
-            st.markdown(f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900;'>📊 ملخص تقرير الوعود القائمة (Pivot)</h4>", unsafe_allow_html=True)
-            st.dataframe(style_pivot_frame(pivot_to_frame(build_pivot(active_promises_df, order='first'))), use_container_width=True, hide_index=True)
-            st.markdown(f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900; margin-top:20px;'>📋 تفاصيل شيت الوعود القائمة</h4>", unsafe_allow_html=True)
-            st.dataframe(active_promises_df, use_container_width=True, height=400)
+
+            # في STC نخفي ملخص الـ Pivot بالكامل، ونخلي تفاصيل القائمة قابلة للفتح والغلق.
+            if selected_bank != 'STC':
+                st.markdown(
+                    f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900;'>📊 ملخص تقرير الوعود القائمة (Pivot)</h4>",
+                    unsafe_allow_html=True
+                )
+                st.dataframe(
+                    style_pivot_frame(pivot_to_frame(build_pivot(active_promises_df, order='first'))),
+                    use_container_width=True,
+                    hide_index=True
+                )
+                st.markdown(
+                    f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900; margin-top:20px;'>📋 تفاصيل شيت الوعود القائمة</h4>",
+                    unsafe_allow_html=True
+                )
+                st.dataframe(active_promises_df, use_container_width=True, height=400)
+            else:
+                with st.expander("📋 تفاصيل شيت الوعود القائمة", expanded=False):
+                    st.dataframe(
+                        active_promises_df,
+                        use_container_width=True,
+                        height=400,
+                        hide_index=True
+                    )
             
         with tab_broken:
-            st.markdown(f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900;'>📊 ملخص تقرير الوعود المكسورة (Pivot)</h4>", unsafe_allow_html=True)
-            st.dataframe(style_pivot_frame(pivot_to_frame(build_pivot(broken_promises_df, order='desc'))), use_container_width=True, hide_index=True)
-            st.markdown(f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900; margin-top:20px;'>📋 تفاصيل شيت الوعود المكسورة</h4>", unsafe_allow_html=True)
+            # في STC نخفي ملخص الـ Pivot الخاص بالوعود المكسورة.
+            if selected_bank != 'STC':
+                st.markdown(
+                    f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900;'>📊 ملخص تقرير الوعود المكسورة (Pivot)</h4>",
+                    unsafe_allow_html=True
+                )
+                st.dataframe(
+                    style_pivot_frame(pivot_to_frame(build_pivot(broken_promises_df, order='desc'))),
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+            st.markdown(
+                f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900; margin-top:20px;'>📋 تفاصيل شيت الوعود المكسورة</h4>",
+                unsafe_allow_html=True
+            )
             st.dataframe(broken_promises_df, use_container_width=True, height=400)
             
         st.markdown("<br>", unsafe_allow_html=True)
