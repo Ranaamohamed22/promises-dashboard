@@ -6860,7 +6860,8 @@ def _filter_snb_activity_period(frame, activity_kind, daily_period, exclude_last
 
 
 def _snb_after_break_notes(prepared, selected, notes_col, collector_col,
-                           activity_kind, exclude_last_hour=False):
+                           activity_kind, daily_period="full",
+                           exclude_last_hour=False):
     """Audit all collector Notes after the 12:00–12:30 break.
 
     One sheet contains each actual Note from 12:30 to 16:00 and flags
@@ -6890,7 +6891,10 @@ def _snb_after_break_notes(prepared, selected, notes_col, collector_col,
         source[stamp_col].dt.hour * 60
         + source[stamp_col].dt.minute
     )
-    upper = 900 if (activity_kind == "يومي" and exclude_last_hour) else 960
+    upper = (
+        900 if (activity_kind == "يومي" and daily_period == "second"
+                and exclude_last_hour) else 960
+    )
     after = source.loc[(minute >= 750) & (minute < upper)].copy()
     after = after.sort_values(
         ["__day", "__collector", stamp_col], kind="stable"
@@ -7431,7 +7435,8 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
         )
         after_break = _snb_after_break_notes(
             prepared, selected, stats["notes"], stats["collector"],
-            activity_kind, exclude_last_hour=exclude_last_hour
+            activity_kind, daily_period=period,
+            exclude_last_hour=exclude_last_hour
         )
         with st.expander(
             "🕧 إفادات كل محصل بعد البريك (12:30 م)", expanded=False
