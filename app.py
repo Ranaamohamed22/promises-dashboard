@@ -1275,6 +1275,29 @@ st.markdown(f"""
         font-weight: 900 !important;
         white-space: normal !important;
     }}
+    /* One HTML grid for both diagnostic tables prevents staggered header rows. */
+    div[class*="st-key-promise_diagnostic_"] .ejada-diagnostic-dual {{
+        display: grid !important;
+        grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) !important;
+        align-items: start !important;
+        direction: rtl !important;
+        column-gap: 12px !important;
+        width: 100% !important;
+        margin-top: 0 !important;
+    }}
+    div[class*="st-key-promise_diagnostic_"] .ejada-diagnostic-dual > div {{
+        min-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }}
+    div[class*="st-key-promise_diagnostic_"] .ejada-diagnostic-dual table.ejada-diagnostic-table {{
+        width: 100% !important;
+        margin: 0 !important;
+        border-collapse: collapse !important;
+    }}
+    div[class*="st-key-promise_diagnostic_"] .ejada-diagnostic-dual thead {{
+        vertical-align: top !important;
+    }}
     /* Two bordered diagnostic tables side by side: steps on right, class counts on left. */
     div[class*="st-key-promise_diagnostic_"] [data-testid="stHorizontalBlock"]:has(.ejada-diagnostic-table) {{
         display: flex !important;
@@ -5714,22 +5737,23 @@ def render_promise_filter_diagnostics(bank, kind):
             class_rows = payload.get('classification_counts') or []
 
             if rows and class_rows:
-                steps_col, class_col = st.columns(
-                    [1.4, 1], gap='small', vertical_alignment='top'
+                # Single flex/grid row removes Streamlit's per-column markdown
+                # spacing: both green table headers now share an exact top edge.
+                st.markdown(
+                    "<div class='ejada-diagnostic-small-caption'>"
+                    "قيم Classification بعد فلترة حالة المعالجة"
+                    "</div>",
+                    unsafe_allow_html=True
                 )
-                with steps_col:
-                    st.markdown(_table_html(rows, 'الخطوة'), unsafe_allow_html=True)
-                with class_col:
-                    st.markdown(
-                        "<div class='ejada-diagnostic-small-caption'>"
-                        "قيم Classification بعد فلترة حالة المعالجة"
-                        "</div>",
-                        unsafe_allow_html=True
-                    )
-                    st.markdown(
-                        _table_html(class_rows, 'Classification'),
-                        unsafe_allow_html=True
-                    )
+                diagnostic_tables = (
+                    '<div class="ejada-diagnostic-dual" dir="rtl">'
+                    '<div class="ejada-diagnostic-steps">'
+                    + _table_html(rows, 'الخطوة')
+                    + '</div><div class="ejada-diagnostic-classes">'
+                    + _table_html(class_rows, 'Classification')
+                    + '</div></div>'
+                )
+                st.markdown(diagnostic_tables, unsafe_allow_html=True)
             elif rows:
                 st.markdown(_table_html(rows, 'الخطوة'), unsafe_allow_html=True)
             elif class_rows:
@@ -6747,10 +6771,11 @@ else:
             ).getvalue()
 
             with st.container(key="promise_downloads_STC"):
-                _right_gap, dl_active_col, dl_broken_col, _left_gap = st.columns(
-                    [0.7, 2, 2, 0.7], gap='medium'
+                # Both downloads in one centered column: active above broken.
+                _download_right_gap, download_center, _download_left_gap = st.columns(
+                    [1, 1.8, 1], gap='small'
                 )
-                with dl_active_col:
+                with download_center:
                     st.download_button(
                         "📥 تحميل تقرير الوعود القائمة STC.xlsx",
                         data=stc_active_report,
@@ -6759,7 +6784,6 @@ else:
                         key="dl_stc_active_promises",
                         use_container_width=False
                     )
-                with dl_broken_col:
                     st.download_button(
                         "📥 تحميل تقرير الوعود المكسورة STC.xlsx",
                         data=stc_broken_report,
