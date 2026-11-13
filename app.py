@@ -1754,7 +1754,8 @@ st.markdown(f"""
         box-sizing: border-box !important;
         width: 172px !important;
         max-width: 100% !important;
-        margin: 0 !important;
+        margin-left: 0 !important;
+        margin-right: auto !important;
     }}
     div.st-key-snb_activity_kind_compact [data-testid="stSelectbox"] {{
         width: 172px !important;
@@ -6183,6 +6184,7 @@ def save_activity_page_upload(bank, kind, widget_key):
     if bank == 'SNB' and kind == "activity":
         # A different upload should not silently keep its predecessor's shift.
         st.session_state.pop("snb_activity_daily_shift", None)
+        st.session_state.pop("snb_activity_exclude_after_shift", None)
         st.session_state.pop("snb_activity_exclude_last_hour", None)
     if bank == 'SNB':
         uploads = st.session_state.activity_page_uploads[bank]
@@ -6817,37 +6819,47 @@ def _infer_snb_daily_period(frame):
     return "full", True
 
 
-def _filter_snb_activity_period(frame, activity_kind, daily_period, exclude_last_hour=False):
-    """Use user-selected daily shift; remove the fixed last clock-hour ONLY on request.
+def _filter_snb_activity_period(frame, activity_kind, daily_period,
+                                exclude_after_shift=True):
+    """Select the daily shift; optionally discard overtime AFTER its end.
 
-    First shift: 02:00–12:00. Break: 12:00–12:30.
-    Second shift: 12:30–16:00. Endpoints are exclusive.
+    The original end-of-shift hour is always included: 11:00-12:00 first,
+    and 15:00-16:00 second. The optional extra hour starts at 12:00/16:00.
     """
     valid = frame.dropna(subset=["__ejada_parsed_created"]).copy()
     if valid.empty:
         return valid, 0
     timestamps = valid["__ejada_parsed_created"]
     day_start = timestamps.max().normalize()
-    hour_excluded = 0
+    overtime_excluded = 0
 
     if activity_kind == "يومي":
         if daily_period == "first":
             lower = day_start + pd.Timedelta(hours=2)
-            upper = day_start + pd.Timedelta(hours=12)
+            shift_end = day_start + pd.Timedelta(hours=12)
         elif daily_period == "second":
             lower = day_start + pd.Timedelta(hours=12, minutes=30)
-            upper = day_start + pd.Timedelta(hours=16)
+            shift_end = day_start + pd.Timedelta(hours=16)
         else:
-            lower, upper = day_start, day_start + pd.Timedelta(days=1)
+            lower, shift_end = day_start, day_start + pd.Timedelta(days=1)
 
-        valid = valid.loc[(timestamps >= lower) & (timestamps < upper)].copy()
-        if exclude_last_hour and daily_period in ("first", "second"):
-            # Unlike the old implementation, never remove "one hour before
-            # the last observed call". This is the shift's actual final hour.
-            last_hour_start = upper - pd.Timedelta(hours=1)
-            excluded = valid["__ejada_parsed_created"] >= last_hour_start
-            hour_excluded = int(excluded.sum())
-            valid = valid.loc[~excluded].copy()
+        # The extra after-shift hour can be kept only when explicitly allowed.
+        if daily_period in ("first", "second"):
+            upper = shift_end if exclude_after_shift else (
+                shift_end + pd.Timedelta(hours=1)
+            )
+            in_overtime = (
+                (timestamps >= shift_end)
+                & (timestamps < shift_end + pd.Timedelta(hours=1))
+                & (timestamps.dt.normalize() == day_start)
+            )
+            if exclude_after_shift:
+                overtime_excluded = int(in_overtime.sum())
+        else:
+            upper = shift_end
+        valid = valid.loc[
+            (timestamps >= lower) & (timestamps < upper)
+        ].copy()
     elif activity_kind == "أسبوعي":
         valid = valid.loc[
             timestamps >= day_start - pd.Timedelta(days=6)
@@ -6856,8 +6868,7 @@ def _filter_snb_activity_period(frame, activity_kind, daily_period, exclude_last
         valid = valid.loc[
             timestamps >= day_start - pd.Timedelta(days=29)
         ].copy()
-    return valid, hour_excluded
-
+    return valid, overtime_excluded
 
 def _snb_after_break_notes(prepared, selected, notes_col, collector_col,
                            activity_kind, daily_period="full",
@@ -7290,7 +7301,7 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             )
 
         period = "full"
-        exclude_last_hour = False
+        exclude_after_shift = True
         if activity_kind == "يومي":
             suggestion, _ = _infer_snb_daily_period(prepared)
             shift_labels = [
@@ -7309,21 +7320,22 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
                         key="snb_activity_daily_shift"
                     )
                 with last_hour_col:
-                    exclude_last_hour = st.checkbox(
-                        "استبعاد آخر ساعة",
-                        value=False,
-                        key="snb_activity_exclude_last_hour"
+                    exclude_after_shift = st.checkbox(
+                        "استبعاد الساعة الزيادة بعد نهاية الفترة",
+                        value=True,
+                        key="snb_activity_exclude_after_shift"
                     )
             period = "first" if shift_choice == shift_labels[0] else "second"
             st.caption(
                 "البريك من 12:00 إلى 12:30. "
-                "اختيار استبعاد آخر ساعة يحذف 11:00–12:00 من الفترة الأولى "
-                "أو 3:00–4:00 من الفترة الثانية."
+                "لو فعلتي الاستبعاد: هتتحذف تسجيلات الساعة 12:00–1:00 ظهرًا "
+                "للفترة الأولى، أو 4:00–5:00 عصرًا للفترة الثانية. "
+                "آخر ساعة داخل الشيفت نفسه هتفضل محسوبة."
             )
 
-        selected, excluded_hour = _filter_snb_activity_period(
+        selected, excluded_after_shift = _filter_snb_activity_period(
             prepared, activity_kind, period,
-            exclude_last_hour=exclude_last_hour
+            exclude_after_shift=exclude_after_shift
         )
         manual_decisions = _snb_manual_evaluations(model_upload)
         slash_row_decisions, slash_reviewed = _snb_review_slash_rows(
@@ -7373,7 +7385,7 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             f'صفوف الملف: {stats["original"]:,} | '
             f'التكرارات المحذوفة: {stats["duplicates"]:,} | '
             f'بعد الفترة: {len(result):,} | '
-            f'المستبعد من آخر ساعة: {excluded_hour:,} | '
+            f'المستبعد بعد نهاية الفترة: {excluded_after_shift:,} | '
             f'ناجحة: {successful:,} | غير ناجحة: {unsuccessful:,} | '
             f'غير مصنفة: {unknown:,}'
             '</p>',
@@ -7436,7 +7448,7 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
         after_break = _snb_after_break_notes(
             prepared, selected, stats["notes"], stats["collector"],
             activity_kind, daily_period=period,
-            exclude_last_hour=exclude_last_hour
+            exclude_last_hour=False
         )
         with st.expander(
             "🕧 إفادات كل محصل بعد البريك (12:30 م)", expanded=False
@@ -8286,17 +8298,12 @@ if page_uploaded is None:
             selected_bank == "SNB" and bool(_snb_secret("SNB_MODEL_ENCRYPTED"))
         )
         with st.container(key="snb_activity_header_row"):
-            if _snb_secret_model_ready:
-                activity_col, header_col, kind_col, _left_space = st.columns(
-                    [1.6, 2.2, 1.0, 4.0],
-                    gap="small", vertical_alignment="center"
-                )
-            else:
-                activity_col, header_col, kind_col, model_col, _left_space = st.columns(
-                    [1.6, 2.2, 1.0, 1.6, 2.4],
-                    gap="small", vertical_alignment="center"
-                )
-
+            # Three columns with EQUAL side widths keep the title in the
+            # true horizontal centre regardless of uploader or menu size.
+            activity_col, header_col, kind_col = st.columns(
+                [1.8, 6.0, 1.8], gap="small",
+                vertical_alignment="center"
+            )
             with activity_col:
                 with st.container(border=True, key="activity_file_upload_card"):
                     st.markdown(
@@ -8337,26 +8344,30 @@ if page_uploaded is None:
                         "نوع النشاط", options=["يومي", "أسبوعي", "شهري"],
                         key="snb_activity_kind_selector"
                     )
-            if not _snb_secret_model_ready:
-                with model_col:
-                    with st.container(border=True, key="activity_model_upload_card"):
-                        st.markdown(
-                            f'<div style="color:{label_color};direction:rtl;'
-                            'text-align:center;font-size:18px;font-weight:900;'
-                            'margin-bottom:8px;">خانة رفع موديل النشاط</div>',
-                            unsafe_allow_html=True
-                        )
-                        model_key = (
-                            f"activity_model_file_{selected_bank}_"
-                            f"{st.session_state.activity_upload_versions[selected_bank]['model']}"
-                        )
-                        st.file_uploader(
-                            "خانة رفع موديل النشاط", type=["xlsx"],
-                            accept_multiple_files=False,
-                            label_visibility="collapsed", key=model_key,
-                            on_change=save_activity_page_upload,
-                            args=(selected_bank, "model", model_key)
-                        )
+
+        # Legacy fallback: no encrypted model configured, allow a model upload
+        # below the main header without moving the centred title.
+        if not _snb_secret_model_ready:
+            model_col, _model_space = st.columns([1.8, 7.8], gap="small")
+            with model_col:
+                with st.container(border=True, key="activity_model_upload_card"):
+                    st.markdown(
+                        f'<div style="color:{label_color};direction:rtl;'
+                        'text-align:center;font-size:18px;font-weight:900;'
+                        'margin-bottom:8px;">خانة رفع موديل النشاط</div>',
+                        unsafe_allow_html=True
+                    )
+                    model_key = (
+                        f"activity_model_file_{selected_bank}_"
+                        f"{st.session_state.activity_upload_versions[selected_bank]['model']}"
+                    )
+                    st.file_uploader(
+                        "خانة رفع موديل النشاط", type=["xlsx"],
+                        accept_multiple_files=False,
+                        label_visibility="collapsed", key=model_key,
+                        on_change=save_activity_page_upload,
+                        args=(selected_bank, "model", model_key)
+                    )
 
         # Auto-switch to the report screen when BOTH files have been uploaded.
         # Same two upload controls remain visible above in the report screen.
