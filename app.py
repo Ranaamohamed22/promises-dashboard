@@ -895,6 +895,57 @@ with st.container(key="report_nav_group"):
 
 st.markdown(f"<hr style='margin: 10px 0 20px 0; border-color: {border_color}; clear: both;'>", unsafe_allow_html=True)
 
+# Click on empty canvas to close the current report and return Home.
+# All controls, file uploads, charts and actual report content are excluded.
+_BLANK_CLICK_SCRIPT = r"""
+<script>
+(() => {
+  try {
+    const root = window.parent !== window ? window.parent : window;
+    const doc = root.document;
+    if (root.__ejadaBlankCloseHandler) {
+      doc.removeEventListener('click', root.__ejadaBlankCloseHandler, true);
+      root.__ejadaBlankCloseHandler = null;
+    }
+    if (!__ACTIVE__) return;
+    const excluded = [
+      'button','a','input','select','textarea','label','iframe',
+      '[role="button"]','[role="tab"]','[data-testid="stHeader"]',
+      '[data-testid="stFileUploader"]','[data-testid="stMarkdownContainer"]',
+      '[data-testid="stPlotlyChart"]','[data-testid="stDataFrame"]',
+      '[data-testid="stImage"]','[data-testid="stAlert"]',
+      '[data-testid="stExpander"]','[data-testid="stTabs"]',
+      '.kpi-card','.kpi-grid-4','.kpi-grid-6',
+      '[data-testid="stVerticalBlockBorderWrapper"]'
+    ].join(',');
+    const empty = [
+      '.stApp','main','[data-testid="stMain"]',
+      '[data-testid="stMainBlockContainer"]','.block-container',
+      '[data-testid="stVerticalBlock"]','[data-testid="stHorizontalBlock"]',
+      '[data-testid="stColumn"]','[data-testid="stElementContainer"]'
+    ].join(',');
+    const listener = e => {
+      if (e.button !== 0 || !e.target || e.target.nodeType !== 1) return;
+      if (e.target.closest(excluded) || !e.target.matches(empty)) return;
+      const home = doc.querySelector('div.st-key-nav_home_btn button');
+      if (home) home.click();
+    };
+    root.__ejadaBlankCloseHandler = listener;
+    doc.addEventListener('click', listener, true);
+  } catch (_) {}
+})();
+</script>
+"""
+_BLANK_CLICK_SCRIPT = _BLANK_CLICK_SCRIPT.replace(
+    '__ACTIVE__', 'true' if st.session_state.current_page != 'Home' else 'false'
+)
+try:
+    st.html(_BLANK_CLICK_SCRIPT, unsafe_allow_javascript=True)
+except TypeError:
+    from streamlit.components.v1 import html as _legacy_html
+    _legacy_html(_BLANK_CLICK_SCRIPT, height=0, width=0)
+
+
 # ==========================================
 # دوال تقرير الوعود والإكسيل (مع Pivot Table حقيقي وتفاعلي 100% يفتح فوراً على Excel)
 # ==========================================
