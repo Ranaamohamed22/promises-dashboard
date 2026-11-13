@@ -252,18 +252,40 @@ st.markdown(f"""
         line-height: 1.15 !important;
     }}
 
-    /* Streamlit top toolbar icons (GitHub / share / edit / star / menu)
-       follow the active dashboard theme instead of keeping a fixed color. */
+    /* Move the Streamlit cloud toolbar (Share / star / edit / GitHub / menu)
+       to the far-left and keep all of its icons/text white. */
+    header[data-testid="stHeader"] [data-testid="stToolbar"],
+    header[data-testid="stHeader"] [data-testid="stToolbarActions"] {{
+        position: absolute !important;
+        left: 12px !important;
+        right: auto !important;
+        margin-left: 0 !important;
+        margin-right: auto !important;
+        direction: ltr !important;
+        justify-content: flex-start !important;
+    }}
+
+    header[data-testid="stHeader"] [data-testid="stToolbar"] *,
+    header[data-testid="stHeader"] [data-testid="stToolbarActions"] *,
+    header[data-testid="stHeader"] button,
+    header[data-testid="stHeader"] a {{
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }}
+
     header[data-testid="stHeader"] [data-testid="stToolbar"] svg,
+    header[data-testid="stHeader"] [data-testid="stToolbarActions"] svg,
     header[data-testid="stHeader"] button svg,
     header[data-testid="stHeader"] a svg {{
-        color: {header_logo_color} !important;
-        fill: {header_logo_color} !important;
-        stroke: {header_logo_color} !important;
+        color: #FFFFFF !important;
+        fill: #FFFFFF !important;
+        stroke: #FFFFFF !important;
     }}
-    header[data-testid="stHeader"] [data-testid="stToolbar"] button,
-    header[data-testid="stHeader"] [data-testid="stToolbar"] a {{
-        color: {header_logo_color} !important;
+
+    /* Keep the main menu / overflow control aligned with the left toolbar too. */
+    header[data-testid="stHeader"] [data-testid="stMainMenu"],
+    header[data-testid="stHeader"] button[aria-label*="menu" i] {{
+        color: #FFFFFF !important;
     }}
 
     /* Home navigation is intentionally icon-only. */
