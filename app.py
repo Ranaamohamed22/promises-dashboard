@@ -1793,6 +1793,40 @@ st.markdown(f"""
         }}
     }}
 
+    /* Activity summary: visibly distinct KPI cards in both SNB and STC. */
+    div.st-key-ejada_activity_kpi_panel {{
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-top: 5px !important;
+        margin-bottom: 12px !important;
+    }}
+    div.st-key-ejada_activity_kpi_panel [data-testid="stMetric"] {{
+        box-sizing: border-box !important;
+        border: 1px solid {border_color} !important;
+        background: {card_color} !important;
+        border-radius: 12px !important;
+        min-height: 108px !important;
+        padding: 12px 14px !important;
+        box-shadow: 0 2px 7px rgba(0,0,0,0.05) !important;
+        text-align: center !important;
+    }}
+    div.st-key-ejada_activity_kpi_panel [data-testid="stMetric"] label,
+    div.st-key-ejada_activity_kpi_panel [data-testid="stMetricLabel"],
+    div.st-key-ejada_activity_kpi_panel [data-testid="stMetricLabel"] p {{
+        color: {text_color} !important;
+        font-size: 17px !important;
+        font-weight: 800 !important;
+        text-align: center !important;
+        justify-content: center !important;
+    }}
+    div.st-key-ejada_activity_kpi_panel [data-testid="stMetricValue"],
+    div.st-key-ejada_activity_kpi_panel [data-testid="stMetricValue"] > div {{
+        color: {text_color} !important;
+        font-weight: 900 !important;
+        font-size: 31px !important;
+        text-align: center !important;
+    }}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -7309,7 +7343,7 @@ def _snb_kpi_counts(selected, notes_col, mapping, manual, row_decisions):
 def _ejada_stc_activity_kpi_counts(uploaded):
     """Coverage from STC uploaded records; success only from explicit call rating."""
     if uploaded is None:
-        return 0, None, None, 0
+        return 0, 0, 0, 0
     name = uploaded.name.lower()
     raw = io.BytesIO(uploaded.getvalue())
     if name.endswith(".csv"):
@@ -8479,8 +8513,26 @@ if page_uploaded is None:
             except Exception as exc:
                 st.error(f"تعذر قراءة بيانات نشاط STC: {exc}")
                 _ejada_activity_kpis("STC", 0)
-        elif st.session_state.activity_page_uploads["SNB"]["activity"] is None:
-            _ejada_activity_kpis("SNB", 0, 0, 0)
+        elif not _snb_secret_model_ready and (
+            st.session_state.activity_page_uploads["SNB"]["model"] is None
+        ):
+            # No baseline model available yet: count coverage, but never guess.
+            _waiting = st.session_state.activity_page_uploads["SNB"]["activity"]
+            if _waiting is None:
+                _ejada_activity_kpis("SNB", 0, 0, 0)
+            else:
+                try:
+                    _waiting_data, _ = _prepare_snb_activity_file(_waiting)
+                    _ejada_activity_kpis(
+                        "SNB", len(_waiting_data), None, None, len(_waiting_data)
+                    )
+                    st.caption(
+                        "حمّلي موديل النشاط لتحديد الناجحة وغير الناجحة "
+                        "بدون تخمين."
+                    )
+                except Exception as exc:
+                    st.warning(f"تعذر قراءة ملف النشاط لعرض المؤشرات: {exc}")
+                    _ejada_activity_kpis("SNB", 0, None, None)
 
         # SNB report is rendered only when an activity file and model exist.
         if selected_bank == 'SNB':
