@@ -5954,11 +5954,26 @@ def _prepare_snb_activity_file(uploaded_file):
     created = _snb_find_column(
         frame, "Created on", "Created_on", "CreatedOn"
     )
+    # Merge CC and PF in the EXISTING product/finance column, not a new one.
     product = _snb_find_column(
         frame, "نوع المنتج-التمويل", "نوع المنتج - التمويل",
         "نوع المتنج-التمويل", "نوع المنتج", "Product Type",
-        "ProductType"
+        "ProductType", "Product Type - Finance", "Product Type - Financing"
     )
+    if product is None:
+        product_matches = [
+            col for col in frame.columns
+            if (
+                ("منتج" in _snb_header_key(col) and
+                 "تمويل" in _snb_header_key(col))
+                or (
+                    "product" in _snb_header_key(col)
+                    and "type" in _snb_header_key(col)
+                )
+            )
+        ]
+        if len(product_matches) == 1:
+            product = product_matches[0]
     missing = [
         label for label, col in [
             ("Debitor", debitor), ("Notes (الإفادة)", notes),
@@ -6043,32 +6058,30 @@ def _prepare_snb_activity_file(uploaded_file):
 
 
 def _infer_snb_daily_period(frame):
-    """Choose a daily shift from Created on, avoiding guesses on overlaps."""
+    """Infer SNB shift from Created on: 02:00–12:00 / 12:00–16:00 / full day."""
     times = frame["__ejada_parsed_created"].dropna()
     if times.empty:
         return "full", True
-    latest = times.max().normalize()
-    # Include the previous day's evening calls if the shift crosses midnight.
-    relevant = times[times >= latest - pd.Timedelta(days=1)]
-    minutes = relevant.dt.hour * 60 + relevant.dt.minute
-    has_early_day = ((minutes > 0) & (minutes < 720)).any()
-    has_second_only = ((minutes >= 720) & (minutes < 840)).any()
-    has_first_only = (minutes >= 960).any()
-    has_midnight = (minutes == 0).any()
+    latest_day = times.max().normalize()
+    # Infer from the most recent calendar date in this upload.
+    current_day = times[times.dt.normalize() == latest_day]
+    minute_of_day = current_day.dt.hour * 60 + current_day.dt.minute
+    first = ((minute_of_day >= 120) & (minute_of_day < 720)).any()
+    second = ((minute_of_day >= 720) & (minute_of_day < 960)).any()
+    outside = ((minute_of_day < 120) | (minute_of_day >= 960)).any()
 
-    if has_early_day or (has_second_only and has_first_only):
+    if outside or (first and second):
         return "full", False
-    if has_second_only and not has_first_only:
-        return "second", False
-    if has_first_only or has_midnight:
+    if first:
         return "first", False
-    # Only 14:00–16:00 is fundamentally ambiguous for two overlapping shifts.
-    # Keep the entire file rather than drop a potentially wrong last hour.
+    if second:
+        return "second", False
+    # No reliable timing evidence: keep all hours to avoid losing calls.
     return "full", True
 
 
 def _filter_snb_activity_period(frame, activity_kind, daily_period):
-    """Filter using Created on, and exclude last hour only for partial shifts."""
+    """Apply corrected daily shifts; exclude the last hour of partial shifts only."""
     valid = frame.dropna(subset=["__ejada_parsed_created"]).copy()
     if valid.empty:
         return valid, 0
@@ -6078,28 +6091,21 @@ def _filter_snb_activity_period(frame, activity_kind, daily_period):
 
     if activity_kind == "يومي":
         if daily_period == "first":
-            # At midnight, a 14:00–00:00 shift began on the PREVIOUS day.
-            max_time = timestamps.max()
-            if (
-                max_time.hour == 0 and max_time.minute == 0
-                and (
-                    (timestamps >= day_start - pd.Timedelta(hours=10))
-                    & (timestamps < day_start)
-                ).any()
-            ):
-                day_start -= pd.Timedelta(days=1)
-            lower = day_start + pd.Timedelta(hours=14)
-            upper = day_start + pd.Timedelta(days=1)
+            # First period: 2 AM inclusive up to 12 PM (noon) exclusive.
+            lower = day_start + pd.Timedelta(hours=2)
+            upper = day_start + pd.Timedelta(hours=12)
             valid = valid[
-                (timestamps >= lower) & (timestamps <= upper)
+                (timestamps >= lower) & (timestamps < upper)
             ].copy()
         elif daily_period == "second":
+            # Second period: noon inclusive up to 4 PM exclusive.
             lower = day_start + pd.Timedelta(hours=12)
             upper = day_start + pd.Timedelta(hours=16)
             valid = valid[
-                (timestamps >= lower) & (timestamps <= upper)
+                (timestamps >= lower) & (timestamps < upper)
             ].copy()
         else:
+            # Full day includes ALL hours; do NOT remove its last hour.
             lower = day_start
             upper = day_start + pd.Timedelta(days=1)
             valid = valid[
@@ -6107,9 +6113,9 @@ def _filter_snb_activity_period(frame, activity_kind, daily_period):
             ].copy()
 
         if daily_period in ("first", "second") and not valid.empty:
-            last_timestamp = valid["__ejada_parsed_created"].max()
-            last_hour = last_timestamp - pd.Timedelta(hours=1)
-            keep = valid["__ejada_parsed_created"] < last_hour
+            latest_period_call = valid["__ejada_parsed_created"].max()
+            last_hour_start = latest_period_call - pd.Timedelta(hours=1)
+            keep = valid["__ejada_parsed_created"] < last_hour_start
             hour_excluded = int((~keep).sum())
             valid = valid.loc[keep].copy()
     elif activity_kind == "أسبوعي":
@@ -6187,7 +6193,7 @@ def render_snb_activity_report(model_upload, activity_upload):
         if activity_kind == "يومي":
             period, ambiguous = _infer_snb_daily_period(prepared)
             names = {
-                "first": "الفترة الأولى (2 مساءً – 12 منتصف الليل)",
+                "first": "الفترة الأولى (2 فجرًا – 12 ظهرًا)",
                 "second": "الفترة الثانية (12 ظهرًا – 4 عصرًا)",
                 "full": "اليوم الكامل"
             }
@@ -6200,9 +6206,8 @@ def render_snb_activity_report(model_upload, activity_upload):
             )
             if ambiguous:
                 st.warning(
-                    "أوقات المكالمات تقع في نطاق يتداخل بين فترتين، "
-                    "ولا يمكن معرفة الفترة بيقين من Created on وحده. "
-                    "احتفظت باليوم الكامل دون حذف آخر ساعة لحماية البيانات."
+                    "تعذر تحديد الفترة بثقة من أوقات Created on. "
+                    "تم الاحتفاظ باليوم الكامل دون استبعاد آخر ساعة لحماية البيانات."
                 )
 
         selected, excluded_hour = _filter_snb_activity_period(
