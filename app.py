@@ -780,7 +780,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 if st.session_state.current_page not in ('Overview', 'Home'):
-    bank_col1, bank_col2, _bank_spacer = st.columns([1.3, 1.3, 7.4], gap='small')
+    _bank_spacer, bank_col1, bank_col2 = st.columns([7.4, 1.3, 1.3], gap='small')
     with bank_col1:
         st.button('🏦 SNB | البنك الأهلي السعودي', key='bank_SNB',
                   type='primary' if st.session_state.selected_bank == 'SNB' else 'secondary',
