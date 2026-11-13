@@ -315,97 +315,79 @@ st.markdown(f"""
         white-space: nowrap !important;
     }}
 
-    /* Streamlit cloud toolbar: Share, star, edit, GitHub and menu.
-       Green stays visible against Light, Navy, and Dark backgrounds. */
-    header[data-testid="stHeader"] [data-testid="stToolbar"],
+    /* Fix the Streamlit header: never give the full-width toolbar a white background.
+       Only the small actions cluster receives the white card. */
+    header[data-testid="stHeader"] {{
+        background: transparent !important;
+        background-color: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
+        height: 2.5rem !important;
+        min-height: 0 !important;
+        pointer-events: none !important;
+    }}
+    header[data-testid="stHeader"] [data-testid="stToolbar"] {{
+        position: relative !important;
+        top: 0 !important;
+        left: auto !important;
+        right: auto !important;
+        display: flex !important;
+        width: 100% !important;
+        height: 2.5rem !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: transparent !important;
+        background-color: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
+        pointer-events: none !important;
+    }}
+
+    /* Keep Share, star, edit and GitHub together in a compact white box. */
     header[data-testid="stHeader"] [data-testid="stToolbarActions"] {{
         position: absolute !important;
-        left: 12px !important;
+        top: 7px !important;
+        left: 8px !important;
         right: auto !important;
-        margin-left: 0 !important;
-        margin-right: auto !important;
-        direction: ltr !important;
+        display: inline-flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
         justify-content: flex-start !important;
+        width: max-content !important;
+        max-width: calc(100vw - 36px) !important;
+        height: auto !important;
+        padding: 5px 10px !important;
+        margin: 0 !important;
+        background: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 10px !important;
+        box-shadow: 0 2px 7px rgba(0,0,0,0.12) !important;
+        direction: ltr !important;
+        pointer-events: auto !important;
+        z-index: 20 !important;
     }}
-
-    header[data-testid="stHeader"] [data-testid="stToolbar"],
-    header[data-testid="stHeader"] [data-testid="stToolbarActions"],
-    header[data-testid="stHeader"] [data-testid="stToolbar"] *,
-    header[data-testid="stHeader"] [data-testid="stToolbarActions"] *,
-    header[data-testid="stHeader"] button,
-    header[data-testid="stHeader"] a,
-    header[data-testid="stHeader"] span,
-    header[data-testid="stHeader"] [role="button"],
-    header[data-testid="stHeader"] [aria-label] {{
+    header[data-testid="stHeader"] [data-testid="stToolbarActions"] :is(button, a, span, [role="button"]),
+    header[data-testid="stHeader"] [data-testid="stToolbarActions"] :is(button, a, span, [role="button"]) * {{
         color: {snb_green} !important;
         -webkit-text-fill-color: {snb_green} !important;
-        opacity: 1 !important;
     }}
-
-    /* A filter recolors both filled and outlined SVG icons without
-       destroying their original shapes (unlike forcing fill on paths). */
-    header[data-testid="stHeader"] [data-testid="stToolbar"] svg,
+    /* Filter the complete SVG so both solid and outline icons remain green;
+       do not force fill on every path (which ruins outlined icons). */
     header[data-testid="stHeader"] [data-testid="stToolbarActions"] svg,
-    header[data-testid="stHeader"] button svg,
-    header[data-testid="stHeader"] a svg,
-    header[data-testid="stHeader"] img,
-    header[data-testid="stHeader"] [data-testid="stToolbar"] img,
-    header[data-testid="stHeader"] [data-testid="stToolbarActions"] img {{
-        filter: brightness(0) saturate(100%) invert(48%) sepia(70%)
-                saturate(570%) hue-rotate(86deg) brightness(91%) contrast(92%) !important;
+    header[data-testid="stHeader"] [data-testid="stToolbarActions"] img,
+    header[data-testid="stHeader"] [data-testid="stToolbar"] svg,
+    header[data-testid="stHeader"] [data-testid="stToolbar"] img {{
+        color: {snb_green} !important;
+        filter: brightness(0) saturate(100%) invert(49%) sepia(77%)
+                saturate(575%) hue-rotate(82deg) brightness(92%) contrast(88%) !important;
         opacity: 1 !important;
-        color: {snb_green} !important;
     }}
-
+    /* Allow the Streamlit menu at the opposite edge to remain clickable. */
     header[data-testid="stHeader"] [data-testid="stMainMenu"],
+    header[data-testid="stHeader"] [data-testid="stMainMenu"] *,
     header[data-testid="stHeader"] button[aria-label*="menu" i] {{
+        pointer-events: auto !important;
         color: {snb_green} !important;
-    }}
-
-    /* Header actions: white background and green Share, star, edit and GitHub icons. */
-    header[data-testid="stHeader"] [data-testid="stToolbar"],
-    header[data-testid="stHeader"] [data-testid="stToolbarActions"],
-    [data-testid="stToolbar"]:not(header),
-    [data-testid="stToolbarActions"]:not(header) {{
-        background: #FFFFFF !important;
-        border-radius: 9px !important;
-        padding: 3px 7px !important;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.12) !important;
-    }}
-    header[data-testid="stHeader"] svg,
-    [data-testid="stToolbar"] svg,
-    [data-testid="stToolbarActions"] svg {{
-        filter: none !important;
-        color: {snb_green} !important;
-        stroke: {snb_green} !important;
-        fill: {snb_green} !important;
-    }}
-    header[data-testid="stHeader"] svg path,
-    header[data-testid="stHeader"] svg circle,
-    header[data-testid="stHeader"] svg rect,
-    header[data-testid="stHeader"] svg line,
-    header[data-testid="stHeader"] svg polyline,
-    header[data-testid="stHeader"] svg polygon,
-    [data-testid="stToolbar"] svg path,
-    [data-testid="stToolbar"] svg circle,
-    [data-testid="stToolbar"] svg rect,
-    [data-testid="stToolbar"] svg line,
-    [data-testid="stToolbar"] svg polyline,
-    [data-testid="stToolbar"] svg polygon,
-    [data-testid="stToolbarActions"] svg path,
-    [data-testid="stToolbarActions"] svg circle,
-    [data-testid="stToolbarActions"] svg rect,
-    [data-testid="stToolbarActions"] svg line,
-    [data-testid="stToolbarActions"] svg polyline,
-    [data-testid="stToolbarActions"] svg polygon {{
-        color: {snb_green} !important;
-        stroke: {snb_green} !important;
-        fill: {snb_green} !important;
-    }}
-    header[data-testid="stHeader"] svg [fill="none"],
-    [data-testid="stToolbar"] svg [fill="none"],
-    [data-testid="stToolbarActions"] svg [fill="none"] {{
-        fill: none !important;
     }}
 
     /* Bank selection: real two-column row aligned to screen left. */
