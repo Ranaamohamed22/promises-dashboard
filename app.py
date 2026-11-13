@@ -5101,6 +5101,12 @@ def render_report_upload_bar(page):
                     if new_sig != current_sig:
                         bank_files[page] = new_files
                         st.rerun()
+                elif current_files:
+                    # لو المستخدم شال كل الملفات من علامة × داخل الـ uploader،
+                    # امسح النسخة القديمة المخزنة فوراً حتى لا تظل الـ KPIs تعرض أرقاماً قديمة.
+                    bank_files[page] = None
+                    st.session_state.report_uploader_versions[selected_bank][page] += 1
+                    st.rerun()
 
                 if current_files:
                     st.caption("الملف الحالي: " + "، ".join(x.name for x in current_files))
