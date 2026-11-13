@@ -4856,28 +4856,49 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
             temp_df = pd.read_csv(f, dtype=str) if f.name.endswith('.csv') else pd.read_excel(f, dtype=str)
             temp_df.columns = temp_df.columns.astype(str).str.strip()
 
-            # حماية من رفع محفظة STC داخل تقارير البنك الأهلي SNB.
-            # نعتمد على العمود المرجعي في محفظة STC: Portfolio Type = STC Bank.
+            # حماية من رفع محفظة بنك في خانة البنك الآخر.
+            # نعتمد أولاً على Portfolio Type لأنه أوضح بصمة داخل ملف المحفظة.
             portfolio_type_col = find_col_in(
                 temp_df,
                 ['Portfolio Type', 'portfolio type', 'Portfolio_Type']
             )
-            if bank == 'SNB' and portfolio_type_col:
+            if portfolio_type_col:
                 portfolio_values = (
                     temp_df[portfolio_type_col]
                     .dropna()
                     .astype(str)
                     .str.strip()
-                    .str.lower()
                 )
-                is_stc_portfolio = portfolio_values.str.fullmatch(
-                    r'stc\s*bank',
-                    case=False,
-                    na=False
+
+                normalized_portfolio_values = (
+                    portfolio_values
+                    .str.lower()
+                    .str.split()
+                    .str.join(' ')
+                )
+                compact_portfolio_values = normalized_portfolio_values.str.replace(
+                    ' ', '', regex=False
+                )
+
+                is_stc_portfolio = compact_portfolio_values.eq('stcbank').any()
+
+                is_snb_portfolio = (
+                    normalized_portfolio_values.str.contains('snb', regex=False, na=False) |
+                    normalized_portfolio_values.str.contains('saudi national bank', regex=False, na=False) |
+                    normalized_portfolio_values.str.contains('البنك الأهلي السعودي', regex=False, na=False) |
+                    normalized_portfolio_values.str.contains('البنك الاهلي السعودي', regex=False, na=False)
                 ).any()
 
-                if is_stc_portfolio:
+                if bank == 'SNB' and is_stc_portfolio:
                     st.error("⚠️ رنا إنتِ في البنك الغلط — الملف ده خاص بـ STC Bank.")
+                    st.caption(f"الملف المرفوع: {f.name}")
+                    return (
+                        pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(),
+                        None, 0, 0, 0, 0, 0, 0
+                    )
+
+                if bank == 'STC' and is_snb_portfolio:
+                    st.error("⚠️ رنا إنتِ في البنك الغلط — الملف ده خاص بالبنك الأهلي السعودي SNB.")
                     st.caption(f"الملف المرفوع: {f.name}")
                     return (
                         pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(),
