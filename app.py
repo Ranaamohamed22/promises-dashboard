@@ -8756,7 +8756,9 @@ def render_stc_activity_report(model_upload, activity_upload,
     saved_notice = st.session_state.pop("stc_model_last_save_notice", None)
     if saved_notice:
         st.success(saved_notice)
-    with st.expander("🏦 موديل النشاط الخاص ببنك STC", expanded=bool(model_upload)):
+    # Outer container, not an expander: the setup function has its own
+    # collapsible import section (Streamlit disallows nested expanders).
+    with st.container(border=True):
         _stc_render_model_setup(model_upload, uploaded_model, saved_mapping)
 
     # Stored ratings take priority over an uploaded baseline, so explicit
