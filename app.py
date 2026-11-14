@@ -6436,12 +6436,12 @@ def _snb_secret_model_evaluations():
 
 
 def _snb_load_saved_model_notes(settings):
-    """Return normalized mapping, original labels, and current file SHA."""
+    """Return ratings, labels, SHA and explicitly approved special-note keys."""
     if not settings["token"]:
-        return {}, {}, None
+        return {}, {}, None, set()
     response = _snb_github_model_request(settings)
     if response is None:
-        return {}, {}, None
+        return {}, {}, None, set()
     if not isinstance(response, dict) or response.get("type") != "file":
         raise ValueError("ملف موديل النشاط على GitHub غير صالح.")
     encoded = response.get("content", "")
@@ -6457,7 +6457,7 @@ def _snb_load_saved_model_notes(settings):
         ) from exc
     if not isinstance(document, dict) or not isinstance(document.get("entries", []), list):
         raise ValueError("صيغة ملف الموديل المحفوظ غير صحيحة.")
-    ratings, labels = {}, {}
+    ratings, labels, approved_special = {}, {}, set()
     for entry in document.get("entries", []):
         if not isinstance(entry, dict):
             continue
@@ -6468,27 +6468,39 @@ def _snb_load_saved_model_notes(settings):
             if key in ratings and ratings[key] != value:
                 raise ValueError("موديل النشاط المحفوظ يحتوي على تقييمين متعارضين.")
             ratings[key], labels[key] = value, note
-    return ratings, labels, response.get("sha")
+            if entry.get("allow_special") is True and _snb_review_trigger_reasons(note):
+                approved_special.add(key)
+    return ratings, labels, response.get("sha"), approved_special
 
 
-def _snb_save_model_notes(settings, additions):
-    """Merge entries using a fresh SHA; do not overwrite concurrent updates."""
+def _snb_save_model_notes(settings, additions, allow_special=False):
+    """Store approved notes encrypted; special-note reuse requires explicit consent.
+
+    Only an exact normalized note with allow_special=True is trusted in future
+    reports. Existing approved exceptions remain intact during unrelated saves.
+    """
     if not settings["token"]:
         raise RuntimeError("لم يتم إعداد GITHUB_TOKEN داخل Streamlit Secrets.")
-    current, labels, sha = _snb_load_saved_model_notes(settings)
+    current, labels, sha, approved_special = _snb_load_saved_model_notes(settings)
     for note, rating in additions:
         key = _snb_normalize_note(note)
-        if not key or rating not in (0, 1):
+        if not key or type(rating) is not int or rating not in (0, 1):
             raise ValueError("لا يمكن حفظ إفادة فارغة أو تقييم غير صالح.")
-        if _snb_special_review_mask(pd.Series([note])).iloc[0]:
-            raise ValueError(
-                "الإفادات التي تحتوي على / أو // أو «معالج» أو «تم» "
-                "تحتاج مراجعة لكل صف، ولا تُحفظ كتقييم عام."
-            )
+        if _snb_review_trigger_reasons(note):
+            if not allow_special:
+                raise ValueError(
+                    "لحفظ الإفادات الخاصة فعّلي خيار الموافقة على حفظها "
+                    "واستخدام تقييمها مستقبلًا عند تطابق النص تمامًا."
+                )
+            approved_special.add(key)
         current[key] = int(rating)
         labels[key] = str(note).strip()
     entries = [
-        {"notes": labels[key], "evaluation": current[key]}
+        {
+            "notes": labels[key],
+            "evaluation": current[key],
+            **({"allow_special": True} if key in approved_special else {}),
+        }
         for key in sorted(current)
     ]
     raw = json.dumps(
@@ -6514,8 +6526,10 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
     st.markdown("### إدارة موديل النشاط")
     st.caption(
         "تظهر هنا الإفادات الجديدة بعد اعتماد تقييماتها. "
-        "الحفظ يضيف الإفادات العادية فقط إلى ملف مرجعي دائم على GitHub؛ "
-        "الإفادات الخاصة (/ أو // أو معالج أو تم) تظل للمراجعة في كل تقرير."
+        "الحفظ يضيف الإفادات إلى ملف مرجعي مشفّر على GitHub. "
+        "الإفادات الخاصة (/ أو // أو معالج أو تم) يمكن حفظها بعد موافقة صريحة، "
+        "وساعتها يُستخدم تقييم النص المطابق تمامًا في التقارير القادمة؛ "
+        "الإفادات الأخرى تظل للمراجعة."
     )
     previous_notice = st.session_state.pop("snb_model_manager_saved", None)
     if previous_notice:
@@ -6549,7 +6563,7 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
         st.rerun()
 
     try:
-        persisted, _, _ = _snb_load_saved_model_notes(settings)
+        persisted, _, _, saved_special_keys = _snb_load_saved_model_notes(settings)
     except (RuntimeError, ValueError, json.JSONDecodeError) as exc:
         st.error(str(exc))
         return
@@ -6559,22 +6573,35 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
     conflicted = set()
     normalized = notes.map(_snb_normalize_note)
     note_counts = normalized.value_counts(dropna=False)
-    for index, (note, key) in enumerate(zip(notes, normalized)):
-        if not key or _snb_special_review_mask(pd.Series([note])).iloc[0]:
-            continue  # Special notes require per-row review, never a generic rating.
-        # The original model's ratings are already known. Only approved manual
-        # ratings are eligible to be added to the persistent additions file.
-        if key not in manual:
+    special_candidates = set()
+    for index, (note, key) in zip(notes.index, zip(notes, normalized)):
+        if not key:
             continue
-        value = manual[key]
-        if value not in (0, 1):
-            continue
+        is_special = bool(_snb_review_trigger_reasons(note))
+        # Special notes use the explicitly approved per-row rating, not a
+        # similarity suggestion. Never turn conflicting row ratings into a rule.
+        if is_special:
+            value = row_decisions.get(str(index))
+            if value not in (0, 1):
+                continue
+            special_candidates.add(key)
+        else:
+            if key not in manual:
+                continue
+            value = manual[key]
+            if value not in (0, 1):
+                continue
         if key in candidates and candidates[key] != value:
             conflicted.add(key)
         candidates[key] = value
         display_labels.setdefault(key, str(note).strip())
     for key in conflicted:
         candidates.pop(key, None)
+    if conflicted:
+        st.warning(
+            f"يوجد {len(conflicted)} نص إفادة بتقييمات مختلفة بين الصفوف؛ "
+            "لن يُحفظ تلقائيًا كتقييم عام. يمكن إدخال نص محدد يدويًا بعد مراجعته."
+        )
     rows = [
         {
             "إضافة للموديل": False,
@@ -6582,7 +6609,9 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
             "عدد المكالمات": int(note_counts.get(key, 0)),
             "التقييم": "ناجحة" if rating == 1 else "غير ناجحة",
             "الحالة": (
-                "موجودة بنفس التقييم" if persisted.get(key) == rating
+                "حالة خاصة - موافقة إضافية مطلوبة"
+                if key in special_candidates and key not in saved_special_keys
+                else "موجودة بنفس التقييم" if persisted.get(key) == rating
                 else "تحديث تقييم محفوظ" if key in persisted
                 else "تحديث الموديل الأساسي" if key in base_mapping
                 else "جديدة"
@@ -6590,6 +6619,7 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
         }
         for key, rating in sorted(candidates.items())
         if persisted.get(key) != rating
+        or (key in special_candidates and key not in saved_special_keys)
     ]
     st.caption(f"الإفادات المعتمدة المتاحة للإضافة: {len(rows)}")
     sort_mode = st.selectbox(
@@ -6647,6 +6677,15 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
             "أوافق على استبدال التقييم القديم لو الإفادة موجودة",
             value=False,
         )
+        allow_special = st.checkbox(
+            "أوافق على حفظ الإفادات الخاصة أيضًا كتقييم ثابت عند تطابق النص تمامًا",
+            value=False,
+            help=(
+                "ينطبق على / أو // أو معالج أو تم. لا يُحفَظ كتقييم عام "
+                "إلا بعد مراجعتك، وقد يتكرر النص في مكالمات أخرى؛ "
+                "تأكدي من صلاحيته للتعميم قبل الموافقة."
+            ),
+        )
         save = st.form_submit_button("💾 حفظ الإفادات المحددة في الموديل")
     if not save:
         return
@@ -6674,8 +6713,11 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
         if not key:
             st.error("لا يمكن حفظ إفادة فارغة.")
             return
-        if _snb_special_review_mask(pd.Series([note])).iloc[0]:
-            st.error("هذه الإفادة من الحالات الخاصة التي تتطلب مراجعة كل صف؛ لن تُضاف كتقييم عام.")
+        if _snb_review_trigger_reasons(note) and not allow_special:
+            st.warning(
+                "الإفادة من الحالات الخاصة؛ فعّلي خيار «أوافق على حفظ "
+                "الإفادات الخاصة» لحفظ تقييمها كتقييم ثابت للنص نفسه."
+            )
             return
         if key in batch and batch[key] != rating:
             st.error("نفس الإفادة موجودة بتقييمين مختلفين.")
@@ -6689,7 +6731,8 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
     try:
         count = _snb_save_model_notes(
             settings,
-            [(batch_labels[key], rating) for key, rating in batch.items()]
+            [(batch_labels[key], rating) for key, rating in batch.items()],
+            allow_special=allow_special,
         )
     except (RuntimeError, ValueError) as exc:
         st.error(f"تعذّر الحفظ على GitHub: {exc}")
@@ -7281,9 +7324,15 @@ def _snb_review_trigger_reasons(note):
         reasons.append("تم")
     return reasons
 
-def _snb_special_review_mask(notes):
-    """Rows requiring explicit evaluation even when their Note matches the model."""
-    return notes.map(lambda note: bool(_snb_review_trigger_reasons(note)))
+def _snb_special_review_mask(notes, approved_special_keys=None):
+    """Review special notes except explicitly saved exact-text model exceptions."""
+    approved = set(approved_special_keys or ())
+    return notes.map(
+        lambda note: (
+            bool(_snb_review_trigger_reasons(note))
+            and _snb_normalize_note(note) not in approved
+        )
+    )
 
 
 def _snb_slash_row_decisions(activity_upload):
@@ -7296,10 +7345,11 @@ def _snb_slash_row_decisions(activity_upload):
     return storage["ratings"]
 
 
-def _snb_review_slash_rows(frame, notes_col, activity_upload, model_mapping, manual_mapping=None):
-    """Prefill exact-model ratings for review; commit ONLY explicit row approval."""
+def _snb_review_slash_rows(frame, notes_col, activity_upload, model_mapping,
+                           manual_mapping=None, approved_special_keys=None):
+    """Review each special row unless its exact text was explicitly approved."""
     decisions = _snb_slash_row_decisions(activity_upload)
-    marked = _snb_special_review_mask(frame[notes_col])
+    marked = _snb_special_review_mask(frame[notes_col], approved_special_keys)
     flagged = frame.loc[marked].copy()
     if flagged.empty:
         return decisions, True
@@ -8434,8 +8484,9 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             return
         # Persistent model sync failure must never disable the Activity report.
         # Display a warning rather than silently pretending remote notes loaded.
+        approved_special_keys = set()
         try:
-            saved_model_mapping, _, _ = _snb_load_saved_model_notes(
+            saved_model_mapping, _, _, approved_special_keys = _snb_load_saved_model_notes(
                 _snb_model_git_settings()
             )
             model_mapping.update(saved_model_mapping)
@@ -8513,14 +8564,17 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             _ejada_activity_kpis("SNB", *counts)
         slash_row_decisions, slash_reviewed = _snb_review_slash_rows(
             selected, stats["notes"], activity_upload,
-            model_mapping, manual_decisions
+            model_mapping, manual_decisions,
+            approved_special_keys=approved_special_keys,
         )
         if not slash_reviewed:
             return
         # Special-review rows use their own row-level manual decisions.
         # Skip repeat note-level review for those rows.
         ordinary_notes = selected.loc[
-            ~_snb_special_review_mask(selected[stats["notes"]]),
+            ~_snb_special_review_mask(
+                selected[stats["notes"]], approved_special_keys
+            ),
             stats["notes"]
         ]
         similarity, fully_reviewed = _snb_review_new_notes(
