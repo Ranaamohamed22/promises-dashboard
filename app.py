@@ -7058,7 +7058,9 @@ def _snb_review_new_notes(notes, mapping, manual, conflicted=0):
             "عدد المكالمات": int(counts.get(key, 0)),
             "أقرب إفادة في الموديل": closest or "لا يوجد",
             "نسبة التشابه": f"{score}%",
-            "التقييم المطلوب": "اختاري التقييم"
+            "التقييم المطلوب": {1: "ناجحة", 0: "غير ناجحة"}.get(
+                mapping.get(closest) if key and closest and score > 0 else None, "اختاري التقييم"
+            )
         })
 
     st.warning(
@@ -7070,8 +7072,7 @@ def _snb_review_new_notes(notes, mapping, manual, conflicted=0):
             "الإفادات التي لها تقييمان متعارضان في الموديل تعرض للمراجعة أيضًا."
         )
     st.caption(
-        "نسبة التشابه تقارن نص الإفادة بالموديل فقط؛ "
-        "لا يتم اعتبار التقييم ناجحًا أو غير ناجح بناءً على التشابه."
+        "التقييم مقترح من أقرب إفادة في الموديل. راجعي الاقتراح وعدّليه قبل الاعتماد."
     )
     with st.form("snb_activity_new_notes_review_form"):
         edited = st.data_editor(
