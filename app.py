@@ -7005,26 +7005,12 @@ def _snb_model_similarity(note_key, model_keys):
         return 100, note_key
     if not note_key or not model_keys:
         return 0, ""
-    # Model sets are usually small. Narrow to comparable-length candidates when
-    # there are many notes to avoid a costly all-against-all comparison.
-    candidates = model_keys
-    if len(model_keys) > 600:
-        candidates = [
-            text for text in model_keys
-            if abs(len(text) - len(note_key)) <= max(7, len(note_key) // 2)
-        ]
-        if not candidates:
-            candidates = sorted(
-                model_keys, key=lambda text: abs(len(text) - len(note_key))
-            )[:50]
-    closest = get_close_matches(
-        note_key, candidates, n=1, cutoff=0
-    )
+    closest = get_close_matches(note_key, model_keys, n=1, cutoff=0)
     if not closest:
         return 0, ""
     match = closest[0]
-    percent = round(100 * SequenceMatcher(None, note_key, match).ratio())
-    return int(percent), match
+    percent = round(100 * SequenceMatcher(None, match, note_key).ratio(), 2)
+    return percent, match
 
 
 def _snb_manual_evaluations(model_upload):
@@ -7185,6 +7171,11 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload, model_mapping, man
     manual_mapping = manual_mapping or {}
     # Model values are ONLY editable suggestions here, never approvals.
     # Previously approved row choices override the suggestion.
+    model_keys = list(model_mapping)
+    matches = {
+        key: _snb_model_similarity(key, model_keys)
+        for key in flagged[notes_col].map(_snb_normalize_note).unique()
+    }
     def _suggestion(note, original_index):
         key = _snb_normalize_note(note)
         prior = decisions.get(str(original_index))
@@ -7194,7 +7185,10 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload, model_mapping, man
             return manual_mapping[key], "تقييم معتمد للإفادة"
         if key in model_mapping:
             return model_mapping[key], "موديل النشاط"
-        return None, "غير موجودة في الموديل"
+        score, nearest = matches[key]
+        if score > 0 and nearest in model_mapping:
+            return model_mapping[nearest], "أقرب إفادة في الموديل"
+        return None, "لا توجد مطابقة"
 
     suggestions = [
         _suggestion(note, original_index)
@@ -7208,6 +7202,9 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload, model_mapping, man
     review["مصدر التقييم"] = [source for suggested, source in suggestions]
     review["رقم الصف في الملف"] = [int(i) + 2 for i in original_indices]
     review["الإفادة"] = flagged[notes_col].fillna("").astype(str).tolist()
+    note_matches = [matches[_snb_normalize_note(note)] for note in flagged[notes_col]]
+    review["نسبة التقارب"] = [score for score, _ in note_matches]
+    review["أقرب إفادة في الموديل"] = [nearest for _, nearest in note_matches]
     review["سبب المراجعة"] = reasons
     # Preserve *every* uploaded source field in the same editable table.
     # Avoid repeating the Notes column, already displayed as "الإفادة".
@@ -7227,20 +7224,25 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload, model_mapping, man
             "(باستثناء الإفادات الخاصة بالسداد والخصم والسحب التي تُقيَّم من الموديل). "
             "راجعي كل صف ظاهر حتى لو طابق موديل النشاط."
         )
-        st.markdown(
-            "**التقييم ظاهر مسبقًا من موديل النشاط لو الإفادة مطابقة له.** "
-            "راجعيه وعدّلي «احسب المكالمة» لو محتاج، ثم اضغطي زر الاعتماد. "
-            "عمود «مصدر التقييم» يوضح هل التقييم من الموديل أو معتمد منك سابقًا. "
-            "**التقييم المقترح لا يدخل التقرير كتقييم معتمد قبل الضغط على الزر.** "
-            "جميع بيانات العملاء موجودة في نفس الجدول."
-        )
+        st.caption("التقييم مقترح من أقرب إفادة في الموديل. الأصفر يعني تقارب أقل من 50%. تقدري تعدّلي التقييم قبل الاعتماد.")
+        order = st.selectbox("ترتيب حسب اللون · Sort by color",
+                             ["ترتيب الملف", "الأصفر أولًا", "بدون لون أولًا"])
+        if order != "ترتيب الملف":
+            low = review["نسبة التقارب"].lt(50)
+            review = review.loc[low.sort_values(ascending=order == "بدون لون أولًا",
+                                                kind="stable").index]
+        original_indices = review.index.tolist()
+        styles = pd.DataFrame("", index=review.index, columns=["الإفادة"])
+        styles.loc[review["نسبة التقارب"].lt(50), "الإفادة"] = "background-color: #FFFF00; color: #111111"
+        styled = review.style.apply(lambda _: styles, axis=None, subset=["الإفادة"])
         with st.form("snb_activity_slash_rows_review_form"):
             edited = st.data_editor(
-                review,
+                styled,
                 use_container_width=True,
                 hide_index=True,
                 disabled=locked,
                 column_config={
+                    "نسبة التقارب": st.column_config.NumberColumn(format="%.2f%%"),
                     "احسب المكالمة": st.column_config.SelectboxColumn(
                         "احسب المكالمة",
                         options=["اختاري التقييم", "ناجحة", "غير ناجحة"],
