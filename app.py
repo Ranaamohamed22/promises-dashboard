@@ -17,6 +17,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from difflib import SequenceMatcher, get_close_matches
 from xml.sax.saxutils import escape as _xml_escape
 from openpyxl import Workbook, load_workbook
+from openpyxl.chart import LineChart, Reference
 from copy import copy
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -7507,7 +7508,10 @@ def _style_snb_activity_workbook(workbook):
         if not last_row or not last_col:
             continue
         sheet.sheet_view.showGridLines = False
-        if sheet.title == "Efficiency_Call_Quality":
+        if sheet.title in (
+            "Efficiency_Call_Quality", "Collector_Stage_Product",
+            "Weekly_Dropoff", "Substate_Breakdown"
+        ):
             sheet.sheet_view.rightToLeft = True
         sheet.freeze_panes = "A2"
         sheet.auto_filter.ref = f"A1:{get_column_letter(last_col)}{last_row}"
@@ -7567,6 +7571,13 @@ def _style_snb_activity_workbook(workbook):
                             cell.font = Font(
                                 name="Calibri", size=11, bold=True, color="173452"
                             )
+                    if sheet.title == "Substate_Breakdown" and (
+                        sheet.cell(row=1, column=col_idx).value == "مؤشر مراجعة الجودة"
+                    ) and cell.value == "مرتفع - للمراجعة":
+                        cell.fill = PatternFill(fill_type="solid", fgColor="FFF0C2")
+                        cell.font = Font(
+                            name="Calibri", size=11, bold=True, color="8A5600"
+                        )
 
 
 def _snb_ptp_note_status(value):
@@ -7821,6 +7832,246 @@ def _build_snb_efficiency_call_quality(result, collector_col, notes_col):
     ).reset_index(drop=True)
     ordered["Efficiency Category"] = ordered["Efficiency Category"].map(category_ar)
     return ordered.rename(columns=headers_ar)
+
+
+def _snb_weekly_activity_trend(result, collector_col):
+    """Build total and collector-level daily trends from the SAME weekly calls."""
+    total_columns = [
+        "التاريخ", "اليوم", "إجمالي المكالمات", "المكالمات الناجحة",
+        "المكالمات غير الناجحة", "المكالمات غير المصنفة",
+        "نسبة النجاح %", "التغير عن اليوم السابق %",
+    ]
+    collector_columns = [
+        "المحصل", "التاريخ", "اليوم", "إجمالي المكالمات",
+        "المكالمات الناجحة", "المكالمات غير الناجحة",
+        "المكالمات غير المصنفة", "نسبة النجاح %",
+    ]
+    stamp = "__ejada_parsed_created"
+    if (result is None or result.empty or stamp not in result.columns
+            or collector_col not in result.columns):
+        return pd.DataFrame(columns=total_columns), pd.DataFrame(columns=collector_columns)
+    data = result.copy()
+    data[stamp] = pd.to_datetime(data[stamp], errors="coerce")
+    data = data.dropna(subset=[stamp]).copy()
+    if data.empty:
+        return pd.DataFrame(columns=total_columns), pd.DataFrame(columns=collector_columns)
+    data["__trend_day"] = data[stamp].dt.normalize()
+    data["__trend_collector"] = (
+        data[collector_col].fillna("").astype(str).str.strip()
+        .replace("", "(بدون اسم)")
+    )
+    all_dates = pd.date_range(
+        data["__trend_day"].min(), data["__trend_day"].max(), freq="D"
+    )
+    days_ar = (
+        "الاثنين", "الثلاثاء", "الأربعاء", "الخميس",
+        "الجمعة", "السبت", "الأحد",
+    )
+
+    def _numbers(group):
+        statuses = group["تقييم المكالمات"].fillna("").astype(str).str.strip()
+        successful = int(statuses.eq("ناجحة").sum())
+        unsuccessful = int(statuses.eq("غير ناجحة").sum())
+        calls = int(len(group))
+        classified = successful + unsuccessful
+        return (
+            calls, successful, unsuccessful, calls - classified,
+            round(100 * successful / classified, 2) if classified else None,
+        )
+
+    total_rows, per_collector = [], []
+    previous_calls = None
+    for day in all_dates:
+        group = data.loc[data["__trend_day"] == day]
+        total, success, unsuccessful, unknown, success_rate = _numbers(group)
+        change_pct = (
+            round(100 * (total - previous_calls) / previous_calls, 2)
+            if previous_calls not in (None, 0) else None
+        )
+        total_rows.append({
+            "التاريخ": day.strftime("%Y-%m-%d"),
+            "اليوم": days_ar[day.weekday()],
+            "إجمالي المكالمات": total,
+            "المكالمات الناجحة": success,
+            "المكالمات غير الناجحة": unsuccessful,
+            "المكالمات غير المصنفة": unknown,
+            "نسبة النجاح %": success_rate,
+            "التغير عن اليوم السابق %": change_pct,
+        })
+        previous_calls = total
+
+    for collector_name, group in data.groupby("__trend_collector", sort=True):
+        for day in all_dates:
+            daily = group.loc[group["__trend_day"] == day]
+            total, success, unsuccessful, unknown, success_rate = _numbers(daily)
+            per_collector.append({
+                "المحصل": collector_name,
+                "التاريخ": day.strftime("%Y-%m-%d"),
+                "اليوم": days_ar[day.weekday()],
+                "إجمالي المكالمات": total,
+                "المكالمات الناجحة": success,
+                "المكالمات غير الناجحة": unsuccessful,
+                "المكالمات غير المصنفة": unknown,
+                "نسبة النجاح %": success_rate,
+            })
+    return (
+        pd.DataFrame(total_rows, columns=total_columns),
+        pd.DataFrame(per_collector, columns=collector_columns),
+    )
+
+
+def _snb_normalize_substate(value):
+    """Group common equivalent sub-states without guessing other categories."""
+    if pd.isna(value) or not str(value).strip():
+        return "غير محدد"
+    original = str(value).strip()
+    norm = original.casefold()
+    norm = (norm.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا")
+            .replace("ى", "ي").replace("ة", "ه"))
+    norm = re.sub(r"\s+", " ", norm)
+    if any(term in norm for term in (
+        "هاتف مغلق", "الجوال مغلق", "موبايل مغلق", "الرقم مغلق",
+        "مغلق", "مقفل", "switched off", "phone off", "closed number",
+    )):
+        return "الهاتف مغلق"
+    if any(term in norm for term in (
+        "لا يجيب", "لا يرد", "لم يرد", "عدم الرد", "بدون رد",
+        "لا يوجد رد", "no answer", "no response", "unanswered",
+    )):
+        return "عدم الرد"
+    if any(term in norm for term in ("مماطل", "مماطله", "stalling")):
+        return "مماطل"
+    if any(term in norm for term in (
+        "رافض", "رفض سداد", "رفض السداد", "refus", "رفض الدفع",
+    )):
+        return "رفض السداد"
+    if (
+        ("وعد" in norm or "promise" in norm or "ptp" in norm)
+        and not any(term in norm for term in ("مكسور", "broken", "ملغي", "مرفوض"))
+    ):
+        return "وعد قيد التنفيذ"
+    return original
+
+
+def _snb_substate_breakdown(result, collector_col):
+    """Per-collector classification distribution and guarded team outlier flags.
+
+    Flags call for quality sampling; they are NOT evidence of fabricated calls.
+    """
+    columns = [
+        "ترتيب المحصل حسب المكالمات", "المحصل", "الحالة الفرعية",
+        "عدد المكالمات", "الترتيب داخل المحصل",
+        "إجمالي مكالمات المحصل", "نسبة المحصل %",
+        "نسبة الفريق %", "الفرق عن الفريق (نقطة مئوية)",
+        "مؤشر مراجعة الجودة",
+    ]
+    if result is None or result.empty or collector_col not in result.columns:
+        return pd.DataFrame(columns=columns), None
+    state_col = _snb_find_column(
+        result, "Sub State", "SubState", "Sub-state", "Sub_State",
+        "الحالة الفرعية", "الحاله الفرعيه", "حالة فرعية",
+        "Classification", "التصنيف", "تصنيف المكالمة",
+    )
+    if state_col is None:
+        return pd.DataFrame(columns=columns), None
+    frame = result.copy()
+    frame["__sub_collector"] = (
+        frame[collector_col].fillna("").astype(str).str.strip()
+        .replace("", "(بدون اسم)")
+    )
+    frame["__sub_state"] = frame[state_col].map(_snb_normalize_substate)
+    collector_totals = frame["__sub_collector"].value_counts()
+    team_state_counts = frame["__sub_state"].value_counts()
+    team_total = len(frame)
+    collector_rank = collector_totals.rank(
+        method="min", ascending=False
+    ).astype(int)
+
+    stats = (
+        frame.groupby(["__sub_collector", "__sub_state"], dropna=False)
+        .size().reset_index(name="عدد المكالمات")
+    )
+    stats["إجمالي مكالمات المحصل"] = stats["__sub_collector"].map(collector_totals)
+    stats["ترتيب المحصل حسب المكالمات"] = (
+        stats["__sub_collector"].map(collector_rank).astype(int)
+    )
+    stats["نسبة المحصل %"] = (
+        100 * stats["عدد المكالمات"] / stats["إجمالي مكالمات المحصل"]
+    ).round(2)
+    stats["نسبة الفريق %"] = (
+        100 * stats["__sub_state"].map(team_state_counts) / team_total
+    ).round(2)
+    stats["الفرق عن الفريق (نقطة مئوية)"] = (
+        stats["نسبة المحصل %"] - stats["نسبة الفريق %"]
+    ).round(2)
+
+    def _review(row):
+        if row["__sub_state"] not in ("الهاتف مغلق", "عدم الرد"):
+            return "طبيعي / لا ينطبق"
+        # Guard against false alarms on very small samples.
+        if row["إجمالي مكالمات المحصل"] < 20 or row["عدد المكالمات"] < 5:
+            return "عينة غير كافية"
+        if (
+            row["نسبة المحصل %"] >= row["نسبة الفريق %"] * 1.5
+            and row["الفرق عن الفريق (نقطة مئوية)"] >= 10
+        ):
+            return "مرتفع - للمراجعة"
+        return "ضمن النطاق"
+
+    stats["مؤشر مراجعة الجودة"] = stats.apply(_review, axis=1)
+    stats = stats.sort_values(
+        ["ترتيب المحصل حسب المكالمات", "عدد المكالمات",
+         "__sub_collector", "__sub_state"],
+        ascending=[True, False, True, True], kind="stable"
+    )
+    stats["الترتيب داخل المحصل"] = (
+        stats.groupby("__sub_collector").cumcount() + 1
+    )
+    stats = stats.rename(columns={
+        "__sub_collector": "المحصل", "__sub_state": "الحالة الفرعية",
+    })
+    return stats[columns].reset_index(drop=True), state_col
+
+
+def _snb_style_weekly_trend_chart(ws, daily_rows, collector_rows):
+    """Style the second table and chart without hiding collector data."""
+    ws.sheet_view.rightToLeft = True
+    detail_header_row = daily_rows + 5
+    if collector_rows:
+        title_cell = ws.cell(
+            row=detail_header_row - 2, column=1,
+            value="تفاصيل نشاط كل محصل يوميًا خلال الأسبوع"
+        )
+        title_cell.font = Font(
+            name="Calibri", size=13, bold=True, color="1F4373"
+        )
+        for cell in ws[detail_header_row]:
+            if cell.value is None:
+                continue
+            cell.fill = PatternFill(fill_type="solid", fgColor="1F4373")
+            cell.font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+            cell.alignment = Alignment(
+                horizontal="center", vertical="center", wrap_text=True
+            )
+        ws.row_dimensions[detail_header_row].height = 34
+    if daily_rows:
+        chart = LineChart()
+        chart.title = "منحنى النشاط الأسبوعي"
+        chart.style = 13
+        chart.y_axis.title = "عدد المكالمات"
+        chart.x_axis.title = "اليوم"
+        chart.height = 9
+        chart.width = 19
+        chart.legend.position = "b"
+        values = Reference(
+            ws, min_col=3, max_col=5, min_row=1, max_row=daily_rows + 1
+        )
+        chart.add_data(values, titles_from_data=True)
+        categories = Reference(
+            ws, min_col=2, min_row=2, max_row=daily_rows + 1
+        )
+        chart.set_categories(categories)
+        ws.add_chart(chart, "K2")
 
 
 def _snb_wasted_time_reports(result, collector_col, notes_col, activity_kind="يومي"):
@@ -8239,6 +8490,14 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             _build_snb_stage_product_breakdown(result, stats["collector"])
             if activity_kind == "أسبوعي" else None
         )
+        weekly_daily, weekly_collectors = (
+            _snb_weekly_activity_trend(result, stats["collector"])
+            if activity_kind == "أسبوعي" else (None, None)
+        )
+        substate_breakdown, substate_source = (
+            _snb_substate_breakdown(result, stats["collector"])
+            if activity_kind == "أسبوعي" else (None, None)
+        )
         with st.expander(
             "🕧 أول إفادة لكل محصل بعد البريك + مدة الدوام", expanded=False
         ):
@@ -8275,6 +8534,32 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
                            "إن وجدت، وإلا Main State أو Classification؛ والمنتج من "
                            "Claim/نوع المتنج-التمويل (يشمل دمج CC+PF).")
                 _expander_table(stage_product_detail, "stage_product_detail")
+            with st.expander(
+                "📉 منحنى النشاط الأسبوعي | Weekly Drop-off", expanded=False
+            ):
+                st.caption(
+                    "إجمالي المكالمات حسب اليوم من بداية الفترة لنهايتها، "
+                    "مع تفصيل كل محصل، واحتساب الأيام بدون مكالمات بصفر."
+                )
+                _expander_table(weekly_daily, "weekly_daily")
+                _expander_table(weekly_collectors, "weekly_collectors")
+            with st.expander(
+                "📊 توزيع الحالات الفرعية | Sub-state Breakdown",
+                expanded=False,
+            ):
+                if substate_source is None:
+                    st.warning(
+                        "عمود Sub State / Classification غير موجود في ملف "
+                        "النشاط؛ لا يمكن حساب توزيع الحالات من الإفادات وحدها."
+                    )
+                else:
+                    st.caption(
+                        f"مصدر الحالات: {substate_source}. المقارنة مع متوسط "
+                        "الفريق في نفس الأسبوع. تنبيه «مرتفع - للمراجعة» يظهر "
+                        "فقط للهاتف مغلق/عدم الرد مع عينة كافية وفارق ملحوظ؛ "
+                        "ولا يدل وحده على إجراء مكالمات وهمية."
+                    )
+                _expander_table(substate_breakdown, "substate_breakdown")
         _snb_render_model_management(
             selected[stats["notes"]], model_mapping,
             manual_decisions, slash_row_decisions
@@ -8307,7 +8592,22 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
                 stage_product_detail.to_excel(
                     writer, sheet_name="Collector_Stage_Product", index=False
                 )
+                weekly_daily.to_excel(
+                    writer, sheet_name="Weekly_Dropoff", index=False
+                )
+                weekly_collectors.to_excel(
+                    writer, sheet_name="Weekly_Dropoff",
+                    startrow=len(weekly_daily) + 4, index=False
+                )
+                substate_breakdown.to_excel(
+                    writer, sheet_name="Substate_Breakdown", index=False
+                )
             _style_snb_activity_workbook(writer.book)
+            if efficiency_quality is not None:
+                _snb_style_weekly_trend_chart(
+                    writer.book["Weekly_Dropoff"],
+                    len(weekly_daily), len(weekly_collectors)
+                )
         activity_only = io.BytesIO()
         with pd.ExcelWriter(activity_only, engine="openpyxl") as writer:
             final.to_excel(writer, sheet_name="Activity", index=False)
