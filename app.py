@@ -6330,14 +6330,18 @@ def _snb_model_git_settings():
     }
 
 
-def _snb_github_model_request(settings, method="GET", payload=None):
-    """Read/write exactly one reference file via GitHub Contents API."""
+_STC_MODEL_FILE_PATH = "data/stc_activity_model.enc"
+
+
+def _snb_github_model_request(settings, method="GET", payload=None,
+                              model_path=_SNB_MODEL_OVERRIDES_PATH):
+    """Read/write only the selected encrypted model reference path."""
     from urllib.parse import quote
     repo_name = settings["repo"]
     repo_parts = repo_name.split("/")
     if len(repo_parts) != 2 or any(not part for part in repo_parts):
         raise ValueError("إعداد GITHUB_REPO يجب أن يكون owner/repository.")
-    path = quote(_SNB_MODEL_OVERRIDES_PATH, safe="/")
+    path = quote(model_path, safe="/")
     url = (
         "https://api.github.com/repos/"
         + quote(repo_parts[0], safe="")
@@ -6741,6 +6745,220 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
         f"اتحفظت {count} إفادة في موديل النشاط الدائم على GitHub."
     )
     st.rerun()
+
+
+
+# ---------------------------------------------------------------------------
+# Dedicated STC Activity Model.  This bank has its own encrypted reference
+# file; no STC Notes are ever placed in the source or in plaintext on GitHub.
+# ---------------------------------------------------------------------------
+def _stc_parse_activity_model(uploaded):
+    """Read STC Notes/التقيم Excel, dedupe and isolate conflicting ratings."""
+    empty = {"ratings": {}, "labels": {}, "conflicts": {}, "invalid": 0, "rows": 0}
+    if uploaded is None:
+        return empty
+    frame = pd.read_excel(io.BytesIO(uploaded.getvalue()), dtype=str)
+    frame.columns = frame.columns.astype(str).str.strip()
+    note_col = _snb_find_column(
+        frame, "Notes", "Note", "الإفادة", "افاده", "ملاحظات"
+    )
+    rating_col = _snb_find_column(
+        frame, "التقيم", "التقييم", "Evaluation", "Rating",
+        "تقييم المكالمات", "التقييم النهائي"
+    )
+    if note_col is None or rating_col is None:
+        raise ValueError(
+            "موديل STC لازم يحتوي على عمود Notes وعمود التقيم (0 أو 1)."
+        )
+    grouped, labels = {}, {}
+    invalid = 0
+    for note, rating in zip(frame[note_col], frame[rating_col]):
+        key = _snb_normalize_note(note)
+        value = str(rating).strip()
+        if value in ("0.0", "1.0", "5.0"):
+            value = value[0]
+        if not key or value not in ("0", "1", "5"):
+            invalid += 1
+            continue
+        score = 0 if value == "5" else int(value)
+        grouped.setdefault(key, {0: 0, 1: 0})[score] += 1
+        labels.setdefault(key, str(note).strip())
+    conflicts = {key: counts for key, counts in grouped.items()
+                 if counts[0] and counts[1]}
+    ratings = {key: (1 if counts[1] else 0)
+               for key, counts in grouped.items() if key not in conflicts}
+    return {
+        "ratings": ratings, "labels": labels, "conflicts": conflicts,
+        "invalid": invalid, "rows": len(frame)
+    }
+
+
+def _stc_load_saved_activity_model():
+    """Fetch encrypted STC model separately from the SNB encrypted model."""
+    settings = _snb_model_git_settings()
+    if not settings["token"]:
+        return {}, {}, None
+    response = _snb_github_model_request(
+        settings, model_path=_STC_MODEL_FILE_PATH
+    )
+    if response is None:
+        return {}, {}, None
+    encoded = response.get("content")
+    if response.get("type") != "file" or not encoded:
+        raise ValueError("ملف STC المشفّر على GitHub غير صالح.")
+    try:
+        plain = _snb_get_fernet().decrypt(base64.b64decode(encoded))
+        doc = json.loads(plain.decode("utf-8"))
+    except (InvalidToken, ValueError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(
+            "تعذر فك تشفير موديل STC؛ راجعي MODEL_ENCRYPTION_KEY."
+        ) from exc
+    if not isinstance(doc, dict) or not isinstance(doc.get("entries"), list):
+        raise ValueError("صيغة موديل STC الدائم غير صالحة.")
+    ratings, labels = {}, {}
+    for item in doc["entries"]:
+        if not isinstance(item, dict):
+            continue
+        note = str(item.get("notes", "")).strip()
+        key = _snb_normalize_note(note)
+        rating = item.get("evaluation")
+        if key and type(rating) is int and rating in (0, 1):
+            if key in ratings and ratings[key] != rating:
+                raise ValueError("موديل STC الدائم يحتوي على تقييمين متعارضين.")
+            ratings[key] = rating
+            labels[key] = note
+    return ratings, labels, response.get("sha")
+
+
+def _stc_save_activity_model(additions, allow_overwrite=False):
+    """Merge STC updates under a fresh GitHub SHA and persist them encrypted."""
+    settings = _snb_model_git_settings()
+    if not settings["token"]:
+        raise RuntimeError("لازم إعداد GITHUB_TOKEN لحفظ موديل STC الدائم.")
+    current, labels, sha = _stc_load_saved_activity_model()
+    for note, rating in additions:
+        key = _snb_normalize_note(note)
+        if not key or type(rating) is not int or rating not in (0, 1):
+            raise ValueError("إفادة أو تقييم STC غير صالح.")
+        if key in current and current[key] != rating and not allow_overwrite:
+            raise ValueError(
+                "فيه إفادة محفوظة بتقييم مختلف. فعّلي الموافقة على الاستبدال."
+            )
+        current[key], labels[key] = rating, str(note).strip()
+    if not current:
+        raise ValueError("لا توجد إفادات STC معتمدة للحفظ.")
+    document = {
+        "schema_version": 1, "bank": "STC",
+        "entries": [
+            {"notes": labels[key], "evaluation": current[key]}
+            for key in sorted(current)
+        ]
+    }
+    encrypted = _snb_get_fernet().encrypt(
+        json.dumps(document, ensure_ascii=False).encode("utf-8")
+    )
+    payload = {
+        "branch": settings["branch"],
+        "message": "Update independent encrypted EJADA STC activity model",
+        "content": base64.b64encode(encrypted).decode("ascii"),
+    }
+    if sha:
+        payload["sha"] = sha
+    _snb_github_model_request(
+        settings, method="PUT", payload=payload,
+        model_path=_STC_MODEL_FILE_PATH
+    )
+    return len(current)
+
+
+def _stc_render_model_setup(uploaded, model_info, saved_ratings):
+    """Allow one-time secure import, including manual resolution of model conflicts."""
+    if uploaded is None:
+        if saved_ratings:
+            st.success(
+                f"موديل STC المستقل محفوظ ومتاح للاستخدام: "
+                f"{len(saved_ratings):,} إفادة."
+            )
+        else:
+            st.info(
+                "ارفعي موديل STC بصيغة Excel من خانة موديل النشاط، "
+                "ثم احفظيه مشفّرًا ليُستخدم بدون إعادة الرفع."
+            )
+        return
+    st.markdown("#### 🏦 إعداد موديل نشاط STC المستقل")
+    conflicts = model_info["conflicts"]
+    st.caption(
+        f"صفوف المصدر: {model_info['rows']:,} | "
+        f"إفادات معتمدة بلا تعارض: {len(model_info['ratings']):,} | "
+        f"إفادات متعارضة: {len(conflicts):,} | "
+        f"صفوف غير صالحة: {model_info['invalid']:,}"
+    )
+    if saved_ratings:
+        st.caption(
+            f"الموديل المحفوظ مسبقًا يحتوي على {len(saved_ratings):,} إفادة "
+            "ومستقل عن موديل SNB."
+        )
+    with st.expander("🔐 حفظ أو تحديث موديل STC على GitHub", expanded=True):
+        st.caption(
+            "يُحفظ الملف مشفّرًا في data/stc_activity_model.enc، "
+            "ولا يتم تعديل موديل SNB أو نشر نصوص الإفادات في app.py."
+        )
+        if not _snb_secret("MODEL_ENCRYPTION_KEY"):
+            st.warning("لازم إعداد MODEL_ENCRYPTION_KEY في Streamlit Secrets.")
+        if not _snb_secret("GITHUB_TOKEN"):
+            st.warning("لازم إعداد GITHUB_TOKEN في Streamlit Secrets.")
+        with st.form("stc_model_import_form"):
+            decisions = {}
+            for ix, (key, counts) in enumerate(sorted(conflicts.items())):
+                note = model_info["labels"][key]
+                choice = st.selectbox(
+                    f"إفادة بتقييمين: {note[:120]} "
+                    f"(ناجحة {counts[1]} / غير ناجحة {counts[0]})",
+                    ["اختاري التقييم", "ناجحة", "غير ناجحة"],
+                    key=f"stc_conflict_{ix}",
+                )
+                decisions[key] = choice
+            overwrite = st.checkbox(
+                "أوافق على استبدال تقييم STC القديم عند اختلافه",
+                value=False,
+            )
+            password = st.text_input(
+                "كلمة مرور إدارة الموديل", type="password"
+            )
+            submit = st.form_submit_button("💾 حفظ موديل STC المستقل")
+        if submit:
+            configured = _snb_model_git_settings()
+            if not configured["admin_password"] or not hmac.compare_digest(
+                password, configured["admin_password"]
+            ):
+                st.error("كلمة مرور إدارة الموديل غير صحيحة أو غير مُعدّة.")
+                return
+            unresolved = [key for key, val in decisions.items()
+                          if val == "اختاري التقييم"]
+            if unresolved:
+                st.error(
+                    f"راجعي {len(unresolved)} إفادة ذات تقييم متعارض أولًا."
+                )
+                return
+            additions = [
+                (model_info["labels"][key], value)
+                for key, value in model_info["ratings"].items()
+            ]
+            additions.extend(
+                (model_info["labels"][key], 1 if choice == "ناجحة" else 0)
+                for key, choice in decisions.items()
+            )
+            try:
+                total = _stc_save_activity_model(
+                    additions, allow_overwrite=overwrite
+                )
+            except (RuntimeError, ValueError) as exc:
+                st.error(f"تعذر حفظ موديل STC: {exc}")
+                return
+            st.session_state["stc_model_last_save_notice"] = (
+                f"تم حفظ {total:,} إفادة في موديل STC المستقل بنجاح."
+            )
+            st.rerun()
 
 
 def _snb_model_evaluations(uploaded_model):
