@@ -7580,16 +7580,29 @@ def _style_snb_activity_workbook(workbook):
                         )
 
 
-def _build_snb_collector_details_xlsx(result, collector_col, wasted_details):
-    """One Excel workbook: index and a complete separate tab for every collector.
+def _snb_export_visible_columns(frame):
+    """Drop comparison and unresolved-call count columns from any SNB Excel export."""
+    if frame is None:
+        return pd.DataFrame()
+    excluded = {
+        _snb_header_key(name) for name in (
+            "نسبة تطابق التقييم", "نسبة تطابق الموديل",
+            "المكالمات غير المصنفة", "المكالمات الغير مصنفة",
+            "Unclassified Calls", "Unclassified Calls (0/5)"
+        )
+    }
+    return frame.drop(
+        columns=[col for col in frame.columns
+                 if _snb_header_key(col) in excluded],
+        errors="ignore",
+    ).copy()
 
-    Original processed Activity columns are never dropped except internal helpers.
-    Each collector also receives their own call-level wasted-time detail table.
-    """
+
+def _build_snb_collector_details_xlsx(result, collector_col):
+    """Export all Activity call details, one worksheet per collector, without waste table."""
     output = io.BytesIO()
     if result is None or result.empty or collector_col not in result.columns:
         return output.getvalue()
-
     frame = result.copy()
     frame["__collector_sheet_key"] = (
         frame[collector_col].fillna("").astype(str).str.strip()
@@ -7597,7 +7610,6 @@ def _build_snb_collector_details_xlsx(result, collector_col, wasted_details):
     )
     used_names = {"فهرس المحصلين".casefold()}
     summary = []
-    layouts = {}
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         for collector_name, group in frame.groupby(
             "__collector_sheet_key", sort=True, dropna=False
@@ -7613,97 +7625,40 @@ def _build_snb_collector_details_xlsx(result, collector_col, wasted_details):
                 sheet_name = base[:31-len(suffix)] + suffix
                 index += 1
             used_names.add(sheet_name.casefold())
-
             stamp = "__ejada_parsed_created"
             if stamp in group.columns:
                 group = group.sort_values(stamp, kind="stable")
-            detail = group.drop(
-                columns=[stamp, "__collector_sheet_key"], errors="ignore"
-            ).copy()
-            detail.to_excel(writer, sheet_name=sheet_name, index=False)
-
-            call_waste = wasted_details.loc[
-                wasted_details["المحصل"].fillna("").astype(str).str.strip() == name
-            ].copy() if wasted_details is not None and not wasted_details.empty else pd.DataFrame()
-            second_header_row = None
-            if not call_waste.empty:
-                # A second complete detail table in the SAME collector tab.
-                second_header_row = len(detail) + 5
-                call_waste.to_excel(
-                    writer, sheet_name=sheet_name,
-                    startrow=second_header_row - 1, index=False,
-                )
-
-            statuses = group["تقييم المكالمات"].fillna("").astype(str).str.strip()
-            successful = int((statuses == "ناجحة").sum())
-            unsuccessful = int((statuses == "غير ناجحة").sum())
-            waste_minutes = (
-                round(float(pd.to_numeric(
-                    call_waste["الوقت المهدر (دقائق)"], errors="coerce"
-                ).fillna(0).sum()), 2)
-                if not call_waste.empty else 0.0
+            detail = _snb_export_visible_columns(
+                group.drop(columns=[stamp, "__collector_sheet_key"], errors="ignore")
             )
+            detail.to_excel(writer, sheet_name=sheet_name, index=False)
+            statuses = group["تقييم المكالمات"].fillna("").astype(str).str.strip()
             summary.append({
                 "المحصل": name,
                 "إجمالي المكالمات": len(detail),
-                "المكالمات الناجحة": successful,
-                "المكالمات غير الناجحة": unsuccessful,
-                "المكالمات غير المصنفة": len(detail) - successful - unsuccessful,
-                "إجمالي الوقت المهدر (دقائق)": waste_minutes,
+                "المكالمات الناجحة": int((statuses == "ناجحة").sum()),
+                "المكالمات غير الناجحة": int((statuses == "غير ناجحة").sum()),
                 "اسم الشيت": sheet_name,
             })
-            layouts[sheet_name] = (len(detail) + 1, second_header_row, len(detail.columns))
-
         summary_df = pd.DataFrame(summary).sort_values(
             ["إجمالي المكالمات", "المحصل"],
             ascending=[False, True], kind="stable"
         ).reset_index(drop=True)
         summary_df.insert(0, "الترتيب", range(1, len(summary_df) + 1))
-        summary_df.to_excel(
-            writer, sheet_name="فهرس المحصلين", index=False
-        )
-
+        summary_df.to_excel(writer, sheet_name="فهرس المحصلين", index=False)
         book = writer.book
         book._sheets.insert(
             0, book._sheets.pop(book._sheets.index(book["فهرس المحصلين"]))
         )
         _style_snb_activity_workbook(book)
-        for sheet_name, (first_end_row, second_header_row, first_cols) in layouts.items():
-            ws = book[sheet_name]
+        for ws in book.worksheets:
             ws.sheet_view.rightToLeft = True
-            ws.auto_filter.ref = (
-                f"A1:{get_column_letter(first_cols)}{first_end_row}"
-            )
-            ws.freeze_panes = "A2"
-            if second_header_row is not None:
-                title_row = second_header_row - 2
-                title = ws.cell(
-                    row=title_row, column=1,
-                    value="تفاصيل الوقت المهدر للمحصّل"
-                )
-                title.font = Font(
-                    name="Calibri", size=13, bold=True, color="1F4373"
-                )
-                ws.row_dimensions[second_header_row].height = 34
-                for cell in ws[second_header_row]:
-                    if cell.value is not None:
-                        cell.fill = PatternFill(
-                            fill_type="solid", fgColor="1F4373"
-                        )
-                        cell.font = Font(
-                            name="Calibri", size=11, bold=True, color="FFFFFF"
-                        )
-                        cell.alignment = Alignment(
-                            horizontal="center", vertical="center", wrap_text=True
-                        )
-
         index_ws = book["فهرس المحصلين"]
-        index_ws.sheet_view.rightToLeft = True
         sheet_col = summary_df.columns.get_loc("اسم الشيت") + 1
         for row_num, label in enumerate(summary_df["اسم الشيت"], start=2):
-            link_cell = index_ws.cell(row=row_num, column=sheet_col)
-            link_cell.hyperlink = f"#'{label}'!A1"
-            link_cell.font = Font(
+            cell = index_ws.cell(row=row_num, column=sheet_col)
+            cell.hyperlink = f"#'{label}'!A1"
+            cell.font = Font(
                 name="Calibri", bold=True, color="0563C1", underline="single"
             )
         index_ws.column_dimensions[get_column_letter(sheet_col)].width = 35
@@ -7849,8 +7804,7 @@ def _build_snb_efficiency_call_quality(result, collector_col, notes_col):
     """
     columns = [
         "Collector", "Total Calls", "Successful Calls",
-        "Unsuccessful Calls (0/5)", "Unclassified Calls",
-        "Success Rate %", "PTP Count", "PTP Conversion %",
+        "Unsuccessful Calls (0/5)", "Success Rate %", "PTP Count", "PTP Conversion %",
         "PTP Needs Review", "Team Median Calls",
         "Team Median Success %", "Efficiency Category",
         "Call Rank", "Top Stage", "Stage Calls",
@@ -7894,7 +7848,6 @@ def _build_snb_efficiency_call_quality(result, collector_col, notes_col):
             "Total Calls": int(len(group)),
             "Successful Calls": successes,
             "Unsuccessful Calls (0/5)": failures,
-            "Unclassified Calls": int(len(group) - classified),
             "Success Rate %": round(100 * successes / classified, 2)
             if classified else None,
             "PTP Count": ptp,
@@ -7944,7 +7897,6 @@ def _build_snb_efficiency_call_quality(result, collector_col, notes_col):
         "Total Calls": "إجمالي المكالمات",
         "Successful Calls": "المكالمات الناجحة",
         "Unsuccessful Calls (0/5)": "المكالمات غير الناجحة (0/5)",
-        "Unclassified Calls": "المكالمات غير المصنفة",
         "Success Rate %": "نسبة نجاح المكالمات %",
         "PTP Count": "عدد وعود السداد",
         "PTP Conversion %": "نسبة التحويل لوعود السداد %",
@@ -7970,13 +7922,12 @@ def _snb_weekly_activity_trend(result, collector_col):
     """Build total and collector-level daily trends from the SAME weekly calls."""
     total_columns = [
         "التاريخ", "اليوم", "إجمالي المكالمات", "المكالمات الناجحة",
-        "المكالمات غير الناجحة", "المكالمات غير المصنفة",
-        "نسبة النجاح %", "التغير عن اليوم السابق %",
+        "المكالمات غير الناجحة", "نسبة النجاح %", "التغير عن اليوم السابق %",
     ]
     collector_columns = [
         "المحصل", "التاريخ", "اليوم", "إجمالي المكالمات",
         "المكالمات الناجحة", "المكالمات غير الناجحة",
-        "المكالمات غير المصنفة", "نسبة النجاح %",
+        "نسبة النجاح %",
     ]
     stamp = "__ejada_parsed_created"
     if (result is None or result.empty or stamp not in result.columns
@@ -8026,7 +7977,6 @@ def _snb_weekly_activity_trend(result, collector_col):
             "إجمالي المكالمات": total,
             "المكالمات الناجحة": success,
             "المكالمات غير الناجحة": unsuccessful,
-            "المكالمات غير المصنفة": unknown,
             "نسبة النجاح %": success_rate,
             "التغير عن اليوم السابق %": change_pct,
         })
@@ -8043,7 +7993,6 @@ def _snb_weekly_activity_trend(result, collector_col):
                 "إجمالي المكالمات": total,
                 "المكالمات الناجحة": success,
                 "المكالمات غير الناجحة": unsuccessful,
-                "المكالمات غير المصنفة": unknown,
                 "نسبة النجاح %": success_rate,
             })
     return (
@@ -8538,6 +8487,13 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             (result["تقييم المكالمات"] == "غير ناجحة").sum()
         )
         unknown = len(result) - successful - unsuccessful
+        if unknown:
+            st.error(
+                f"يوجد {unknown:,} مكالمة لم يتم اعتماد تقييمها بعد. "
+                "يجب مراجعتها وتصنيفها ناجحة أو غير ناجحة "
+                "قبل إتاحة تحميل التقارير."
+            )
+            return
 
         st.markdown(
             f'<p style="color:{label_color};font-weight:800;direction:rtl;'
@@ -8546,8 +8502,7 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             f'التكرارات المحذوفة: {stats["duplicates"]:,} | '
             f'بعد الفترة: {len(result):,} | '
             f'المستبعد بعد نهاية الفترة: {excluded_after_shift:,} | '
-            f'ناجحة: {successful:,} | غير ناجحة: {unsuccessful:,} | '
-            f'غير مصنفة: {unknown:,}'
+            f'ناجحة: {successful:,} | غير ناجحة: {unsuccessful:,}'
             '</p>',
             unsafe_allow_html=True
         )
@@ -8713,33 +8668,34 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             "Wasted_Time_Weekly" if weekly_report
             else "Wasted_Time_Daily"
         )
+        export_final = _snb_export_visible_columns(final)
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            final.to_excel(writer, sheet_name="Activity", index=False)
-            after_break.to_excel(
+            export_final.to_excel(writer, sheet_name="Activity", index=False)
+            _snb_export_visible_columns(after_break).to_excel(
                 writer, sheet_name="After_Break_Notes", index=False
             )
-            wasted_details.to_excel(
+            _snb_export_visible_columns(wasted_details).to_excel(
                 writer, sheet_name=details_sheet, index=False
             )
-            wasted_summary.to_excel(
+            _snb_export_visible_columns(wasted_summary).to_excel(
                 writer, sheet_name=summary_sheet, index=False
             )
             if efficiency_quality is not None:
-                efficiency_quality.to_excel(
+                _snb_export_visible_columns(efficiency_quality).to_excel(
                     writer, sheet_name="Efficiency_Call_Quality", index=False
                 )
-                stage_product_detail.to_excel(
+                _snb_export_visible_columns(stage_product_detail).to_excel(
                     writer, sheet_name="Collector_Stage_Product", index=False
                 )
-                weekly_daily.to_excel(
+                _snb_export_visible_columns(weekly_daily).to_excel(
                     writer, sheet_name="Weekly_Dropoff", index=False
                 )
-                weekly_collectors.to_excel(
+                _snb_export_visible_columns(weekly_collectors).to_excel(
                     writer, sheet_name="Weekly_Dropoff",
                     startrow=len(weekly_daily) + 4, index=False
                 )
-                substate_breakdown.to_excel(
+                _snb_export_visible_columns(substate_breakdown).to_excel(
                     writer, sheet_name="Substate_Breakdown", index=False
                 )
             _style_snb_activity_workbook(writer.book)
@@ -8750,10 +8706,10 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
                 )
         activity_only = io.BytesIO()
         with pd.ExcelWriter(activity_only, engine="openpyxl") as writer:
-            final.to_excel(writer, sheet_name="Activity", index=False)
+            export_final.to_excel(writer, sheet_name="Activity", index=False)
             _style_snb_activity_workbook(writer.book)
         collectors_workbook = _build_snb_collector_details_xlsx(
-            result, stats["collector"], wasted_details
+            result, stats["collector"]
         )
         st.download_button(
             "📥 تحميل شيت Activity منفصل", data=activity_only.getvalue(),
