@@ -7580,6 +7580,136 @@ def _style_snb_activity_workbook(workbook):
                         )
 
 
+def _build_snb_collector_details_xlsx(result, collector_col, wasted_details):
+    """One Excel workbook: index and a complete separate tab for every collector.
+
+    Original processed Activity columns are never dropped except internal helpers.
+    Each collector also receives their own call-level wasted-time detail table.
+    """
+    output = io.BytesIO()
+    if result is None or result.empty or collector_col not in result.columns:
+        return output.getvalue()
+
+    frame = result.copy()
+    frame["__collector_sheet_key"] = (
+        frame[collector_col].fillna("").astype(str).str.strip()
+        .replace("", "(بدون اسم)")
+    )
+    used_names = {"فهرس المحصلين".casefold()}
+    summary = []
+    layouts = {}
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        for collector_name, group in frame.groupby(
+            "__collector_sheet_key", sort=True, dropna=False
+        ):
+            name = str(collector_name).strip()
+            safe = re.sub(r"[\\/*?:\[\]]", " ", name).strip(" '")
+            safe = re.sub(r"\s+", " ", safe) or "محصل"
+            base = safe[:31]
+            sheet_name = base
+            index = 2
+            while sheet_name.casefold() in used_names:
+                suffix = f"_{index}"
+                sheet_name = base[:31-len(suffix)] + suffix
+                index += 1
+            used_names.add(sheet_name.casefold())
+
+            stamp = "__ejada_parsed_created"
+            if stamp in group.columns:
+                group = group.sort_values(stamp, kind="stable")
+            detail = group.drop(
+                columns=[stamp, "__collector_sheet_key"], errors="ignore"
+            ).copy()
+            detail.to_excel(writer, sheet_name=sheet_name, index=False)
+
+            call_waste = wasted_details.loc[
+                wasted_details["المحصل"].fillna("").astype(str).str.strip() == name
+            ].copy() if wasted_details is not None and not wasted_details.empty else pd.DataFrame()
+            second_header_row = None
+            if not call_waste.empty:
+                # A second complete detail table in the SAME collector tab.
+                second_header_row = len(detail) + 5
+                call_waste.to_excel(
+                    writer, sheet_name=sheet_name,
+                    startrow=second_header_row - 1, index=False,
+                )
+
+            statuses = group["تقييم المكالمات"].fillna("").astype(str).str.strip()
+            successful = int((statuses == "ناجحة").sum())
+            unsuccessful = int((statuses == "غير ناجحة").sum())
+            waste_minutes = (
+                round(float(pd.to_numeric(
+                    call_waste["الوقت المهدر (دقائق)"], errors="coerce"
+                ).fillna(0).sum()), 2)
+                if not call_waste.empty else 0.0
+            )
+            summary.append({
+                "المحصل": name,
+                "إجمالي المكالمات": len(detail),
+                "المكالمات الناجحة": successful,
+                "المكالمات غير الناجحة": unsuccessful,
+                "المكالمات غير المصنفة": len(detail) - successful - unsuccessful,
+                "إجمالي الوقت المهدر (دقائق)": waste_minutes,
+                "اسم الشيت": sheet_name,
+            })
+            layouts[sheet_name] = (len(detail) + 1, second_header_row, len(detail.columns))
+
+        summary_df = pd.DataFrame(summary).sort_values(
+            ["إجمالي المكالمات", "المحصل"],
+            ascending=[False, True], kind="stable"
+        ).reset_index(drop=True)
+        summary_df.insert(0, "الترتيب", range(1, len(summary_df) + 1))
+        summary_df.to_excel(
+            writer, sheet_name="فهرس المحصلين", index=False
+        )
+
+        book = writer.book
+        book._sheets.insert(
+            0, book._sheets.pop(book._sheets.index(book["فهرس المحصلين"]))
+        )
+        _style_snb_activity_workbook(book)
+        for sheet_name, (first_end_row, second_header_row, first_cols) in layouts.items():
+            ws = book[sheet_name]
+            ws.sheet_view.rightToLeft = True
+            ws.auto_filter.ref = (
+                f"A1:{get_column_letter(first_cols)}{first_end_row}"
+            )
+            ws.freeze_panes = "A2"
+            if second_header_row is not None:
+                title_row = second_header_row - 2
+                title = ws.cell(
+                    row=title_row, column=1,
+                    value="تفاصيل الوقت المهدر للمحصّل"
+                )
+                title.font = Font(
+                    name="Calibri", size=13, bold=True, color="1F4373"
+                )
+                ws.row_dimensions[second_header_row].height = 34
+                for cell in ws[second_header_row]:
+                    if cell.value is not None:
+                        cell.fill = PatternFill(
+                            fill_type="solid", fgColor="1F4373"
+                        )
+                        cell.font = Font(
+                            name="Calibri", size=11, bold=True, color="FFFFFF"
+                        )
+                        cell.alignment = Alignment(
+                            horizontal="center", vertical="center", wrap_text=True
+                        )
+
+        index_ws = book["فهرس المحصلين"]
+        index_ws.sheet_view.rightToLeft = True
+        sheet_col = summary_df.columns.get_loc("اسم الشيت") + 1
+        for row_num, label in enumerate(summary_df["اسم الشيت"], start=2):
+            link_cell = index_ws.cell(row=row_num, column=sheet_col)
+            link_cell.hyperlink = f"#'{label}'!A1"
+            link_cell.font = Font(
+                name="Calibri", bold=True, color="0563C1", underline="single"
+            )
+        index_ws.column_dimensions[get_column_letter(sheet_col)].width = 35
+    return output.getvalue()
+
+
 def _snb_ptp_note_status(value):
     """Conservatively identify explicit payment promises in call Notes.
 
@@ -7629,10 +7759,12 @@ def _snb_ptp_note_status(value):
 
 def _snb_stage_product_columns(frame):
     """Resolve stage and product using the columns actually present in SNB activity."""
+    # The SNB collection stage comes from financing Notes, NOT Main State.
+    # Keep this separate from the product/financing type column.
     stage_col = _snb_find_column(
-        frame, "Stage", "Collection Stage", "Call Stage", "مرحلة",
-        "المرحلة", "مرحلة التحصيل", "Main State", "الحالة الرئيسية",
-        "Classification", "التصنيف"
+        frame, "Claim/ملاحظات-التمويل", "Claim/ملاحظات التمويل",
+        "ملاحظات-التمويل", "ملاحظات التمويل",
+        "Claim/ملاحظات - التمويل"
     )
     product_col = _snb_find_column(
         frame, "Claim/نوع المتنج-التمويل",
@@ -8518,6 +8650,12 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             _expander_table(wasted_details, "wasted_details")
             _expander_table(wasted_summary, "wasted_summary")
         if efficiency_quality is not None:
+            stage_source, product_source = _snb_stage_product_columns(result)
+            if stage_source is None:
+                st.warning(
+                    "عمود المرحلة Claim/ملاحظات-التمويل غير موجود في الملف؛ "
+                    "مرحلة التحصيل هتظهر «العمود غير موجود» بدون تخمين."
+                )
             with st.expander(
                 "🎯 الكفاءة وجودة الأداء | Efficiency & Call Quality",
                 expanded=False,
@@ -8530,9 +8668,11 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
                     "«وعود تحتاج للمراجعة» ولا تُحسب وعودًا مؤكدة."
                 )
                 _expander_table(efficiency_quality, "efficiency_quality")
-                st.caption("الترتيب حسب إجمالي مكالمات الأسبوع. المرحلة تُقرأ من Stage "
-                           "إن وجدت، وإلا Main State أو Classification؛ والمنتج من "
-                           "Claim/نوع المتنج-التمويل (يشمل دمج CC+PF).")
+                st.caption(
+                    "الترتيب حسب إجمالي مكالمات الأسبوع. المرحلة من عمود "
+                    "Claim/ملاحظات-التمويل، ونوع المنتج من "
+                    "Claim/نوع المتنج-التمويل (مع دمج CC وPF إلى CC+PF)."
+                )
                 _expander_table(stage_product_detail, "stage_product_detail")
             with st.expander(
                 "📉 منحنى النشاط الأسبوعي | Weekly Drop-off", expanded=False
@@ -8612,6 +8752,9 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
         with pd.ExcelWriter(activity_only, engine="openpyxl") as writer:
             final.to_excel(writer, sheet_name="Activity", index=False)
             _style_snb_activity_workbook(writer.book)
+        collectors_workbook = _build_snb_collector_details_xlsx(
+            result, stats["collector"], wasted_details
+        )
         st.download_button(
             "📥 تحميل شيت Activity منفصل", data=activity_only.getvalue(),
             file_name=f"SNB_Activity_{activity_kind}.xlsx",
@@ -8624,6 +8767,13 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             file_name=f"SNB_Activity_{activity_kind}_Processed.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="download_snb_activity_processed"
+        )
+        st.download_button(
+            "📥 تحميل تقرير مفصل لكل محصل (شيت مستقل)",
+            data=collectors_workbook,
+            file_name=f"SNB_Collectors_Details_{activity_kind}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="download_snb_activity_per_collector"
         )
 
 
