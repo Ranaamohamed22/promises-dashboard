@@ -6401,9 +6401,11 @@ def _snb_secret_model_evaluations():
             continue
         key = _snb_normalize_note(entry.get("notes"))
         rating = entry.get("evaluation")
-        if not key or type(rating) is not int or rating not in (0, 1):
+        if not key or type(rating) is not int or rating not in (0, 1, 5):
             invalid += 1
             continue
+        # Historical 5 and 0 both mean unsuccessful; keep the normalized model 0/1.
+        rating = 0 if rating == 5 else rating
         if key in mapping and mapping[key] != rating:
             conflicts.add(key)
         else:
@@ -6674,9 +6676,12 @@ def _snb_model_evaluations(uploaded_model):
         model[evaluation_col].astype(str).str.strip(),
         errors="coerce"
     )
+    model["__recognized"] = model["__value"].isin([0, 1, 5])
     valid = model[
-        model["__key"].ne("") & model["__value"].isin([0, 1])
+        model["__key"].ne("") & model["__recognized"]
     ].copy()
+    # Normalize the legacy 5 code to 0 before conflict checks and counting.
+    valid.loc[valid["__value"] == 5, "__value"] = 0
 
     # If identical Notes have both 0 and 1 in the model, leave them unclassified.
     conflicts = valid.groupby("__key")["__value"].nunique()
@@ -6688,7 +6693,7 @@ def _snb_model_evaluations(uploaded_model):
         zip(valid["__key"], valid["__value"].astype(int))
     )
     rejected = int(
-        (model["__key"].eq("") | ~model["__value"].isin([0, 1])).sum()
+        (model["__key"].eq("") | ~model["__recognized"]).sum()
     )
     return mapping, len(conflict_keys), rejected
 
@@ -7511,6 +7516,155 @@ def _style_snb_activity_workbook(workbook):
                         horizontal="right" if isinstance(cell.value, str) else "center",
                         vertical="center",
                     )
+                    if sheet.title == "Efficiency_Call_Quality" and (
+                        sheet.cell(row=1, column=col_idx).value == "Efficiency Category"
+                    ):
+                        category_colors = {
+                            "Top Performers": "D9EEDB",
+                            "Needs Coaching": "FFF0C2",
+                            "High Quality / Low Volume": "DDEAF8",
+                            "Needs Attention": "FADCDC",
+                            "Not Rated": "E9EEF3",
+                        }
+                        fill_color = category_colors.get(str(cell.value))
+                        if fill_color:
+                            cell.fill = PatternFill(fill_type="solid", fgColor=fill_color)
+                            cell.font = Font(
+                                name="Calibri", size=11, bold=True, color="173452"
+                            )
+
+
+def _snb_ptp_note_status(value):
+    """Conservatively identify explicit payment promises in call Notes.
+
+    This is not a promise-system match: uncertain future-payment wording is
+    flagged for review rather than counted as a confirmed PTP.
+    """
+    if pd.isna(value):
+        return "No explicit PTP"
+    note = str(value).strip().casefold()
+    if not note:
+        return "No explicit PTP"
+    note = re.sub(r"[\\u064b-\\u065f\\u0670\\u0640]", "", note)
+    note = (note.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا")
+            .replace("ى", "ي").replace("ة", "ه"))
+    note = re.sub(r"\\s+", " ", note)
+
+    explicit_ar = (
+        r"\\b(?:وعد|واعد|تعهد|يتعهد|التزم|ملتزم)\\b"
+        r".{0,45}\\b(?:سداد|السداد|دفع|الدفع|تحويل|التحويل|قسط|الاقساط)\\b"
+        r"|\\b(?:اتفقنا|تم الاتفاق|اتفاق)\\b.{0,45}"
+        r"\\b(?:سداد|السداد|دفع|الدفع|تحويل|التحويل)\\b"
+        r"|\\b(?:وعد بسداد|وعد بالسداد|وعد بالدفع|واعد بسداد)\\b"
+    )
+    explicit_en = r"\\b(?:ptp|promise(?:d)? to pay|payment promise)\\b"
+    explicit = bool(re.search(explicit_ar, note) or re.search(explicit_en, note))
+    negated = bool(
+        re.search(
+            r"\\b(?:لم|لن|لا|عدم|رفض|رافض|بدون|غير|مرفوض|ملغي)\\b"
+            r".{0,35}\\b(?:وعد|واعد|تعهد|اتفاق|سداد|الدفع|دفع|ptp)\\b",
+            note,
+        )
+        or re.search(
+            r"\\b(?:وعد|واعد|تعهد|اتفاق|ptp)\\b.{0,45}"
+            r"\\b(?:اتلغي|ملغي|مرفوض|رفض|رافض|لم يلتزم)\\b",
+            note,
+        )
+    )
+    if explicit and not negated:
+        return "Explicit PTP"
+    if explicit or re.search(
+        r"\\b(?:سيسدد|هيسدد|سوف يسدد|سيتم السداد|سوف يدفع|سيحول|"
+        r"تعهد|وعد|واعد|promise)\\b", note,
+    ):
+        return "Needs PTP Review"
+    return "No explicit PTP"
+
+
+def _build_snb_efficiency_call_quality(result, collector_col, notes_col):
+    """Weekly collector-level success, PTP conversion, and effort/result matrix.
+
+    Percentages use classified calls only. Benchmarks are team medians from the
+    SAME uploaded weekly report. PTP is counted only for successful calls whose
+    Notes explicitly record a promise; ambiguous text is kept for review.
+    """
+    columns = [
+        "Collector", "Total Calls", "Successful Calls",
+        "Unsuccessful Calls (0/5)", "Unclassified Calls",
+        "Success Rate %", "PTP Count", "PTP Conversion %",
+        "PTP Needs Review", "Team Median Calls",
+        "Team Median Success %", "Efficiency Category",
+    ]
+    if result is None or result.empty:
+        return pd.DataFrame(columns=columns)
+    if collector_col not in result or notes_col not in result:
+        return pd.DataFrame(columns=columns)
+
+    frame = result.copy()
+    frame["__quality_collector"] = (
+        frame[collector_col].fillna("").astype(str).str.strip()
+        .replace("", "(بدون اسم)")
+    )
+    frame["__quality_status"] = (
+        frame["تقييم المكالمات"].fillna("").astype(str).str.strip()
+    )
+    # Count explicit promises only when the call was rated successful.
+    frame["__quality_ptp"] = frame[notes_col].map(_snb_ptp_note_status)
+    rows = []
+    for collector_name, group in frame.groupby(
+        "__quality_collector", sort=True, dropna=False
+    ):
+        successful_mask = group["__quality_status"].eq("ناجحة")
+        unsuccessful_mask = group["__quality_status"].eq("غير ناجحة")
+        successes = int(successful_mask.sum())
+        failures = int(unsuccessful_mask.sum())
+        classified = successes + failures
+        ptp = int(
+            (successful_mask & group["__quality_ptp"].eq("Explicit PTP")).sum()
+        )
+        needs_review = int(
+            (successful_mask & group["__quality_ptp"].eq("Needs PTP Review")).sum()
+        )
+        rows.append({
+            "Collector": collector_name,
+            "Total Calls": int(len(group)),
+            "Successful Calls": successes,
+            "Unsuccessful Calls (0/5)": failures,
+            "Unclassified Calls": int(len(group) - classified),
+            "Success Rate %": round(100 * successes / classified, 2)
+            if classified else None,
+            "PTP Count": ptp,
+            "PTP Conversion %": round(100 * ptp / successes, 2)
+            if successes else None,
+            "PTP Needs Review": needs_review,
+        })
+    quality = pd.DataFrame(rows)
+    median_calls = float(quality["Total Calls"].median())
+    rate_values = quality["Success Rate %"].dropna()
+    median_rate = float(rate_values.median()) if len(rate_values) else None
+    quality["Team Median Calls"] = round(median_calls, 2)
+    quality["Team Median Success %"] = (
+        round(median_rate, 2) if median_rate is not None else None
+    )
+
+    def _category(row):
+        if len(quality) < 2 or pd.isna(row["Success Rate %"]):
+            return "Not Rated"
+        high_calls = row["Total Calls"] >= median_calls
+        high_success = row["Success Rate %"] >= median_rate
+        if high_calls and high_success:
+            return "Top Performers"
+        if high_calls:
+            return "Needs Coaching"
+        if high_success:
+            return "High Quality / Low Volume"
+        return "Needs Attention"
+
+    quality["Efficiency Category"] = quality.apply(_category, axis=1)
+    return quality[columns].sort_values(
+        ["Successful Calls", "Total Calls", "Collector"],
+        ascending=[False, False, True], kind="stable"
+    ).reset_index(drop=True)
 
 
 def _snb_wasted_time_reports(result, collector_col, notes_col, activity_kind="يومي"):
@@ -7919,6 +8073,12 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             result, stats["collector"], stats["notes"],
             activity_kind=activity_kind
         )
+        efficiency_quality = (
+            _build_snb_efficiency_call_quality(
+                result, stats["collector"], stats["notes"]
+            )
+            if activity_kind == "أسبوعي" else None
+        )
         with st.expander(
             "🕧 أول إفادة لكل محصل بعد البريك + مدة الدوام", expanded=False
         ):
@@ -7938,6 +8098,19 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             )
             _expander_table(wasted_details, "wasted_details")
             _expander_table(wasted_summary, "wasted_summary")
+        if efficiency_quality is not None:
+            with st.expander(
+                "🎯 الكفاءة وجودة الأداء | Efficiency & Call Quality",
+                expanded=False,
+            ):
+                st.caption(
+                    "Success Rate = الناجحة ÷ (الناجحة + غير الناجحة 0/5). "
+                    "PTP Conversion = الوعود الصريحة في إفادات المكالمات الناجحة "
+                    "÷ المكالمات الناجحة. التصنيف بمقارنة عدد المكالمات ونسبة النجاح "
+                    "بوسيط الفريق لنفس الأسبوع؛ العبارات غير المؤكدة تظهر في "
+                    "PTP Needs Review ولا تُحسب وعودًا مؤكدة."
+                )
+                _expander_table(efficiency_quality, "efficiency_quality")
         _snb_render_model_management(
             selected[stats["notes"]], model_mapping,
             manual_decisions, slash_row_decisions
@@ -7963,6 +8136,10 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             wasted_summary.to_excel(
                 writer, sheet_name=summary_sheet, index=False
             )
+            if efficiency_quality is not None:
+                efficiency_quality.to_excel(
+                    writer, sheet_name="Efficiency_Call_Quality", index=False
+                )
             _style_snb_activity_workbook(writer.book)
         activity_only = io.BytesIO()
         with pd.ExcelWriter(activity_only, engine="openpyxl") as writer:
