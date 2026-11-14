@@ -7583,6 +7583,46 @@ def _snb_wasted_time_reports(result, collector_col, notes_col):
     return detail, pd.DataFrame(rows, columns=summary_cols)
 
 
+st.markdown("""<style>[data-testid="stExpander"] table :is(td,th){font-size:16px!important;border:1px solid #9eafbf!important}[data-testid="stExpander"] table th{text-align:center!important;font-weight:700!important}</style>""", unsafe_allow_html=True)
+
+def _expander_table(frame, key, show_index=False):
+    page_size = 100
+    page = 1
+    if len(frame) > page_size:
+        pages = (len(frame) + page_size - 1) // page_size
+        page = st.number_input("صفحة الجدول", 1, pages, key=f"table_page_{key}")
+    start = (page - 1) * page_size
+    table = frame.iloc[start:start + page_size].to_html(
+        index=show_index, escape=True, border=0, na_rep="",
+        float_format=lambda value: f"{value:.2f}"
+    )
+    st.markdown(
+        """<style>.rana-table{overflow:auto;max-height:450px}
+        .rana-table table{border-collapse:collapse;width:100%}
+        .rana-table table :is(th,td){border:1px solid #9eafbf;padding:7px 10px;font-size:16px}
+        .rana-table table th{text-align:center!important;font-weight:700}
+        .rana-table thead th{position:sticky;top:0;background:#eaf0f6;color:#173452}
+        </style><div class="rana-table">""" + table + "</div>", unsafe_allow_html=True
+    )
+
+
+def _activity_period(stamps):
+    valid = stamps.dropna()
+    if valid.empty:
+        return None, "رنا، الفترة مش واضحة لأن مفيش تاريخ صالح في Created On."
+    first, last = valid.min(), valid.max()
+    days = (last.date() - first.date()).days + 1
+    if days > 7:
+        return "شهري", "رنا إحنا في النشاط الشهري"
+    if days > 1:
+        return "أسبوعي", "رنا إحنا في النشاط الأسبوعي"
+    if last.time() <= time(12):
+        return "يومي", "رنا إحنا في الفترة الأولى"
+    if first.time() > time(12):
+        return "يومي", "رنا إحنا في الفترة التانية"
+    return "يومي", "رنا إحنا في النشاط اليومي"
+
+
 def render_snb_activity_report(model_upload, activity_upload, activity_kind="يومي", error_slot=None):
     """Report screen opens with both upload boxes still visible above."""
     if activity_upload is None:
@@ -7623,9 +7663,16 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
                 f"التفاصيل: {exc}"
             )
 
+        detected_kind, message = _activity_period(prepared["__ejada_parsed_created"])
+        st.info(message)
+        automatic = activity_kind == "تلقائي"
+        if automatic:
+            if detected_kind is None:
+                return
+            activity_kind = detected_kind
         period = "full"
         exclude_after_shift = True
-        if activity_kind == "يومي":
+        if not automatic and activity_kind == "يومي":
             suggested_period, unsure = _infer_snb_daily_period(prepared)
             if suggested_period == "full" and not unsure:
                 # Automatically honor a file containing both shift windows:
@@ -7665,10 +7712,14 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
                     "آخر ساعة داخل الشيفت نفسه هتفضل محسوبة."
                 )
 
-        selected, excluded_after_shift = _filter_snb_activity_period(
-            prepared, activity_kind, period,
-            exclude_after_shift=exclude_after_shift
-        )
+        if automatic:
+            selected = prepared.dropna(subset=["__ejada_parsed_created"]).copy()
+            excluded_after_shift = 0
+        else:
+            selected, excluded_after_shift = _filter_snb_activity_period(
+                prepared, activity_kind, period,
+                exclude_after_shift=exclude_after_shift
+            )
         manual_decisions = _snb_manual_evaluations(model_upload)
         slash_row_decisions = _snb_slash_row_decisions(activity_upload)
         if _ejada_activity_dashboard_is_open("SNB"):
@@ -7798,10 +7849,7 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
                 "صف واحد لكل محصل في كل يوم. مدة الدوام = وقت آخر إفادة "
                 "ناقص وقت أول إفادة في الملف المرفوع (وتشمل فترة البريك)."
             )
-            st.dataframe(
-                after_break, use_container_width=True, hide_index=True,
-                height=360
-            )
+            _expander_table(after_break, "after_break")
         with st.expander(
             "⏱️ تفاصيل الوقت المهدر وإجماليه اليومي", expanded=False
         ):
@@ -7810,14 +7858,8 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
                 "ناقص 20 دقيقة للناجحة أو 5 دقائق لغير الناجحة؛ "
                 "ولا يمكن أن يقل عن صفر."
             )
-            st.dataframe(
-                wasted_details, use_container_width=True, hide_index=True,
-                height=340
-            )
-            st.dataframe(
-                wasted_daily, use_container_width=True, hide_index=True,
-                height=280
-            )
+            _expander_table(wasted_details, "wasted_details")
+            _expander_table(wasted_daily, "wasted_daily")
         _snb_render_model_management(
             selected[stats["notes"]], model_mapping,
             manual_decisions, slash_row_decisions
@@ -7834,6 +7876,15 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             wasted_daily.to_excel(
                 writer, sheet_name="Wasted_Time_Daily", index=False
             )
+        activity_only = io.BytesIO()
+        with pd.ExcelWriter(activity_only, engine="openpyxl") as writer:
+            final.to_excel(writer, sheet_name="Activity", index=False)
+        st.download_button(
+            "📥 تحميل شيت Activity منفصل", data=activity_only.getvalue(),
+            file_name=f"SNB_Activity_{activity_kind}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="download_snb_activity_only"
+        )
         st.download_button(
             "📥 تحميل نشاط SNB بعد المعالجة",
             data=output.getvalue(),
@@ -8667,8 +8718,8 @@ if page_uploaded is None:
             with kind_col:
                 with st.container(key="snb_activity_kind_compact"):
                     activity_kind = st.selectbox(
-                        "نوع النشاط", options=["يومي", "أسبوعي", "شهري"],
-                        key="snb_activity_kind_selector"
+                        "نوع النشاط", options=["تلقائي", "يومي", "أسبوعي", "شهري"],
+                        key="snb_activity_kind_auto"
                     )
             with dashboard_col:
                 is_open = _ejada_activity_dashboard_is_open(selected_bank)
@@ -8962,12 +9013,7 @@ else:
                             "📋 تفاصيل شيت الوعود القائمة",
                             expanded=(selected_bank != 'STC')
                         ):
-                            st.dataframe(
-                                active_promises_df,
-                                use_container_width=True,
-                                height=400,
-                                hide_index=True
-                            )
+                            _expander_table(active_promises_df, "active_promises_df")
             
         with tab_broken:
             render_promise_filter_diagnostics(selected_bank, 'broken')
