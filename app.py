@@ -7545,37 +7545,37 @@ def _snb_ptp_note_status(value):
     note = str(value).strip().casefold()
     if not note:
         return "No explicit PTP"
-    note = re.sub(r"[\\u064b-\\u065f\\u0670\\u0640]", "", note)
+    note = re.sub(r"[\u064b-\u065f\u0670\u0640]", "", note)
     note = (note.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا")
             .replace("ى", "ي").replace("ة", "ه"))
-    note = re.sub(r"\\s+", " ", note)
+    note = re.sub(r"\s+", " ", note)
 
     explicit_ar = (
-        r"\\b(?:وعد|واعد|تعهد|يتعهد|التزم|ملتزم)\\b"
-        r".{0,45}\\b(?:سداد|السداد|دفع|الدفع|تحويل|التحويل|قسط|الاقساط)\\b"
-        r"|\\b(?:اتفقنا|تم الاتفاق|اتفاق)\\b.{0,45}"
-        r"\\b(?:سداد|السداد|دفع|الدفع|تحويل|التحويل)\\b"
-        r"|\\b(?:وعد بسداد|وعد بالسداد|وعد بالدفع|واعد بسداد)\\b"
+        r"\b(?:وعد|واعد|تعهد|يتعهد|التزم|ملتزم)\b"
+        r".{0,45}\b(?:سداد|السداد|دفع|الدفع|تحويل|التحويل|قسط|الاقساط)\b"
+        r"|\b(?:اتفقنا|تم الاتفاق|اتفاق)\b.{0,45}"
+        r"\b(?:سداد|السداد|دفع|الدفع|تحويل|التحويل)\b"
+        r"|\b(?:وعد بسداد|وعد بالسداد|وعد بالدفع|واعد بسداد)\b"
     )
-    explicit_en = r"\\b(?:ptp|promise(?:d)? to pay|payment promise)\\b"
+    explicit_en = r"\b(?:ptp|promise(?:d)? to pay|payment promise)\b"
     explicit = bool(re.search(explicit_ar, note) or re.search(explicit_en, note))
     negated = bool(
         re.search(
-            r"\\b(?:لم|لن|لا|عدم|رفض|رافض|بدون|غير|مرفوض|ملغي)\\b"
-            r".{0,35}\\b(?:وعد|واعد|تعهد|اتفاق|سداد|الدفع|دفع|ptp)\\b",
+            r"\b(?:لم|لن|لا|عدم|رفض|رافض|بدون|غير|مرفوض|ملغي)\b"
+            r".{0,35}\b(?:وعد|واعد|تعهد|اتفاق|سداد|الدفع|دفع|ptp)\b",
             note,
         )
         or re.search(
-            r"\\b(?:وعد|واعد|تعهد|اتفاق|ptp)\\b.{0,45}"
-            r"\\b(?:اتلغي|ملغي|مرفوض|رفض|رافض|لم يلتزم)\\b",
+            r"\b(?:وعد|واعد|تعهد|اتفاق|ptp)\b.{0,45}"
+            r"\b(?:اتلغي|ملغي|مرفوض|رفض|رافض|لم يلتزم)\b",
             note,
         )
     )
     if explicit and not negated:
         return "Explicit PTP"
     if explicit or re.search(
-        r"\\b(?:سيسدد|هيسدد|سوف يسدد|سيتم السداد|سوف يدفع|سيحول|"
-        r"تعهد|وعد|واعد|promise)\\b", note,
+        r"\b(?:سيسدد|هيسدد|سوف يسدد|سيتم السداد|سوف يدفع|سيحول|"
+        r"تعهد|وعد|واعد|promise)\b", note,
     ):
         return "Needs PTP Review"
     return "No explicit PTP"
