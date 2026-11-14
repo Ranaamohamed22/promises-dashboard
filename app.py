@@ -7474,6 +7474,8 @@ def _style_snb_activity_workbook(workbook):
         if not last_row or not last_col:
             continue
         sheet.sheet_view.showGridLines = False
+        if sheet.title == "Efficiency_Call_Quality":
+            sheet.sheet_view.rightToLeft = True
         sheet.freeze_panes = "A2"
         sheet.auto_filter.ref = f"A1:{get_column_letter(last_col)}{last_row}"
         sheet.row_dimensions[1].height = 34
@@ -7517,14 +7519,14 @@ def _style_snb_activity_workbook(workbook):
                         vertical="center",
                     )
                     if sheet.title == "Efficiency_Call_Quality" and (
-                        sheet.cell(row=1, column=col_idx).value == "Efficiency Category"
+                        sheet.cell(row=1, column=col_idx).value == "تصنيف كفاءة المحصل"
                     ):
                         category_colors = {
-                            "Top Performers": "D9EEDB",
-                            "Needs Coaching": "FFF0C2",
-                            "High Quality / Low Volume": "DDEAF8",
-                            "Needs Attention": "FADCDC",
-                            "Not Rated": "E9EEF3",
+                            "أفضل المحصلين أداءً": "D9EEDB",
+                            "يحتاج تدريب وتحسين الجودة": "FFF0C2",
+                            "جودة عالية ومكالمات قليلة": "DDEAF8",
+                            "يحتاج مراجعة إدارية": "FADCDC",
+                            "لم يتم التقييم": "E9EEF3",
                         }
                         fill_color = category_colors.get(str(cell.value))
                         if fill_color:
@@ -7661,10 +7663,33 @@ def _build_snb_efficiency_call_quality(result, collector_col, notes_col):
         return "Needs Attention"
 
     quality["Efficiency Category"] = quality.apply(_category, axis=1)
-    return quality[columns].sort_values(
+    category_ar = {
+        "Top Performers": "أفضل المحصلين أداءً",
+        "Needs Coaching": "يحتاج تدريب وتحسين الجودة",
+        "High Quality / Low Volume": "جودة عالية ومكالمات قليلة",
+        "Needs Attention": "يحتاج مراجعة إدارية",
+        "Not Rated": "لم يتم التقييم",
+    }
+    headers_ar = {
+        "Collector": "المحصل",
+        "Total Calls": "إجمالي المكالمات",
+        "Successful Calls": "المكالمات الناجحة",
+        "Unsuccessful Calls (0/5)": "المكالمات غير الناجحة (0/5)",
+        "Unclassified Calls": "المكالمات غير المصنفة",
+        "Success Rate %": "نسبة نجاح المكالمات %",
+        "PTP Count": "عدد وعود السداد",
+        "PTP Conversion %": "نسبة التحويل لوعود السداد %",
+        "PTP Needs Review": "وعود تحتاج للمراجعة",
+        "Team Median Calls": "وسيط مكالمات الفريق",
+        "Team Median Success %": "وسيط نسبة نجاح الفريق %",
+        "Efficiency Category": "تصنيف كفاءة المحصل",
+    }
+    ordered = quality[columns].sort_values(
         ["Successful Calls", "Total Calls", "Collector"],
         ascending=[False, False, True], kind="stable"
     ).reset_index(drop=True)
+    ordered["Efficiency Category"] = ordered["Efficiency Category"].map(category_ar)
+    return ordered.rename(columns=headers_ar)
 
 
 def _snb_wasted_time_reports(result, collector_col, notes_col, activity_kind="يومي"):
@@ -8108,7 +8133,7 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
                     "PTP Conversion = الوعود الصريحة في إفادات المكالمات الناجحة "
                     "÷ المكالمات الناجحة. التصنيف بمقارنة عدد المكالمات ونسبة النجاح "
                     "بوسيط الفريق لنفس الأسبوع؛ العبارات غير المؤكدة تظهر في "
-                    "PTP Needs Review ولا تُحسب وعودًا مؤكدة."
+                    "«وعود تحتاج للمراجعة» ولا تُحسب وعودًا مؤكدة."
                 )
                 _expander_table(efficiency_quality, "efficiency_quality")
         _snb_render_model_management(
