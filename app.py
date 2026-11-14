@@ -53,7 +53,7 @@ def set_bank(bank):
     st.session_state.selected_bank = bank
 
 if 'current_page' not in st.session_state:
-    st.session_state.current_page = 'Home'
+    st.session_state.current_page = 'Overview'
 
 # ترحيل جلسات التشغيل القديمة: الرئيسية أصبحت صفحة مستقلة عن Overview.
 if not st.session_state.get('_separate_home_overview_v1', False):
@@ -8525,6 +8525,17 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
 # صفحة النشاط: العنوان مع لوجو التليفون الكامل + الخانات التلاتة
 # ==========================================
 if curr_page == 'Overview':
+    st.markdown("""<style>
+[data-testid="stAppViewContainer"]{background:#f1f3f2!important}
+[data-testid="stMainBlockContainer"]{max-width:1460px;margin:auto}
+[data-testid="stVerticalBlockBorderWrapper"],[data-testid="stPlotlyChart"]{background:white;border-radius:22px;padding:10px}
+.kpi-grid-4{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;direction:rtl}
+.kpi-grid-4 .kpi-card{padding:22px!important;border:0!important;border-radius:22px!important;background:white!important;box-shadow:0 3px 16px #17261f09!important;text-align:right}
+.kpi-grid-4 .kpi-card:first-child{background:#116044!important}
+.kpi-grid-4 .kpi-card:first-child *{color:white!important}
+.kpi-grid-4 .kpi-value{font-size:34px!important}
+.overview-title{direction:rtl;text-align:right;color:#162d25;font-size:32px;font-weight:750;margin:10px 0 14px}
+</style><div class="overview-title">نظرة عامة على التحصيل</div>""", unsafe_allow_html=True)
     overview_snb_col, overview_stc_col, _overview_bank_spacer = st.columns([0.82, 0.82, 8.36], gap='small')
     with overview_snb_col:
         st.button(
@@ -8847,8 +8858,9 @@ else:
             </div>
             <div class="kpi-card" style="border-right-color:#1F4373;">
                 <div class="kpi-icon">🤝</div>
-                <div class="kpi-title">الوعود القائمة</div>
-                <div class="kpi-value">{active_count:,}</div>
+                <div class="kpi-title">إجمالي الوعود</div>
+                <div class="kpi-value">{active_count + broken_count:,}</div>
+                <small>القائمة {active_count:,} · المكسورة {broken_count:,}</small>
             </div>
             <div class="kpi-card" style="border-right-color:#586F8C;">
                 <div class="kpi-icon">⚠️</div>
@@ -8869,7 +8881,7 @@ else:
             cleaned = re.sub(r'[|]+', ' ', cleaned)
             return re.sub(r'\\s+', ' ', cleaned).strip(' |،-')
 
-        overview_row1 = st.columns(2, gap='large')
+        overview_row1 = st.columns([1.6, 1], gap='large')
 
         with overview_row1[0]:
             with st.container(border=True):
