@@ -17,7 +17,6 @@ from cryptography.fernet import Fernet, InvalidToken
 from difflib import SequenceMatcher, get_close_matches
 from xml.sax.saxutils import escape as _xml_escape
 from openpyxl import Workbook, load_workbook
-from openpyxl.chart import LineChart, Reference
 from copy import copy
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -7038,6 +7037,92 @@ def _snb_after_break_notes(prepared, selected, notes_col, collector_col):
     return pd.DataFrame(rows, columns=columns)
 
 
+def _snb_weekly_first_last_notes(result, collector_col, notes_col):
+    """First, first post-break and last evaluated call per collector per day.
+
+    Uses the exact selected and reviewed weekly activity records, not the raw
+    source, so the time and successful/unsuccessful label belong to one row.
+    """
+    columns = [
+        "التاريخ", "المحصل",
+        "ميعاد أول إفادة", "حالة أول إفادة",
+        "ميعاد أول إفادة بعد البريك", "حالة أول إفادة بعد البريك",
+        "ميعاد آخر إفادة", "حالة آخر إفادة",
+        "أول إفادة بعد البريك", "مدة الدوام",
+        "دقائق من نهاية البريك", "حالة البريك",
+    ]
+    stamp = "__ejada_parsed_created"
+    if (result is None or result.empty or collector_col not in result.columns
+            or notes_col not in result.columns or stamp not in result.columns):
+        return pd.DataFrame(columns=columns)
+    frame = result.dropna(subset=[stamp]).copy()
+    if frame.empty:
+        return pd.DataFrame(columns=columns)
+    frame["__day"] = frame[stamp].dt.normalize()
+    frame["__collector_name"] = (
+        frame[collector_col].fillna("").astype(str).str.strip()
+        .replace("", "(بدون اسم)")
+    )
+    frame = frame.sort_values(
+        ["__day", "__collector_name", stamp], kind="stable"
+    )
+
+    def _rating(row):
+        if row is None:
+            return ""
+        value = str(row.get("تقييم المكالمات", "")).strip()
+        return value if value in ("ناجحة", "غير ناجحة") else ""
+
+    rows = []
+    for (day, collector), group in frame.groupby(
+        ["__day", "__collector_name"], sort=True, dropna=False
+    ):
+        first = group.iloc[0]
+        last = group.iloc[-1]
+        begin, end = first[stamp], last[stamp]
+        duty_seconds = max(0, int(round((end - begin).total_seconds())))
+        duty_text = (
+            f"{duty_seconds // 3600:02d}:"
+            f"{(duty_seconds % 3600) // 60:02d}:"
+            f"{duty_seconds % 60:02d}"
+        )
+        minutes = group[stamp].dt.hour * 60 + group[stamp].dt.minute
+        after_break = group.loc[(minutes >= 750) & (minutes < 960)]
+        post = after_break.iloc[0] if not after_break.empty else None
+        post_time = post[stamp] if post is not None else None
+        wait_minutes = (
+            round(max(
+                0, (post_time - (pd.Timestamp(day) + pd.Timedelta(
+                    hours=12, minutes=30
+                ))).total_seconds() / 60
+            ), 2) if post_time is not None else ""
+        )
+        post_note = (
+            str(post[notes_col]) if post is not None
+            and pd.notna(post[notes_col]) else ""
+        )
+        rows.append({
+            "التاريخ": pd.Timestamp(day).strftime("%Y-%m-%d"),
+            "المحصل": collector,
+            "ميعاد أول إفادة": begin.strftime("%I:%M:%S %p"),
+            "حالة أول إفادة": _rating(first),
+            "ميعاد أول إفادة بعد البريك": (
+                post_time.strftime("%I:%M:%S %p") if post_time is not None else ""
+            ),
+            "حالة أول إفادة بعد البريك": _rating(post),
+            "ميعاد آخر إفادة": end.strftime("%I:%M:%S %p"),
+            "حالة آخر إفادة": _rating(last),
+            "أول إفادة بعد البريك": post_note,
+            "مدة الدوام": duty_text,
+            "دقائق من نهاية البريك": wait_minutes,
+            "حالة البريك": (
+                "سجل أول إفادة بعد البريك" if post is not None
+                else "لم يسجل إفادة بعد البريك"
+            ),
+        })
+    return pd.DataFrame(rows, columns=columns)
+
+
 def _snb_model_similarity(note_key, model_keys):
     """Return similarity to nearest model Notes, NEVER infer the call evaluation."""
     if note_key in model_keys:
@@ -7510,7 +7595,8 @@ def _style_snb_activity_workbook(workbook):
         sheet.sheet_view.showGridLines = False
         if sheet.title in (
             "Efficiency_Call_Quality", "Collector_Stage_Product",
-            "Weekly_Dropoff", "Substate_Breakdown"
+            "Weekly_Dropoff", "Weekly_Collector_Activity",
+            "Weekly_First_Last_Notes"
         ):
             sheet.sheet_view.rightToLeft = True
         sheet.freeze_panes = "A2"
@@ -8114,47 +8200,6 @@ def _snb_substate_breakdown(result, collector_col):
     return stats[columns].reset_index(drop=True), state_col
 
 
-def _snb_style_weekly_trend_chart(ws, daily_rows, collector_rows):
-    """Style the second table and chart without hiding collector data."""
-    ws.sheet_view.rightToLeft = True
-    detail_header_row = daily_rows + 5
-    if collector_rows:
-        title_cell = ws.cell(
-            row=detail_header_row - 2, column=1,
-            value="تفاصيل نشاط كل محصل يوميًا خلال الأسبوع"
-        )
-        title_cell.font = Font(
-            name="Calibri", size=13, bold=True, color="1F4373"
-        )
-        for cell in ws[detail_header_row]:
-            if cell.value is None:
-                continue
-            cell.fill = PatternFill(fill_type="solid", fgColor="1F4373")
-            cell.font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
-            cell.alignment = Alignment(
-                horizontal="center", vertical="center", wrap_text=True
-            )
-        ws.row_dimensions[detail_header_row].height = 34
-    if daily_rows:
-        chart = LineChart()
-        chart.title = "منحنى النشاط الأسبوعي"
-        chart.style = 13
-        chart.y_axis.title = "عدد المكالمات"
-        chart.x_axis.title = "اليوم"
-        chart.height = 9
-        chart.width = 19
-        chart.legend.position = "b"
-        values = Reference(
-            ws, min_col=3, max_col=5, min_row=1, max_row=daily_rows + 1
-        )
-        chart.add_data(values, titles_from_data=True)
-        categories = Reference(
-            ws, min_col=2, min_row=2, max_row=daily_rows + 1
-        )
-        chart.set_categories(categories)
-        ws.add_chart(chart, "K2")
-
-
 def _snb_wasted_time_reports(result, collector_col, notes_col, activity_kind="يومي"):
     """Return audited per-call waste and daily or weekly collector totals.
 
@@ -8581,18 +8626,25 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             _snb_weekly_activity_trend(result, stats["collector"])
             if activity_kind == "أسبوعي" else (None, None)
         )
-        substate_breakdown, substate_source = (
-            _snb_substate_breakdown(result, stats["collector"])
-            if activity_kind == "أسبوعي" else (None, None)
+        weekly_first_last = (
+            _snb_weekly_first_last_notes(
+                result, stats["collector"], stats["notes"]
+            )
+            if activity_kind == "أسبوعي" else None
         )
         with st.expander(
-            "🕧 أول إفادة لكل محصل بعد البريك + مدة الدوام", expanded=False
+            "🕧 أول وآخر إفادة وحالتهما + أول إفادة بعد البريك",
+            expanded=False
         ):
             st.caption(
-                "صف واحد لكل محصل في كل يوم. مدة الدوام = وقت آخر إفادة "
-                "ناقص وقت أول إفادة في الملف المرفوع (وتشمل فترة البريك)."
+                "صف لكل محصل في كل يوم. في النشاط الأسبوعي تعرض حالة "
+                "أول إفادة وأول إفادة بعد البريك وآخر إفادة من المكالمات "
+                "المعتمدة في الأسبوع؛ والدوام من الأولى إلى الأخيرة."
             )
-            _expander_table(after_break, "after_break")
+            _expander_table(
+                weekly_first_last if weekly_first_last is not None else after_break,
+                "weekly_first_last" if weekly_first_last is not None else "after_break"
+            )
         with st.expander(
             f"⏱️ تفاصيل الوقت المهدر وإجماليه {'الأسبوعي' if activity_kind == 'أسبوعي' else 'اليومي'}",
             expanded=False
@@ -8630,31 +8682,17 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
                 )
                 _expander_table(stage_product_detail, "stage_product_detail")
             with st.expander(
-                "📉 منحنى النشاط الأسبوعي | Weekly Drop-off", expanded=False
+                "📉 النشاط الأسبوعي | إجمالي الفريق", expanded=False
+            ):
+                st.caption("إجمالي نشاط الفريق يومًا بيوم خلال الأسبوع.")
+                _expander_table(weekly_daily, "weekly_daily")
+            with st.expander(
+                "📅 النشاط الأسبوعي | تفاصيل كل محصل", expanded=False
             ):
                 st.caption(
-                    "إجمالي المكالمات حسب اليوم من بداية الفترة لنهايتها، "
-                    "مع تفصيل كل محصل، واحتساب الأيام بدون مكالمات بصفر."
+                    "جدول مستقل لكل يوم ومحصّل، بما في ذلك الأيام بلا مكالمات."
                 )
-                _expander_table(weekly_daily, "weekly_daily")
                 _expander_table(weekly_collectors, "weekly_collectors")
-            with st.expander(
-                "📊 توزيع الحالات الفرعية | Sub-state Breakdown",
-                expanded=False,
-            ):
-                if substate_source is None:
-                    st.warning(
-                        "عمود Sub State / Classification غير موجود في ملف "
-                        "النشاط؛ لا يمكن حساب توزيع الحالات من الإفادات وحدها."
-                    )
-                else:
-                    st.caption(
-                        f"مصدر الحالات: {substate_source}. المقارنة مع متوسط "
-                        "الفريق في نفس الأسبوع. تنبيه «مرتفع - للمراجعة» يظهر "
-                        "فقط للهاتف مغلق/عدم الرد مع عينة كافية وفارق ملحوظ؛ "
-                        "ولا يدل وحده على إجراء مكالمات وهمية."
-                    )
-                _expander_table(substate_breakdown, "substate_breakdown")
         _snb_render_model_management(
             selected[stats["notes"]], model_mapping,
             manual_decisions, slash_row_decisions
@@ -8672,8 +8710,15 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             export_final.to_excel(writer, sheet_name="Activity", index=False)
-            _snb_export_visible_columns(after_break).to_excel(
-                writer, sheet_name="After_Break_Notes", index=False
+            _snb_export_visible_columns(
+                weekly_first_last if weekly_report else after_break
+            ).to_excel(
+                writer,
+                sheet_name=(
+                    "Weekly_First_Last_Notes" if weekly_report
+                    else "After_Break_Notes"
+                ),
+                index=False,
             )
             _snb_export_visible_columns(wasted_details).to_excel(
                 writer, sheet_name=details_sheet, index=False
@@ -8692,18 +8737,9 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
                     writer, sheet_name="Weekly_Dropoff", index=False
                 )
                 _snb_export_visible_columns(weekly_collectors).to_excel(
-                    writer, sheet_name="Weekly_Dropoff",
-                    startrow=len(weekly_daily) + 4, index=False
-                )
-                _snb_export_visible_columns(substate_breakdown).to_excel(
-                    writer, sheet_name="Substate_Breakdown", index=False
+                    writer, sheet_name="Weekly_Collector_Activity", index=False
                 )
             _style_snb_activity_workbook(writer.book)
-            if efficiency_quality is not None:
-                _snb_style_weekly_trend_chart(
-                    writer.book["Weekly_Dropoff"],
-                    len(weekly_daily), len(weekly_collectors)
-                )
         activity_only = io.BytesIO()
         with pd.ExcelWriter(activity_only, engine="openpyxl") as writer:
             export_final.to_excel(writer, sheet_name="Activity", index=False)
