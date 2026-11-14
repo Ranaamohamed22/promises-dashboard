@@ -1787,6 +1787,26 @@ st.markdown(f"""
     div.st-key-snb_activity_daily_options [data-testid="stCheckbox"] {{
         margin-bottom: 10px !important;
     }}
+
+    /* SNB report approval: legible white radio title/options on navy theme.
+       Scope styling to this widget and retain theme-aware colors elsewhere. */
+    div.st-key-snb_activity_approval_panel {{
+        background: {bg_color} !important;
+        padding: 8px 14px !important;
+        border-radius: 10px !important;
+    }}
+    div.st-key-snb_activity_approval_panel [data-testid="stRadio"] {{
+        background: transparent !important;
+    }}
+    div.st-key-snb_activity_approval_panel [data-testid="stRadio"] label,
+    div.st-key-snb_activity_approval_panel [data-testid="stRadio"] label p,
+    div.st-key-snb_activity_approval_panel [data-testid="stRadio"] label span,
+    div.st-key-snb_activity_approval_panel [data-testid="stRadio"] [data-testid="stWidgetLabel"] p,
+    div.st-key-snb_activity_approval_panel [data-testid="stRadio"] [data-testid="stMarkdownContainer"] p {{
+        color: {label_color} !important;
+        opacity: 1 !important;
+        font-weight: 800 !important;
+    }}
     @media (max-width: 1060px) {{
         div.st-key-snb_activity_header_row [data-testid="stHorizontalBlock"]:has(.st-key-activity_file_upload_card) {{
             flex-wrap: wrap !important;
@@ -8702,16 +8722,17 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
                     )
                     _expander_table(weekly_collectors, "weekly_collectors")
 
-        approval_choice = st.radio(
-            "طريقة الاعتماد",
-            [
-                "اعتماد التقرير وتحميله مباشرة",
-                "فتح إدارة موديل النشاط (اختياري)",
-            ],
-            index=0,
-            horizontal=True,
-            key="snb_activity_approval_choice",
-        )
+        with st.container(key="snb_activity_approval_panel"):
+            approval_choice = st.radio(
+                "طريقة الاعتماد",
+                [
+                    "اعتماد التقرير وتحميله مباشرة",
+                    "فتح إدارة موديل النشاط (اختياري)",
+                ],
+                index=0,
+                horizontal=True,
+                key="snb_activity_approval_choice",
+            )
         if approval_choice == "فتح إدارة موديل النشاط (اختياري)":
             _snb_render_model_management(
                 selected[stats["notes"]], model_mapping,
