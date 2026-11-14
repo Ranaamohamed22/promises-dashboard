@@ -8632,30 +8632,34 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             )
             if activity_kind == "أسبوعي" else None
         )
-        with st.expander(
-            "🕧 أول وآخر إفادة وحالتهما + أول إفادة بعد البريك",
-            expanded=False
-        ):
-            st.caption(
-                "صف لكل محصل في كل يوم. في النشاط الأسبوعي تعرض حالة "
-                "أول إفادة وأول إفادة بعد البريك وآخر إفادة من المكالمات "
-                "المعتمدة في الأسبوع؛ والدوام من الأولى إلى الأخيرة."
-            )
-            _expander_table(
-                weekly_first_last if weekly_first_last is not None else after_break,
-                "weekly_first_last" if weekly_first_last is not None else "after_break"
-            )
-        with st.expander(
-            f"⏱️ تفاصيل الوقت المهدر وإجماليه {'الأسبوعي' if activity_kind == 'أسبوعي' else 'اليومي'}",
-            expanded=False
-        ):
-            st.caption(
-                "الوقت المهدر = الفاصل بين الإفادات بعد خصم البريك "
-                "ناقص 20 دقيقة للناجحة أو 5 دقائق لغير الناجحة؛ "
-                "ولا يمكن أن يقل عن صفر."
-            )
-            _expander_table(wasted_details, "wasted_details")
-            _expander_table(wasted_summary, "wasted_summary")
+        # Compact reports: two cards for core time analysis and three for weekly analytics.
+        duty_col, waste_col = st.columns(2, gap="small")
+        with duty_col:
+            with st.expander(
+                "🕧 أول وآخر إفادة وحالتهما + أول إفادة بعد البريك",
+                expanded=False,
+            ):
+                st.caption(
+                    "صف لكل محصل في كل يوم. في النشاط الأسبوعي تعرض حالة "
+                    "أول إفادة وأول إفادة بعد البريك وآخر إفادة من المكالمات "
+                    "المعتمدة في الأسبوع؛ والدوام من الأولى إلى الأخيرة."
+                )
+                _expander_table(
+                    weekly_first_last if weekly_first_last is not None else after_break,
+                    "weekly_first_last" if weekly_first_last is not None else "after_break",
+                )
+        with waste_col:
+            with st.expander(
+                f"⏱️ تفاصيل الوقت المهدر وإجماليه ${'الأسبوعي' if activity_kind == 'أسبوعي' else 'اليومي'}",
+                expanded=False,
+            ):
+                st.caption(
+                    "الوقت المهدر = الفاصل بين الإفادات بعد خصم البريك "
+                    "ناقص 20 دقيقة للناجحة أو 5 دقائق لغير الناجحة؛ "
+                    "ولا يمكن أن يقل عن صفر."
+                )
+                _expander_table(wasted_details, "wasted_details")
+                _expander_table(wasted_summary, "wasted_summary")
         if efficiency_quality is not None:
             stage_source, product_source = _snb_stage_product_columns(result)
             if stage_source is None:
@@ -8663,40 +8667,62 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
                     "عمود المرحلة Claim/ملاحظات-التمويل غير موجود في الملف؛ "
                     "مرحلة التحصيل هتظهر «العمود غير موجود» بدون تخمين."
                 )
-            with st.expander(
-                "🎯 الكفاءة وجودة الأداء | Efficiency & Call Quality",
-                expanded=False,
-            ):
-                st.caption(
-                    "Success Rate = الناجحة ÷ (الناجحة + غير الناجحة 0/5). "
-                    "PTP Conversion = الوعود الصريحة في إفادات المكالمات الناجحة "
-                    "÷ المكالمات الناجحة. التصنيف بمقارنة عدد المكالمات ونسبة النجاح "
-                    "بوسيط الفريق لنفس الأسبوع؛ العبارات غير المؤكدة تظهر في "
-                    "«وعود تحتاج للمراجعة» ولا تُحسب وعودًا مؤكدة."
-                )
-                _expander_table(efficiency_quality, "efficiency_quality")
-                st.caption(
-                    "الترتيب حسب إجمالي مكالمات الأسبوع. المرحلة من عمود "
-                    "Claim/ملاحظات-التمويل، ونوع المنتج من "
-                    "Claim/نوع المتنج-التمويل (مع دمج CC وPF إلى CC+PF)."
-                )
-                _expander_table(stage_product_detail, "stage_product_detail")
-            with st.expander(
-                "📉 النشاط الأسبوعي | إجمالي الفريق", expanded=False
-            ):
-                st.caption("إجمالي نشاط الفريق يومًا بيوم خلال الأسبوع.")
-                _expander_table(weekly_daily, "weekly_daily")
-            with st.expander(
-                "📅 النشاط الأسبوعي | تفاصيل كل محصل", expanded=False
-            ):
-                st.caption(
-                    "جدول مستقل لكل يوم ومحصّل، بما في ذلك الأيام بلا مكالمات."
-                )
-                _expander_table(weekly_collectors, "weekly_collectors")
-        _snb_render_model_management(
-            selected[stats["notes"]], model_mapping,
-            manual_decisions, slash_row_decisions
+            efficiency_col, team_col, collectors_col = st.columns(3, gap="small")
+            with efficiency_col:
+                with st.expander(
+                    "🎯 الكفاءة وجودة الأداء | Efficiency & Call Quality",
+                    expanded=False,
+                ):
+                    st.caption(
+                        "Success Rate = الناجحة ÷ (الناجحة + غير الناجحة 0/5). "
+                        "PTP Conversion = الوعود الصريحة في إفادات المكالمات الناجحة "
+                        "÷ المكالمات الناجحة. التصنيف بمقارنة عدد المكالمات ونسبة النجاح "
+                        "بوسيط الفريق لنفس الأسبوع؛ العبارات غير المؤكدة تظهر في "
+                        "«وعود تحتاج للمراجعة» ولا تُحسب وعودًا مؤكدة."
+                    )
+                    _expander_table(efficiency_quality, "efficiency_quality")
+                    st.caption(
+                        "الترتيب حسب إجمالي مكالمات الأسبوع. المرحلة من عمود "
+                        "Claim/ملاحظات-التمويل، ونوع المنتج من "
+                        "Claim/نوع المتنج-التمويل (مع دمج CC وPF إلى CC+PF)."
+                    )
+                    _expander_table(stage_product_detail, "stage_product_detail")
+            with team_col:
+                with st.expander(
+                    "📉 النشاط الأسبوعي | إجمالي الفريق", expanded=False
+                ):
+                    st.caption("إجمالي نشاط الفريق يومًا بيوم خلال الأسبوع.")
+                    _expander_table(weekly_daily, "weekly_daily")
+            with collectors_col:
+                with st.expander(
+                    "📅 النشاط الأسبوعي | تفاصيل كل محصل", expanded=False
+                ):
+                    st.caption(
+                        "جدول مستقل لكل يوم ومحصّل، بما في ذلك الأيام بلا مكالمات."
+                    )
+                    _expander_table(weekly_collectors, "weekly_collectors")
+
+        approval_choice = st.radio(
+            "طريقة الاعتماد",
+            [
+                "اعتماد التقرير وتحميله مباشرة",
+                "فتح إدارة موديل النشاط (اختياري)",
+            ],
+            index=0,
+            horizontal=True,
+            key="snb_activity_approval_choice",
         )
+        if approval_choice == "فتح إدارة موديل النشاط (اختياري)":
+            _snb_render_model_management(
+                selected[stats["notes"]], model_mapping,
+                manual_decisions, slash_row_decisions,
+            )
+        else:
+            st.caption(
+                "✅ التقرير جاهز للتحميل بالتقييمات المعتمدة بالفعل. "
+                "مش لازم تفتحي إدارة موديل النشاط أو تحفظي الإفادات فيه. "
+                "مراجعة الإفادات الجديدة أو الخاصة تظل مطلوبة قبل اعتماد أي تقرير."
+            )
         weekly_report = activity_kind == "أسبوعي"
         details_sheet = (
             "Wasted_Time_Details_Weekly" if weekly_report
