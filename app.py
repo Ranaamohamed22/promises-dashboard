@@ -6802,13 +6802,6 @@ def _prepare_snb_activity_file(uploaded_file):
         combined_products = int(needs_change.sum())
         frame.loc[has_cc_or_pf, product] = "CC+PF"
 
-    frame = (
-        frame.loc[~frame.duplicated(subset=key_columns, keep="first")]
-        .drop(columns=key_columns)
-        .copy()
-    )
-    duplicates = initial_rows - len(frame)
-
     parsed = pd.to_datetime(frame[created], errors="coerce")
     # Pandas 2+ can parse heterogeneous export timestamp formats with "mixed".
     # Only apply that fallback when it actually recovers more timestamps.
@@ -6822,6 +6815,16 @@ def _prepare_snb_activity_file(uploaded_file):
         except (ValueError, TypeError):
             pass
 
+    frame["__ejada_key_day"] = parsed.dt.normalize()
+    key_columns.append("__ejada_key_day")
+    frame = (
+        frame.loc[~frame.duplicated(subset=key_columns, keep="first")]
+        .drop(columns=key_columns)
+        .copy()
+    )
+    duplicates = initial_rows - len(frame)
+
+    parsed = parsed.loc[frame.index]
     if len(frame) and parsed.notna().sum() == 0:
         raise ValueError("تعذر قراءة وقت Created on من ملف النشاط.")
 
@@ -7456,7 +7459,7 @@ def _ejada_stc_activity_kpi_counts(uploaded):
     )
 
 
-def _snb_wasted_time_reports(result, collector_col, notes_col):
+def _snb_wasted_time_reports(result, collector_col, notes_col, weekly=False):
     """Return audited call-gap waste and one collector/day summary.
 
     The call-duration field is the gap to the previous recorded Note for the
@@ -7478,6 +7481,8 @@ def _snb_wasted_time_reports(result, collector_col, notes_col):
         "إجمالي الوقت المهدر (دقائق)",
         "إجمالي الوقت المهدر (ساعات)"
     ]
+    if weekly:
+        summary_cols[0] = "الأسبوع"
     stamp = "__ejada_parsed_created"
     if result.empty:
         return (
@@ -7559,14 +7564,18 @@ def _snb_wasted_time_reports(result, collector_col, notes_col):
     detail = detail[detail_cols].reset_index(drop=True)
 
     rows = []
-    for (day, collector), group in detail.groupby(
-        ["التاريخ", "المحصل"], sort=True, dropna=False
-    ):
+    period_col = summary_cols[0]
+    groups = detail
+    if weekly:
+        end = frame[stamp].max().normalize()
+        start = end - pd.Timedelta(days=6)
+        groups = detail.assign(الأسبوع=f"{start:%Y-%m-%d} — {end:%Y-%m-%d}")
+    for (day, collector), group in groups.groupby([period_col, "المحصل"], sort=True, dropna=False):
         total_waste = round(
             float(group["الوقت المهدر (دقائق)"].sum()), 2
         )
         rows.append({
-            "التاريخ": day,
+            period_col: day,
             "المحصل": collector,
             "إجمالي المكالمات": int(len(group)),
             "المكالمات الناجحة": int(
@@ -7842,8 +7851,9 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
         after_break = _snb_after_break_notes(
             prepared, selected, stats["notes"], stats["collector"]
         )
+        weekly = activity_kind == "أسبوعي"
         wasted_details, wasted_daily = _snb_wasted_time_reports(
-            result, stats["collector"], stats["notes"]
+            result, stats["collector"], stats["notes"], weekly=weekly
         )
         with st.expander(
             "🕧 أول إفادة لكل محصل بعد البريك + مدة الدوام", expanded=False
@@ -7854,7 +7864,7 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             )
             _expander_table(after_break, "after_break")
         with st.expander(
-            "⏱️ تفاصيل الوقت المهدر وإجماليه اليومي", expanded=False
+            ("⏱️ تفاصيل الوقت المهدر وإجماليه الأسبوعي" if weekly else "⏱️ تفاصيل الوقت المهدر وإجماليه اليومي"), expanded=False
         ):
             st.caption(
                 "الوقت المهدر = الفاصل بين الإفادات بعد خصم البريك "
@@ -7867,6 +7877,16 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             selected[stats["notes"]], model_mapping,
             manual_decisions, slash_row_decisions
         )
+        def style_weekly_headers(writer):
+            for sheet in writer.sheets.values():
+                sheet.auto_filter.ref = sheet.dimensions
+                sheet.freeze_panes = "A2"
+                for cell in sheet[1]:
+                    cell.fill = PatternFill("solid", fgColor="183459")
+                    cell.font = Font(bold=True, color="FFFFFF")
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                    sheet.column_dimensions[cell.column_letter].width = max(18, len(str(cell.value)) * 1.5 + 5)
+
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             final.to_excel(writer, sheet_name="Activity", index=False)
@@ -7877,11 +7897,15 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
                 writer, sheet_name="Wasted_Time_Details", index=False
             )
             wasted_daily.to_excel(
-                writer, sheet_name="Wasted_Time_Daily", index=False
+                writer, sheet_name="Wasted_Time_Weekly" if weekly else "Wasted_Time_Daily", index=False
             )
+            if weekly:
+                style_weekly_headers(writer)
         activity_only = io.BytesIO()
         with pd.ExcelWriter(activity_only, engine="openpyxl") as writer:
             final.to_excel(writer, sheet_name="Activity", index=False)
+            if weekly:
+                style_weekly_headers(writer)
         st.download_button(
             "📥 تحميل شيت Activity منفصل", data=activity_only.getvalue(),
             file_name=f"SNB_Activity_{activity_kind}.xlsx",
