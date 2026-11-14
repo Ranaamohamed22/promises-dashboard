@@ -6912,10 +6912,15 @@ def _stc_render_model_setup(uploaded, model_info, saved_ratings):
             for ix, (key, counts) in enumerate(sorted(conflicts.items())):
                 note = model_info["labels"][key]
                 choice = st.selectbox(
-                    f"إفادة بتقييمين: {note[:120]} "
-                    f"(ناجحة {counts[1]} / غير ناجحة {counts[0]})",
-                    ["اختاري التقييم", "ناجحة", "غير ناجحة"],
+                    f"إفادة بتقييمين: {note[:120]} — "
+                    "اختاري التقييم الصحيح (1 = ناجحة، 0 = غير ناجحة)",
+                    ["اختاري التقييم", "ناجحة (1)", "غير ناجحة (0)"],
                     key=f"stc_conflict_{ix}",
+                    help=(
+                        f"عدد مرات ظهور التقييم 1: {counts[1]}، "
+                        f"وعدد مرات ظهور التقييم 0: {counts[0]}. "
+                        "الأعداد دي تكرار الإفادة في الملف، مش رقم التقييم."
+                    ),
                 )
                 decisions[key] = choice
             overwrite = st.checkbox(
@@ -6945,7 +6950,7 @@ def _stc_render_model_setup(uploaded, model_info, saved_ratings):
                 for key, value in model_info["ratings"].items()
             ]
             additions.extend(
-                (model_info["labels"][key], 1 if choice == "ناجحة" else 0)
+                (model_info["labels"][key], 1 if choice == "ناجحة (1)" else 0)
                 for key, choice in decisions.items()
             )
             try:
