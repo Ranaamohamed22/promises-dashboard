@@ -6538,6 +6538,7 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
     candidates = {}
     conflicted = set()
     normalized = notes.map(_snb_normalize_note)
+    note_counts = normalized.value_counts(dropna=False)
     for index, (note, key) in enumerate(zip(notes, normalized)):
         if not key or _snb_special_review_mask(pd.Series([note])).iloc[0]:
             continue  # Special notes require per-row review, never a generic rating.
@@ -6558,6 +6559,7 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
         {
             "إضافة للموديل": False,
             "الإفادة المعتمدة": display_labels[key],
+            "عدد المكالمات": int(note_counts.get(key, 0)),
             "التقييم": "ناجحة" if rating == 1 else "غير ناجحة",
             "الحالة": (
                 "موجودة بنفس التقييم" if persisted.get(key) == rating
@@ -6570,19 +6572,46 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
         if persisted.get(key) != rating
     ]
     st.caption(f"الإفادات المعتمدة المتاحة للإضافة: {len(rows)}")
+    sort_mode = st.selectbox(
+        "ترتيب الإفادات",
+        ["الأكثر تكرارًا", "الأقل تكرارًا", "الإفادة أبجديًا",
+         "الناجحة أولًا", "غير الناجحة أولًا"],
+        key="snb_model_manager_sort",
+    )
+    if sort_mode == "الأكثر تكرارًا":
+        rows.sort(key=lambda item: (-item["عدد المكالمات"], item["الإفادة المعتمدة"]))
+    elif sort_mode == "الأقل تكرارًا":
+        rows.sort(key=lambda item: (item["عدد المكالمات"], item["الإفادة المعتمدة"]))
+    elif sort_mode == "الإفادة أبجديًا":
+        rows.sort(key=lambda item: item["الإفادة المعتمدة"])
+    elif sort_mode == "الناجحة أولًا":
+        rows.sort(key=lambda item: (item["التقييم"] != "ناجحة",
+                                   -item["عدد المكالمات"], item["الإفادة المعتمدة"]))
+    else:
+        rows.sort(key=lambda item: (item["التقييم"] != "غير ناجحة",
+                                   -item["عدد المكالمات"], item["الإفادة المعتمدة"]))
     if not rows:
         st.info("لا توجد إفادات جديدة معتمدة لإضافتها حاليًا.")
+    st.caption("اختاري ناجحة أو غير ناجحة لكل إفادة قبل تحديد إضافتها للموديل.")
     with st.form("snb_model_manager_approved_form"):
         if rows:
             edited = st.data_editor(
                 pd.DataFrame(rows),
                 hide_index=True,
                 use_container_width=True,
-                disabled=["الإفادة المعتمدة", "التقييم", "الحالة"],
+                disabled=["الإفادة المعتمدة", "عدد المكالمات", "الحالة"],
                 column_config={
                     "إضافة للموديل": st.column_config.CheckboxColumn(
                         "إضافة للموديل", default=False
-                    )
+                    ),
+                    "التقييم": st.column_config.SelectboxColumn(
+                        "التقييم: ناجحة أم غير ناجحة؟",
+                        options=["ناجحة", "غير ناجحة"],
+                        required=True,
+                    ),
+                    "عدد المكالمات": st.column_config.NumberColumn(
+                        "عدد المكالمات", format="%d",
+                    ),
                 },
                 key="snb_model_manager_editor",
             )
@@ -6605,9 +6634,13 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
     if not edited.empty:
         for _, row in edited.iterrows():
             if bool(row["إضافة للموديل"]):
+                chosen = str(row["التقييم"]).strip()
+                if chosen not in ("ناجحة", "غير ناجحة"):
+                    st.error("لازم اختيار ناجحة أو غير ناجحة قبل حفظ الإفادة.")
+                    return
                 additions.append((
                     row["الإفادة المعتمدة"],
-                    1 if row["التقييم"] == "ناجحة" else 0
+                    1 if chosen == "ناجحة" else 0
                 ))
     if add_note.strip():
         additions.append((add_note.strip(), 1 if add_rating == "ناجحة" else 0))
@@ -7583,6 +7616,87 @@ def _snb_ptp_note_status(value):
     return "No explicit PTP"
 
 
+def _snb_stage_product_columns(frame):
+    """Resolve stage and product using the columns actually present in SNB activity."""
+    stage_col = _snb_find_column(
+        frame, "Stage", "Collection Stage", "Call Stage", "مرحلة",
+        "المرحلة", "مرحلة التحصيل", "Main State", "الحالة الرئيسية",
+        "Classification", "التصنيف"
+    )
+    product_col = _snb_find_column(
+        frame, "Claim/نوع المتنج-التمويل",
+        "Claim/نوع المنتج-التمويل", "نوع المتنج-التمويل",
+        "نوع المنتج-التمويل", "نوع المنتج", "Product Type",
+        "Product Type - Finance", "ProductType"
+    )
+    return stage_col, product_col
+
+
+def _snb_top_category(group, column):
+    """Return the most frequent nonblank label (alphabetical tie break)."""
+    if column is None or column not in group.columns:
+        return "العمود غير موجود", 0
+    labels = group[column].fillna("").astype(str).str.strip()
+    labels = labels.loc[~labels.str.casefold().isin(["", "nan", "none", "nat"])]
+    if labels.empty:
+        return "غير محدد", 0
+    counts = labels.value_counts()
+    maximum = int(counts.max())
+    winners = sorted(label for label, count in counts.items() if count == maximum)
+    return winners[0], maximum
+
+
+def _build_snb_stage_product_breakdown(result, collector_col):
+    """Rank collector/stage/product intersections by call volume."""
+    columns = [
+        "ترتيب المحصل حسب المكالمات", "المحصل", "المرحلة",
+        "نوع المنتج", "عدد المكالمات", "نسبة من مكالمات المحصل %",
+        "الترتيب داخل المحصل"
+    ]
+    if result is None or result.empty or collector_col not in result.columns:
+        return pd.DataFrame(columns=columns)
+    frame = result.copy()
+    stage_col, product_col = _snb_stage_product_columns(frame)
+    frame["__stage"] = (
+        frame[stage_col].fillna("").astype(str).str.strip()
+        if stage_col else "العمود غير موجود"
+    )
+    frame["__product"] = (
+        frame[product_col].fillna("").astype(str).str.strip()
+        if product_col else "العمود غير موجود"
+    )
+    frame["__collector"] = (
+        frame[collector_col].fillna("").astype(str).str.strip()
+        .replace("", "(بدون اسم)")
+    )
+    for col in ("__stage", "__product"):
+        frame[col] = frame[col].replace("", "غير محدد")
+    counts = (
+        frame.groupby(["__collector", "__stage", "__product"], dropna=False)
+        .size().reset_index(name="عدد المكالمات")
+    )
+    totals = frame["__collector"].value_counts()
+    collector_ranks = totals.rank(method="min", ascending=False).astype(int)
+    counts["ترتيب المحصل حسب المكالمات"] = (
+        counts["__collector"].map(collector_ranks).astype(int)
+    )
+    counts["نسبة من مكالمات المحصل %"] = (
+        100 * counts["عدد المكالمات"] / counts["__collector"].map(totals)
+    ).round(2)
+    counts = counts.sort_values(
+        ["ترتيب المحصل حسب المكالمات", "عدد المكالمات",
+         "__collector", "__stage", "__product"],
+        ascending=[True, False, True, True, True], kind="stable"
+    )
+    counts["الترتيب داخل المحصل"] = (
+        counts.groupby("__collector").cumcount() + 1
+    )
+    return counts.rename(columns={
+        "__collector": "المحصل", "__stage": "المرحلة",
+        "__product": "نوع المنتج",
+    })[columns].reset_index(drop=True)
+
+
 def _build_snb_efficiency_call_quality(result, collector_col, notes_col):
     """Weekly collector-level success, PTP conversion, and effort/result matrix.
 
@@ -7596,6 +7710,8 @@ def _build_snb_efficiency_call_quality(result, collector_col, notes_col):
         "Success Rate %", "PTP Count", "PTP Conversion %",
         "PTP Needs Review", "Team Median Calls",
         "Team Median Success %", "Efficiency Category",
+        "Call Rank", "Top Stage", "Stage Calls",
+        "Top Product", "Product Calls",
     ]
     if result is None or result.empty:
         return pd.DataFrame(columns=columns)
@@ -7612,6 +7728,7 @@ def _build_snb_efficiency_call_quality(result, collector_col, notes_col):
     )
     # Count explicit promises only when the call was rated successful.
     frame["__quality_ptp"] = frame[notes_col].map(_snb_ptp_note_status)
+    stage_col, product_col = _snb_stage_product_columns(frame)
     rows = []
     for collector_name, group in frame.groupby(
         "__quality_collector", sort=True, dropna=False
@@ -7627,6 +7744,8 @@ def _build_snb_efficiency_call_quality(result, collector_col, notes_col):
         needs_review = int(
             (successful_mask & group["__quality_ptp"].eq("Needs PTP Review")).sum()
         )
+        most_stage, stage_calls = _snb_top_category(group, stage_col)
+        most_product, product_calls = _snb_top_category(group, product_col)
         rows.append({
             "Collector": collector_name,
             "Total Calls": int(len(group)),
@@ -7639,8 +7758,15 @@ def _build_snb_efficiency_call_quality(result, collector_col, notes_col):
             "PTP Conversion %": round(100 * ptp / successes, 2)
             if successes else None,
             "PTP Needs Review": needs_review,
+            "Top Stage": most_stage,
+            "Stage Calls": stage_calls,
+            "Top Product": most_product,
+            "Product Calls": product_calls,
         })
     quality = pd.DataFrame(rows)
+    quality["Call Rank"] = (
+        quality["Total Calls"].rank(method="min", ascending=False).astype(int)
+    )
     median_calls = float(quality["Total Calls"].median())
     rate_values = quality["Success Rate %"].dropna()
     median_rate = float(rate_values.median()) if len(rate_values) else None
@@ -7683,9 +7809,14 @@ def _build_snb_efficiency_call_quality(result, collector_col, notes_col):
         "Team Median Calls": "وسيط مكالمات الفريق",
         "Team Median Success %": "وسيط نسبة نجاح الفريق %",
         "Efficiency Category": "تصنيف كفاءة المحصل",
+        "Call Rank": "ترتيب المحصل حسب المكالمات",
+        "Top Stage": "المرحلة الأكثر مكالمات",
+        "Stage Calls": "عدد مكالمات المرحلة",
+        "Top Product": "المنتج الأكثر مكالمات",
+        "Product Calls": "عدد مكالمات المنتج",
     }
     ordered = quality[columns].sort_values(
-        ["Successful Calls", "Total Calls", "Collector"],
+        ["Total Calls", "Successful Calls", "Collector"],
         ascending=[False, False, True], kind="stable"
     ).reset_index(drop=True)
     ordered["Efficiency Category"] = ordered["Efficiency Category"].map(category_ar)
@@ -8104,6 +8235,10 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             )
             if activity_kind == "أسبوعي" else None
         )
+        stage_product_detail = (
+            _build_snb_stage_product_breakdown(result, stats["collector"])
+            if activity_kind == "أسبوعي" else None
+        )
         with st.expander(
             "🕧 أول إفادة لكل محصل بعد البريك + مدة الدوام", expanded=False
         ):
@@ -8136,6 +8271,10 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
                     "«وعود تحتاج للمراجعة» ولا تُحسب وعودًا مؤكدة."
                 )
                 _expander_table(efficiency_quality, "efficiency_quality")
+                st.caption("الترتيب حسب إجمالي مكالمات الأسبوع. المرحلة تُقرأ من Stage "
+                           "إن وجدت، وإلا Main State أو Classification؛ والمنتج من "
+                           "Claim/نوع المتنج-التمويل (يشمل دمج CC+PF).")
+                _expander_table(stage_product_detail, "stage_product_detail")
         _snb_render_model_management(
             selected[stats["notes"]], model_mapping,
             manual_decisions, slash_row_decisions
@@ -8164,6 +8303,9 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             if efficiency_quality is not None:
                 efficiency_quality.to_excel(
                     writer, sheet_name="Efficiency_Call_Quality", index=False
+                )
+                stage_product_detail.to_excel(
+                    writer, sheet_name="Collector_Stage_Product", index=False
                 )
             _style_snb_activity_workbook(writer.book)
         activity_only = io.BytesIO()
