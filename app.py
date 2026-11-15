@@ -10686,9 +10686,9 @@ else:
 
     elif curr_page == 'Neglect':
         # The user's uploaded file determines ALL available Sub State options.
-        sub_col = find_col_in(
-            neglect_df, ["Sub State", "sub state", "substate",
-                         "الحالة الفرعية", "حالة العميل"]
+        sub_col = _snb_find_column(
+            neglect_df, "Sub State", "sub state", "substate",
+            "الحالة الفرعية", "حالة العميل"
         )
         with st.container(key=f"neglect_diagnostic_row_{selected_bank}"):
             diag_col, data_col = st.columns(
