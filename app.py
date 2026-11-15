@@ -1970,6 +1970,7 @@ st.markdown(f"""
     html body .stApp .st-key-report_pills [data-testid="stButton"] button[kind] p {{color:#263745 !important;-webkit-text-fill-color:#263745 !important;font-size:15px !important;}}
     html body .stApp .st-key-report_pills [data-testid="stButton"] button[kind="secondary"] p {{font-weight:500 !important;}}
     .stApp [class*="st-key-upload_field_"] {{width:min(315px,100%) !important;min-width:0;gap:5px !important;margin-left:auto;}}
+    .stApp [class*="st-key-upload_field_"] > [data-testid="stElementContainer"]:has(.upload-field-label) {{min-height:24px !important;margin:0 !important;display:flow-root !important;}}
     .stApp .upload-field-label {{direction:rtl;text-align:center;font-size:17px;font-weight:800;line-height:1.4;color:{label_color};}}
     .stApp [class*="st-key-upload_box_"] {{box-sizing:border-box;width:100% !important;padding:8px !important;border:1px solid {border_color} !important;border-radius:10px;background:transparent !important;}}
     .stApp [class*="st-key-upload_box_"] [data-testid="stFileUploaderDropzone"] {{box-sizing:border-box;display:flex !important;align-items:center !important;justify-content:center !important;width:100%;min-height:54px !important;height:auto !important;padding:6px !important;background:white !important;border:1px dashed #a9bbd0 !important;border-radius:8px !important;}}
