@@ -9434,7 +9434,9 @@ def render_promise_filter_diagnostics(bank, kind):
         html_parts.append('</tbody></table>')
         return ''.join(html_parts)
 
-    kind_label = 'القائمة' if kind == 'active' else 'المكسورة'
+    kind_label = {
+        "active": "القائمة", "broken": "المكسورة", "neglect": "الإهمال"
+    }.get(kind, kind)
     with st.container(key=f'promise_diagnostic_{bank}_{kind}'):
         with st.expander(
             f'🔎 تشخيص فلترة الوعود {kind_label} {bank}',
@@ -9733,7 +9735,7 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
     total_unhandled = 0
     # Diagnostic only; never changes either bank's filter results.
     st.session_state.setdefault('promise_filter_debug', {})[bank] = {
-        'active': None, 'broken': None
+        'active': None, 'broken': None, 'neglect': None
     }
 
     if not df_promises.empty and all(c in df_promises.columns for c in ['Follow up Due Date', 'Follow up Last Date', 'حالة المعالجة - التمويل', 'تحديث فئة العميل - التمويل', 'Classification']):
@@ -9798,6 +9800,30 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
         n_last_date = pd.to_datetime(neglect_base['Follow up Last Date'], errors='coerce').dt.normalize()
         neglect_base['Neglect_Days'] = (today - n_last_date).dt.days
         neglect_df = neglect_base[neglect_base['Neglect_Days'] > 3].copy()
+
+        # Auditable diagnostics, mirroring the actual conditions used above.
+        # Do not change any filtered records while calculating the steps.
+        _neg_status = df_promises['حالة المعالجة - التمويل'].astype(str).str.strip().eq('غير معالج')
+        _neg_category = df_promises['تحديث فئة العميل - التمويل'].astype(str).str.strip().str.lower().ne('writeoff')
+        _neg_after_status = _neg_status
+        _neg_after_category = _neg_after_status & _neg_category
+        _neg_after_due = _neg_after_category & (due_date != today)
+        _neg_age = (today - last_date).dt.days
+        _neg_final = _neg_after_due & _neg_age.gt(3)
+        st.session_state['promise_filter_debug'][bank]['neglect'] = {
+            'steps': [
+                {'الخطوة': 'إجمالي الصفوف الأصلية',
+                 'العدد': int(len(df_promises))},
+                {'الخطوة': 'بعد حالة المعالجة = غير معالج',
+                 'العدد': int(_neg_after_status.sum())},
+                {'الخطوة': 'بعد استبعاد فئة writeoff',
+                 'العدد': int(_neg_after_category.sum())},
+                {'الخطوة': 'بعد استبعاد Follow up Due Date = اليوم',
+                 'العدد': int(_neg_after_due.sum())},
+                {'الخطوة': 'بعد أكثر من 3 أيام منذ Follow up Last Date',
+                 'العدد': int(_neg_final.sum())},
+            ]
+        }
 
         total_unhandled = len(df_promises[base_condition])
 
@@ -10615,9 +10641,55 @@ else:
                     )
 
     elif curr_page == 'Neglect':
-        default_sub_states = ['وعد بسداد مبلغ المعالجة', 'واعد بسداد مبلغ المعالجه', 'رافض السداد', 'الجوال مغلق', 'مماطل', 'تم سداد جزء وليس مبلغ المعالجه', 'لا يجيب', 'متقاعد الراتب علي بنك آخر', 'يرغب بجدوله المديونيه']
-        selected_sub_states = st.multiselect("فلاتر الـ Sub State المشمولة:", options=default_sub_states, default=default_sub_states, key=f"neglect_states_{selected_bank}")
-        sub_col = 'Sub State' if 'Sub State' in neglect_df.columns else 'sub state' if 'sub state' in neglect_df.columns else None
-        final_neglect_df = neglect_df[neglect_df[sub_col].isin(selected_sub_states)] if sub_col else neglect_df
-        st.markdown(f"<p style='text-align:right; direction:rtl; color:{label_color}; font-weight: bold;'>العدد الإجمالي: <b style='color:#586F8C; font-size:18px;'>{len(final_neglect_df):,}</b> حساب مهمل</p>", unsafe_allow_html=True)
-        st.dataframe(final_neglect_df, use_container_width=True, height=450)
+        # The user's uploaded file determines ALL available Sub State options.
+        sub_col = find_col_in(
+            neglect_df, ["Sub State", "sub state", "substate",
+                         "الحالة الفرعية", "حالة العميل"]
+        )
+        with st.container(key=f"neglect_diagnostic_row_{selected_bank}"):
+            diag_col, data_col = st.columns(
+                [1.0, 2.4], gap="small", vertical_alignment="top"
+            )
+            with diag_col:
+                render_promise_filter_diagnostics(selected_bank, "neglect")
+            with data_col:
+                if sub_col:
+                    states = sorted({
+                        str(value).strip()
+                        for value in neglect_df[sub_col].dropna()
+                        if str(value).strip()
+                    })
+                    key_digest = hashlib.sha1(
+                        (
+                            selected_bank + "|" + str(len(neglect_df))
+                            + "|" + "|".join(states)
+                        ).encode("utf-8")
+                    ).hexdigest()[:10]
+                    selected_sub_states = st.multiselect(
+                        "اختاري حالات Sub State المعروضة:",
+                        options=states, default=states,
+                        key=f"neglect_states_{selected_bank}_{key_digest}",
+                        help="كل الحالات الموجودة في ملف البنك متاحة للاختيار."
+                    )
+                    final_neglect_df = neglect_df.loc[
+                        neglect_df[sub_col].fillna("").astype(str).str.strip()
+                        .isin(selected_sub_states)
+                    ].copy()
+                    st.caption(
+                        f"الحالات المتاحة: {len(states):,} | "
+                        f"الحالات المحددة: {len(selected_sub_states):,}"
+                    )
+                else:
+                    final_neglect_df = neglect_df.copy()
+                    st.info("عمود Sub State غير موجود في بيانات الإهمال المرفوعة.")
+                st.markdown(
+                    f"<p style='text-align:right;direction:rtl;color:{label_color};"
+                    f"font-weight:900;'>عدد حسابات الإهمال: "
+                    f"<b style='color:{snb_green};font-size:19px;'>"
+                    f"{len(final_neglect_df):,}</b></p>",
+                    unsafe_allow_html=True
+                )
+                st.dataframe(
+                    final_neglect_df, use_container_width=True,
+                    hide_index=True, height=460
+                )
