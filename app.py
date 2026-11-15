@@ -10549,21 +10549,14 @@ else:
 
             st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
 
-            # Preserve SNB's original Pivot summary; STC has no active Pivot.
-            if selected_bank != 'STC':
-                st.markdown(
-                    f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900;'>📊 ملخص تقرير الوعود القائمة (Pivot)</h4>",
-                    unsafe_allow_html=True
-                )
-                st.dataframe(
-                    style_pivot_frame(pivot_to_frame(build_pivot(active_promises_df, order='first'))),
-                    use_container_width=True,
-                    hide_index=True
-                )
+            # Pivot removed: use the audited filter steps and underlying records.
 
             # Matching horizontal cards: diagnostic on the right, sheet on the left.
             with st.container(key=f"promise_details_row_{selected_bank}"):
-                diag_col, details_col = st.columns([3.1, 1], gap='small')
+                diag_col, details_col = st.columns(
+                    [1.35, 2.10] if selected_bank == "STC" else [0.95, 2.45],
+                    gap='small', vertical_alignment='top'
+                )
                 with diag_col:
                     render_promise_filter_diagnostics(selected_bank, 'active')
                 with details_col:
@@ -10575,25 +10568,20 @@ else:
                             _expander_table(active_promises_df, "active_promises_df")
             
         with tab_broken:
-            render_promise_filter_diagnostics(selected_bank, 'broken')
-            # في STC نخفي ملخص الـ Pivot الخاص بالوعود المكسورة.
-            if selected_bank != 'STC':
-                st.markdown(
-                    f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900;'>📊 ملخص تقرير الوعود المكسورة (Pivot)</h4>",
-                    unsafe_allow_html=True
+            # Mirror the active side-by-side layout; no second Pivot preview.
+            with st.container(key=f"promise_broken_details_row_{selected_bank}"):
+                diag_col, details_col = st.columns(
+                    [1.35, 2.10] if selected_bank == "STC" else [0.95, 2.45],
+                    gap="small", vertical_alignment="top"
                 )
-                st.dataframe(
-                    style_pivot_frame(pivot_to_frame(build_pivot(broken_promises_df, order='desc'))),
-                    use_container_width=True,
-                    hide_index=True
-                )
+                with diag_col:
+                    render_promise_filter_diagnostics(selected_bank, "broken")
+                with details_col:
+                    with st.expander(
+                        "📋 تفاصيل شيت الوعود المكسورة", expanded=True
+                    ):
+                        _expander_table(broken_promises_df, "broken_promises_df")
 
-            st.markdown(
-                f"<h4 style='text-align:right; direction:rtl; color:{label_color}; font-weight:900; margin-top:20px;'>📋 تفاصيل شيت الوعود المكسورة</h4>",
-                unsafe_allow_html=True
-            )
-            st.dataframe(broken_promises_df, use_container_width=True, height=400)
-            
         st.markdown("<br>", unsafe_allow_html=True)
         if selected_bank == 'STC':
             stc_active_report = build_single_promise_report_xlsx(
@@ -10632,9 +10620,9 @@ else:
                 )
                 with center_download:
                     st.download_button(
-                        "📥 تحميل التقرير الشامل (الإكسيل بالملخصات).xlsx",
+                        "📥 تحميل الوعود القائمة والمكسورة (شيتان في ملف واحد)",
                         data=report_bytes,
-                        file_name=f"{selected_bank}_Daily_Promises_Report.xlsx",
+                        file_name="SNB_Active_Broken_Promises.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key=f"dl_promises_all_{selected_bank}",
                         use_container_width=False
