@@ -9599,18 +9599,16 @@ def render_report_upload_bar(page, promise_metrics=None):
     uploader_version = st.session_state.report_uploader_versions[selected_bank][page]
 
     with st.container(key=f"report_upload_bar_{selected_bank}_{page}"):
-        if not current_files:
-            st.markdown(f'<div class="ejada-upload-name" style="color:{label_color};">مفيش ملف مرفوع لسه يا رنا</div>',
-                        unsafe_allow_html=True)
-
         # Top-aligned row used by all three reports for both banks.
         upload_col, title_col, _left_balance = st.columns(
             [1.7, 3.9, 4.4], gap='small', vertical_alignment='top'
         )
 
         with upload_col:
-            with upload_field("رفع ملف الوعود" if page == "Promises" else "رفع ملف المحفظة",
-                              f"report_{selected_bank}_{page}"):
+            field_title = "رفع ملف الوعود" if page == "Promises" else "رفع ملف المحفظة"
+            if not current_files:
+                field_title = "مفيش ملف لسه مرفوع يا رنا"
+            with upload_field(field_title, f"report_{selected_bank}_{page}"):
                 widget_key = f"report_uploader_{selected_bank}_{page}_{uploader_version}"
                 if current_files:
                     uploaded_chip(current_files, f"small_clear_report_{selected_bank}_{page}",
