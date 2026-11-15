@@ -1450,6 +1450,48 @@ st.markdown(f"""
         }}
     }}
 
+
+    /* Home: two bank logos INSIDE the white welcome card. */
+    div.st-key-ejada_home_bank_picker {{
+        background: #FFFFFF !important;
+        border: 1px solid #D7E3EE !important;
+        border-radius: 20px !important;
+        padding: 24px 22px 18px !important;
+        margin-top: 12px !important;
+        margin-bottom: 20px !important;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.06) !important;
+    }}
+    div.st-key-ejada_home_bank_picker [data-testid="stButton"] button {{
+        min-height: 48px !important;
+        font-size: 18px !important;
+        font-weight: 900 !important;
+        border-radius: 12px !important;
+        background: #1F4373 !important;
+        color: #FFFFFF !important;
+        border: 1px solid #1F4373 !important;
+    }}
+    div.st-key-ejada_home_bank_picker [data-testid="stButton"] button:hover {{
+        background: #304D73 !important;
+        border-color: #304D73 !important;
+    }}
+    /* Limit white diagnostic expander to the size of its steps table. */
+    div[class*="st-key-promise_diagnostic_SNB_"] {{
+        width: 100% !important;
+        max-width: 590px !important;
+        min-width: 0 !important;
+        margin: 0 0 8px auto !important;
+    }}
+    div[class*="st-key-promise_diagnostic_STC_"] {{
+        width: 100% !important;
+        max-width: 830px !important;
+        min-width: 0 !important;
+        margin: 0 0 8px auto !important;
+    }}
+    div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] {{
+        width: 100% !important;
+        max-width: 100% !important;
+    }}
+
     /* Activity-page upload cards only: compact outer border and dropzone. */
     div[class*="st-key-activity_model_upload_card"],
     div[class*="st-key-activity_file_upload_card"] {{
@@ -9708,6 +9750,19 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
 
     df_all = pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
     df_promises = pd.concat(promises_dfs, ignore_index=True) if promises_dfs else pd.DataFrame()
+    # Keep ALL Sub State values from the uploaded bank portfolio available for
+    # Neglect selection, even if no row with that value survives the date filters.
+    raw_sub_col = find_col_in(
+        df_promises, ["Sub State", "sub state", "substate",
+                      "الحالة الفرعية", "حالة العميل"]
+    )
+    raw_sub_options = (
+        sorted({str(value).strip()
+                for value in df_promises[raw_sub_col].dropna()
+                if str(value).strip()})
+        if raw_sub_col is not None else []
+    )
+    st.session_state.setdefault("neglect_substate_options", {})[bank] = raw_sub_options
     if activity_dfs:
         df_act_raw = pd.concat(activity_dfs, ignore_index=True)
     else:
@@ -10642,7 +10697,9 @@ else:
                 render_promise_filter_diagnostics(selected_bank, "neglect")
             with data_col:
                 if sub_col:
-                    states = sorted({
+                    states = st.session_state.get(
+                        "neglect_substate_options", {}
+                    ).get(selected_bank) or sorted({
                         str(value).strip()
                         for value in neglect_df[sub_col].dropna()
                         if str(value).strip()
