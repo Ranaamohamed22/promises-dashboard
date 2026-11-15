@@ -118,7 +118,23 @@ def _clock_ticks(start_hour, end_hour, step=2):
         labels.append(label)
     return ticks, labels
 
-THEMES = ['ثيم إجادة (Navy)', 'الوضع الداكن (Black)', 'التصميم الفاتح (Light)']
+BANK_LOGOS = {
+    "SNB": "https://roshem.sa/photos/partners/1723882007.png",
+    "STC": "https://mma.prnewswire.com/media/2379425/4631613/STC_Bank_Logo_Logo.jpg?p=publish",
+}
+NAVY_BACKGROUNDS = {
+    "ثيم إجادة (Navy)": "#1F4373",
+    "كحلي فاتح": "#49678B",
+    "كحلي غامق": "#102541",
+}
+
+def bank_logo(bank, placement):
+    return (
+        f'<div class="bank-logo-{placement}"><img alt="{BANKS[bank]}" '
+        f'src="{BANK_LOGOS[bank]}"></div>'
+    )
+
+THEMES = ['ثيم إجادة (Navy)', 'الوضع الداكن (Black)', 'التصميم الفاتح (Light)', 'كحلي فاتح', 'كحلي غامق']
 
 def toggle_theme():
     current = st.session_state.theme_choice
@@ -150,8 +166,8 @@ snb_green = "#2CA549"
 
 CHART_PALETTE = ["#1F4373", "#304D73", "#586F8C", "#99AABF", "#F2F2F2"]
 
-if st.session_state.theme_choice == "ثيم إجادة (Navy)":
-    bg_color = ejada_navy_dark 
+if st.session_state.theme_choice in NAVY_BACKGROUNDS:
+    bg_color = NAVY_BACKGROUNDS[st.session_state.theme_choice]
     card_color = white_bg 
     border_color = ejada_border_light
     primary_color = ejada_navy_light 
@@ -203,7 +219,7 @@ else:
     input_text = "#1F4373"
 
 _overview_upload_panel_bg = (
-    "#1F4373" if st.session_state.theme_choice == "ثيم إجادة (Navy)"
+    bg_color if st.session_state.theme_choice in NAVY_BACKGROUNDS
     else "#222B39" if st.session_state.theme_choice == "الوضع الداكن (Black)"
     else "#FFFFFF"
 )
@@ -217,6 +233,17 @@ st.markdown(f"""
     [data-testid="collapsedControl"] {{display: none !important;}}
     [data-testid="stSidebar"] {{display: none !important;}}
     
+    .bank-logo-home, .bank-logo-nav {{display:flex;align-items:center;background:white;border-radius:10px;overflow:hidden;}}
+    .bank-logo-home {{height:180px;justify-content:center;}}
+    .bank-logo-home img {{max-width:96%;max-height:176px;object-fit:contain;}}
+    .bank-logo-nav {{width:fit-content;max-width:100%;margin-right:auto;margin-left:0;padding:0 7px;}}
+    .bank-logo-nav img {{height:68px;max-width:100%;object-fit:contain;}}
+    .st-key-ejada_home_bank_picker [data-testid="stButton"] button p {{font-size:20px !important;}}
+    @media(min-width: 700px) {{
+        .st-key-promise_comparison [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] + [data-testid="stColumn"] {{
+            border-inline-start:2px solid {border_color};padding-inline-start:1rem;
+        }}
+    }}
     .stApp {{ background-color: {bg_color} !important; }}
     /* Hide any stale/raw markdown artifact from older bank-label markup after redeploy. */
     div[data-testid="stMarkdownContainer"] > p:has(code) {{
@@ -1919,7 +1946,7 @@ st.markdown(f"""
 top_cols = st.columns([0.48, 1.55, 7.97], gap="small")
 
 with top_cols[0]:
-    st.button("🌓", key="theme_toggle", on_click=toggle_theme, help="تغيير الثيم (كحلي / أسود / أبيض)")
+    st.button("🌓", key="theme_toggle", on_click=toggle_theme, help=f"الثيم الحالي: {st.session_state.theme_choice} · اضغطي لتغيير اللون")
 
 with top_cols[1]:
     if st.session_state.current_page != 'Home':
@@ -1953,16 +1980,11 @@ def _render_ejada_main_navigation():
 
 if st.session_state.current_page != 'Home':
     # A bank is selected on Home; its reports stay grouped behind that choice.
-    current_bank_col, switch_bank_col, nav_col = st.columns(
-        [1.3, 1.35, 7.35], gap='small', vertical_alignment='top'
+    nav_col, switch_bank_col, current_bank_col = st.columns(
+        [7.35, 1.35, 1.3], gap='small', vertical_alignment='top'
     )
     with current_bank_col:
-        st.markdown(
-            f'<div style="color:{label_color};font-weight:900;font-size:17px;'
-            f'direction:rtl;text-align:center;padding-top:10px;">'
-            f'🏦 {BANKS[st.session_state.selected_bank]}</div>',
-            unsafe_allow_html=True
-        )
+        st.markdown(bank_logo(st.session_state.selected_bank, "nav"), unsafe_allow_html=True)
     with switch_bank_col:
         st.button(
             "تغيير البنك", key="ejada_change_bank_btn",
@@ -6198,6 +6220,11 @@ else:
         for report_kind in ('Activity', 'Promises', 'ActivityModel'):
             st.session_state.overview_uploader_versions[b].setdefault(report_kind, 0)
 
+def save_uploaded_files(store, bank, kind, widget_key):
+    files = st.session_state[widget_key]
+    st.session_state[store][bank][kind] = files or None
+
+
 def clear_overview_upload(bank, report_kind):
     if report_kind == 'ActivityModel':
         st.session_state.overview_uploads[bank][report_kind] = None
@@ -9552,70 +9579,17 @@ def render_report_upload_bar(page, promise_metrics=None):
 
         with upload_col:
             with st.container(border=True, key=f"ejada_shared_upload_card_{selected_bank}_{page}"):
-                # The first (RTL/rightmost) subcolumn contains X above +.
-                actions_col, file_box_col = st.columns(
-                    [0.16, 0.84], gap='small', vertical_alignment='top'
+                widget_key = f"report_uploader_{selected_bank}_{page}_{uploader_version}"
+                st.file_uploader(
+                    f"رفع ملف {titles[page]}", type=['xlsx', 'csv'],
+                    accept_multiple_files=True, label_visibility='collapsed',
+                    key=widget_key, on_change=save_uploaded_files,
+                    args=('page_files', selected_bank, page, widget_key)
                 )
-
-                with actions_col:
-                    with st.container(key=f"mini_actions_{selected_bank}_{page}"):
-                        if current_files:
-                            st.button(
-                                "×",
-                                key=f"small_clear_report_{selected_bank}_{page}",
-                                on_click=clear_report_page_file,
-                                args=(selected_bank, page),
-                                help="مسح الملف المرفوع",
-                                use_container_width=False
-                            )
-                        else:
-                            # Reserve the X position so the + stays directly below it.
-                            st.markdown(
-                                '<div class="ejada-mini-x-placeholder"></div>',
-                                unsafe_allow_html=True
-                            )
-
-                        new_files = st.file_uploader(
-                            f"رفع ملف {titles[page]}",
-                            type=['xlsx', 'csv'],
-                            accept_multiple_files=True,
-                            label_visibility='collapsed',
-                            key=f"report_uploader_{selected_bank}_{page}_{uploader_version}"
-                        )
-                        if new_files:
-                            new_sig = [(x.name, x.size) for x in new_files]
-                            current_sig = [(x.name, x.size) for x in current_files]
-                            if new_sig != current_sig:
-                                bank_files[page] = new_files
-                                st.rerun()
-                        elif current_files:
-                            # Preserve native uploader clearing behavior and page state.
-                            bank_files[page] = None
-                            st.session_state.report_uploader_versions[selected_bank][page] += 1
-                            st.rerun()
-
-                with file_box_col:
-                    if current_files:
-                        main_file = current_files[0]
-                        file_name = _xml_escape(main_file.name)
-                        file_size = f"{main_file.size / (1024 * 1024):.1f} MB"
-                        extra_files = (
-                            f" · +{len(current_files) - 1} ملفات"
-                            if len(current_files) > 1 else ""
-                        )
-                        info_html = (
-                            f'<div class="ejada-file-name" title="{file_name}">{file_name}</div>'
-                            f'<div class="ejada-file-size">{file_size}{extra_files}</div>'
-                        )
-                    else:
-                        info_html = (
-                            '<div class="ejada-no-file">📄 لم يتم رفع ملف</div>'
-                            '<div class="ejada-file-size">XLSX / CSV</div>'
-                        )
-                    st.markdown(
-                        '<div class="ejada-current-file-box">' + info_html + '</div>',
-                        unsafe_allow_html=True
-                    )
+                if current_files:
+                    st.button("×", key=f"small_clear_report_{selected_bank}_{page}",
+                              help="مسح الملف المرفوع", on_click=clear_report_page_file,
+                              args=(selected_bank, page))
 
         with title_col:
             if page == 'Promises':
@@ -10117,7 +10091,7 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
 # ==========================================
 if curr_page == 'Overview':
     st.markdown("""<style>
-[data-testid="stAppViewContainer"]{background:#f1f3f2!important}
+
 [data-testid="stMainBlockContainer"]{max-width:1460px;margin:auto}
 [data-testid="stVerticalBlockBorderWrapper"],[data-testid="stPlotlyChart"]{background:white;border-radius:22px;padding:10px}
 .kpi-grid-4{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;direction:rtl}
@@ -10125,8 +10099,8 @@ if curr_page == 'Overview':
 .kpi-grid-4 .kpi-card:first-child{background:#116044!important}
 .kpi-grid-4 .kpi-card:first-child *{color:white!important}
 .kpi-grid-4 .kpi-value{font-size:34px!important}
-.overview-title{direction:rtl;text-align:right;color:#162d25;font-size:32px;font-weight:750;margin:10px 0 14px}
-</style><div class="overview-title">نظرة عامة على التحصيل</div>""", unsafe_allow_html=True)
+.overview-title{direction:rtl;text-align:right;color:inherit;font-size:32px;font-weight:750;margin:10px 0 14px}
+</style><div class="overview-title" style="color:{label_color}">نظرة عامة على التحصيل</div>""".replace("{label_color}", label_color), unsafe_allow_html=True)
     st.caption(
         f"تقارير {BANKS[selected_bank]} — استخدمي «تغيير البنك» للعودة إلى الرئيسية."
     )
@@ -10134,93 +10108,28 @@ if curr_page == 'Overview':
     # Widgets live here only once. Their screen position is the earlier header.
     with _overview_upload_header:
         overview_versions = st.session_state.overview_uploader_versions[selected_bank]
-        # Three separate, equal-size upload panels aligned right in RTL.
-        upload_cols = st.columns([1, 1, 1, 2.7], gap='small')
-    
-        with upload_cols[0]:
-            with st.container(border=True, key='overview_activity_upload_card'):
-                st.markdown(
-                    f"<div style='text-align:center;font-weight:900;color:{label_color};"
-                    "font-size:14px;margin:0 0 3px;'>📈 1) تقرير النشاط</div>"
-                    "",
-                    unsafe_allow_html=True
+        fields = [('Activity', '📈 تقرير النشاط', ['xlsx', 'csv'])]
+        if selected_bank == 'STC':
+            fields.append(('ActivityModel', '🧩 موديل النشاط', ['xlsx']))
+        fields.append(('Promises', 'ارفعي المحفظة', ['xlsx', 'csv']))
+        upload_cols = st.columns([1] * len(fields) + [2.7], gap='small')
+        card_names = {'Activity': 'activity', 'ActivityModel': 'model', 'Promises': 'promises'}
+        for col, (kind, title, extensions) in zip(upload_cols, fields):
+            with col, st.container(border=True, key=f'overview_{card_names[kind]}_upload_card'):
+                st.markdown(f'<div style="text-align:center;font-weight:900;color:{label_color}">{title}</div>', unsafe_allow_html=True)
+                key = f"overview_file_{selected_bank}_{kind}_{overview_versions[kind]}"
+                st.file_uploader(
+                    title, type=extensions, accept_multiple_files=kind != 'ActivityModel',
+                    label_visibility='collapsed', key=key, on_change=save_uploaded_files,
+                    args=('overview_uploads', selected_bank, kind, key)
                 )
-                activity_widget_files = st.file_uploader(
-                    'ارفعي ملف تقرير النشاط في هذه الخانة',
-                    type=['xlsx', 'csv'],
-                    label_visibility='collapsed',
-                    accept_multiple_files=True,
-                    key=f"overview_activity_{selected_bank}_{overview_versions['Activity']}"
-                )
-                if activity_widget_files:
-                    st.session_state.overview_uploads[selected_bank]['Activity'] = activity_widget_files
-    
-                saved_activity_files = st.session_state.overview_uploads[selected_bank]['Activity']
-                if saved_activity_files:
-                    st.caption('المرفوع: ' + '، '.join(f.name for f in saved_activity_files))
-                    st.button(
-                        'مسح تقرير النشاط',
-                        key=f'clear_overview_activity_{selected_bank}',
-                        on_click=clear_overview_upload,
-                        args=(selected_bank, 'Activity')
-                    )
-                else:
-                    st.caption('لم يُرفع تقرير النشاط بعد.')
-    
-        with upload_cols[1]:
-            with st.container(border=True, key='overview_model_upload_card'):
-                st.markdown(
-                    f"<div style='text-align:center;font-weight:900;color:{label_color};"
-                    "font-size:14px;margin:0 0 3px;'>🧩 2) موديل النشاط</div>"
-                    "",
-                    unsafe_allow_html=True
-                )
-                activity_model_file = st.file_uploader(
-                    'ارفعي ملف موديل النشاط في هذه الخانة',
-                    type=['xlsx'],
-                    label_visibility='collapsed',
-                    accept_multiple_files=False,
-                    key=f"overview_activity_model_{selected_bank}_{overview_versions['ActivityModel']}"
-                )
-                if activity_model_file is not None:
-                    st.session_state.overview_uploads[selected_bank]['ActivityModel'] = activity_model_file
-    
-                saved_activity_model = st.session_state.overview_uploads[selected_bank].get('ActivityModel')
-                if saved_activity_model is not None:
-                    st.caption(f'الموديل المرفوع: {saved_activity_model.name}')
-                    st.button(
-                        'مسح موديل النشاط',
-                        key=f'clear_overview_activity_model_{selected_bank}',
-                        on_click=clear_overview_upload,
-                        args=(selected_bank, 'ActivityModel')
-                    )
-                else:
-                    st.caption('لم يُرفع موديل النشاط بعد.')
-    
-        # العمود الثاني: تقرير الوعود والإهمال.
-        with upload_cols[2]:
-            with st.container(border=True, key='overview_promises_upload_card'):
-                st.markdown(f"<div style='text-align:center;font-weight:900;color:{label_color};font-size:14px;margin-bottom:3px;'>ارفعي المحفظة</div>", unsafe_allow_html=True)
-                promises_widget_files = st.file_uploader(
-                    'ارفعي تقرير الوعود والإهمال هنا',
-                    type=['xlsx', 'csv'],
-                    label_visibility='collapsed',
-                    accept_multiple_files=True,
-                    key=f"overview_promises_{selected_bank}_{overview_versions['Promises']}"
-                )
-                if promises_widget_files:
-                    st.session_state.overview_uploads[selected_bank]['Promises'] = promises_widget_files
-                saved_promises_files = st.session_state.overview_uploads[selected_bank]['Promises']
-                if saved_promises_files:
-                    st.caption('الملفات المحفوظة: ' + '، '.join(f.name for f in saved_promises_files))
-                    st.button(
-                        'مسح تقرير الوعود والإهمال',
-                        key=f'clear_overview_promises_{selected_bank}',
-                        on_click=clear_overview_upload,
-                        args=(selected_bank, 'Promises')
-                    )
-                else:
-                    st.caption('لم يتم رفع تقرير الوعود والإهمال بعد.')
+                saved = st.session_state.overview_uploads[selected_bank][kind]
+                if saved:
+                    names = [saved.name] if kind == 'ActivityModel' else [file.name for file in saved]
+                    st.button('×', key=f'clear_overview_{kind}_{selected_bank}',
+                              help='مسح ' + '، '.join(names), on_click=clear_overview_upload,
+                              args=(selected_bank, kind))
+                    st.caption('، '.join(names))
 
     overview_activity_files = st.session_state.overview_uploads[selected_bank]['Activity']
     overview_promises_files = st.session_state.overview_uploads[selected_bank]['Promises']
@@ -10268,28 +10177,14 @@ if page_uploaded is None:
                 [1, 2.2, 2.2, 1], gap="large"
             )
             with snb_home_col:
-                st.markdown(
-                    '<div style="height:134px;display:flex;align-items:center;'
-                    'justify-content:center;background:white;border-radius:12px;">'
-                    '<img alt="شعار البنك الأهلي السعودي SNB" '
-                    'src="https://roshem.sa/photos/partners/1723882007.png" '
-                    'style="max-height:112px;max-width:92%;object-fit:contain;">'
-                    '</div>', unsafe_allow_html=True
-                )
+                st.markdown(bank_logo("SNB", "home"), unsafe_allow_html=True)
                 st.button(
                     "فتح تقارير البنك الأهلي SNB", key="home_open_bank_SNB",
                     use_container_width=True, type="primary",
                     on_click=open_bank_reports, args=("SNB",),
                 )
             with stc_home_col:
-                st.markdown(
-                    '<div style="height:134px;display:flex;align-items:center;'
-                    'justify-content:center;background:white;border-radius:12px;">'
-                    '<img alt="شعار بنك STC" '
-                    'src="https://mma.prnewswire.com/media/2379425/4631613/STC_Bank_Logo_Logo.jpg?p=publish" '
-                    'style="max-height:104px;max-width:92%;object-fit:contain;">'
-                    '</div>', unsafe_allow_html=True
-                )
+                st.markdown(bank_logo("STC", "home"), unsafe_allow_html=True)
                 st.button(
                     "فتح تقارير بنك STC", key="home_open_bank_STC",
                     use_container_width=True, type="primary",
@@ -10356,7 +10251,7 @@ if page_uploaded is None:
 
         # Legacy fallback: no encrypted model configured, allow a model upload
         # below the main header without moving the centred title.
-        if not _snb_secret_model_ready:
+        if selected_bank == "STC":
             model_col, _model_space = st.columns([1.8, 7.8], gap="small")
             with model_col:
                 with st.container(border=True, key="activity_model_upload_card"):
@@ -10403,7 +10298,7 @@ if page_uploaded is None:
                         "SNB", len(_waiting_data), None, None, len(_waiting_data)
                     )
                     st.caption(
-                        "حمّلي موديل النشاط لتحديد الناجحة وغير الناجحة "
+                        "راجعي إعداد الموديل المحفوظ للبنك لتحديد الناجحة وغير الناجحة "
                         "بدون تخمين."
                     )
                 except Exception as exc:
@@ -10598,83 +10493,43 @@ else:
             st.download_button(label="📥 تحميل التقرير الكامل.xlsx", data=report_bytes, file_name=f"{selected_bank}_Daily_Promises_Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
     elif curr_page == 'Promises':
-        tab_active, tab_broken = st.tabs([f"✅ الوعود القائمة ({active_count:,})", f"⚠️ الوعود المكسورة ({broken_count:,})"])
-        
-        with tab_active:
-            # Diagnostics and sheet details are displayed together below the KPIs.
+        with st.container(key="promise_comparison"):
+            active_col, broken_col = st.columns(2, gap="large")
+            with active_col:
+                render_promise_filter_diagnostics(selected_bank, "active")
+            with broken_col:
+                render_promise_filter_diagnostics(selected_bank, "broken")
+                if selected_bank == 'STC':
+                    stc_active_report = build_single_promise_report_xlsx(
+                        active_promises_df,
+                        report_kind='active',
+                        bank='STC'
+                    ).getvalue()
+                    stc_broken_report = build_single_promise_report_xlsx(
+                        broken_promises_df,
+                        report_kind='broken',
+                        bank='STC'
+                    ).getvalue()
 
-            st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
-
-            # Pivot removed: use the audited filter steps and underlying records.
-
-            # Matching horizontal cards: diagnostic on the right, sheet on the left.
-            with st.container(key=f"promise_details_row_{selected_bank}"):
-                diag_col, details_col = st.columns(
-                    [1.35, 2.10] if selected_bank == "STC" else [0.95, 2.45],
-                    gap='small', vertical_alignment='top'
-                )
-                with diag_col:
-                    render_promise_filter_diagnostics(selected_bank, 'active')
-                with details_col:
-                    with st.container(key=f"active_sheet_detail_{selected_bank}"):
-                        with st.expander(
-                            "📋 تفاصيل شيت الوعود القائمة",
-                            expanded=(selected_bank != 'STC')
-                        ):
-                            _expander_table(active_promises_df, "active_promises_df")
-            
-        with tab_broken:
-            # Mirror the active side-by-side layout; no second Pivot preview.
-            with st.container(key=f"promise_broken_details_row_{selected_bank}"):
-                diag_col, details_col = st.columns(
-                    [1.35, 2.10] if selected_bank == "STC" else [0.95, 2.45],
-                    gap="small", vertical_alignment="top"
-                )
-                with diag_col:
-                    render_promise_filter_diagnostics(selected_bank, "broken")
-                with details_col:
-                    with st.expander(
-                        "📋 تفاصيل شيت الوعود المكسورة", expanded=True
-                    ):
-                        _expander_table(broken_promises_df, "broken_promises_df")
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        if selected_bank == 'STC':
-            stc_active_report = build_single_promise_report_xlsx(
-                active_promises_df,
-                report_kind='active',
-                bank='STC'
-            ).getvalue()
-            stc_broken_report = build_single_promise_report_xlsx(
-                broken_promises_df,
-                report_kind='broken',
-                bank='STC'
-            ).getvalue()
-
-            with st.container(key="promise_downloads_STC"):
-                # Full-width RTL container: buttons stacked at the far right.
-                st.download_button(
-                    "📥 تحميل تقرير الوعود القائمة STC.xlsx",
-                    data=stc_active_report,
-                    file_name="STC_Active_Promises_Report.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="dl_stc_active_promises",
-                    use_container_width=False
-                )
-                st.download_button(
-                    "📥 تحميل تقرير الوعود المكسورة STC.xlsx",
-                    data=stc_broken_report,
-                    file_name="STC_Broken_Promises_Report.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="dl_stc_broken_promises",
-                    use_container_width=False
-                )
-        else:
-            with st.container(key="promise_downloads_SNB"):
-                _left_spacer, center_download, _right_spacer = st.columns(
-                    [1, 2.2, 1], gap='medium'
-                )
-                with center_download:
+                    with st.container(key="promise_downloads_STC"):
+                        # Full-width RTL container: buttons stacked at the far right.
+                        st.download_button(
+                            "📥 تحميل تقرير الوعود القائمة STC.xlsx",
+                            data=stc_active_report,
+                            file_name="STC_Active_Promises_Report.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key="dl_stc_active_promises",
+                            use_container_width=False
+                        )
+                        st.download_button(
+                            "📥 تحميل تقرير الوعود المكسورة STC.xlsx",
+                            data=stc_broken_report,
+                            file_name="STC_Broken_Promises_Report.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key="dl_stc_broken_promises",
+                            use_container_width=False
+                        )
+                else:
                     st.download_button(
                         "📥 تحميل الوعود القائمة والمكسورة (شيتان في ملف واحد)",
                         data=report_bytes,
@@ -10683,6 +10538,9 @@ else:
                         key=f"dl_promises_all_{selected_bank}",
                         use_container_width=False
                     )
+
+        with st.expander("📋 تفاصيل شيت الوعود القائمة", expanded=(selected_bank != "STC")):
+            _expander_table(active_promises_df, "active_promises_df")
 
     elif curr_page == 'Neglect':
         # The user's uploaded file determines ALL available Sub State options.
