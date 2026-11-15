@@ -1955,9 +1955,15 @@ st.markdown(f"""
     .st-key-promise_comparison {{margin-top:16px;}}
     .st-key-promise_comparison [data-testid="stExpander"] details[open] {{height:auto !important;max-height:none !important;overflow:visible !important;}}
     .st-key-promise_comparison table.ejada-diagnostic-table {{display:table !important;}}
-    .st-key-promise_comparison table.ejada-diagnostic-table :is(td, th) {{padding:6px 10px !important;line-height:1.4;}}
+    .st-key-promise_comparison table.ejada-diagnostic-table :is(td, th) {{padding:9px 10px !important;line-height:1.4;}}
     .stApp div[class*="st-key-uploaded_chip_"] {{min-height:40px !important;padding:6px 8px !important;align-items:center !important;}}
     .stApp div[class*="st-key-uploaded_chip_"] .uploaded-filename {{line-height:1.5;direction:ltr;text-align:left;}}
+    .stApp .st-key-bank_report_bar {{background:#fff;border-radius:18px;padding:12px 18px;}}
+    .stApp .st-key-report_pills {{direction:rtl;background:#f2f3f4;border-radius:28px;padding:4px;gap:3px !important;max-width:100%;}}
+    html body .stApp .st-key-report_pills [data-testid="stButton"] button[kind] {{background:transparent !important;border:1px solid transparent !important;box-shadow:none !important;border-radius:22px !important;padding:5px 14px !important;min-height:36px !important;}}
+    html body .stApp .st-key-report_pills [data-testid="stButton"] button[kind="primary"] {{background:#fff !important;border-color:#e0e2e4 !important;box-shadow:0 1px 3px #1f334518 !important;}}
+    html body .stApp .st-key-report_pills [data-testid="stButton"] button[kind] p {{color:#263745 !important;-webkit-text-fill-color:#263745 !important;font-size:15px !important;}}
+    html body .stApp .st-key-report_pills [data-testid="stButton"] button[kind="secondary"] p {{font-weight:500 !important;}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1968,12 +1974,6 @@ top_cols = st.columns([0.48, 1.55, 7.97], gap="small")
 
 with top_cols[0]:
     st.button("🌓", key="theme_toggle", on_click=toggle_theme, help=f"الثيم الحالي: {st.session_state.theme_choice} · اضغطي لتغيير اللون")
-
-with top_cols[1]:
-    if st.session_state.current_page != 'Home':
-        st.button("📊 Overview", key="top_overview_btn",
-                  type="primary" if st.session_state.current_page == 'Overview' else "secondary",
-                  use_container_width=False, on_click=set_page, args=('Overview',))
 
 # ==========================================
 # 1. الهيدر الرئيسي
@@ -1993,24 +1993,30 @@ st.markdown(f"""
 
 # Keep report navigation in the SAME row as SNB/STC, aligned to the top right.
 def _render_ejada_main_navigation():
-    with st.container(key="report_nav_group"):
-        st.button("🏠", key="nav_home_btn", type="primary" if st.session_state.current_page == 'Home' else "secondary", use_container_width=False, on_click=set_page, args=('Home',), help="الرئيسية")
-        st.button("🤝 الوعود القائمة والمكسورة", key="nav_prom_btn", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=False, on_click=set_page, args=('Promises',))
-        st.button("🚨", help="فتح تقرير الإهمال", key="nav_neg_btn", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=False, on_click=set_page, args=('Neglect',))
-        st.button("📈 النشاط", key="nav_act_btn", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=False, on_click=set_page, args=('Activity',))
+    pages = (
+        ("Overview", "نظرة عامة", "top_overview_btn"),
+        ("Promises", "الوعود القائمة والمكسورة", "nav_prom_btn"),
+        ("Neglect", "الإهمال", "nav_neg_btn"),
+        ("Activity", "النشاط", "nav_act_btn"),
+    )
+    with st.container(key="report_pills", horizontal=True, width="content", gap=None):
+        for page, label, key in pages:
+            st.button(label, key=key, width="content", on_click=set_page, args=(page,),
+                      type="primary" if st.session_state.current_page == page else "secondary")
 
 if st.session_state.current_page != 'Home':
     # A bank is selected on Home; its reports stay grouped behind that choice.
-    nav_col, bank_col = st.columns([4, 1.4], gap="small", vertical_alignment="center")
-    with bank_col, st.container(key="bank_switch", horizontal=True, gap=None,
-                                horizontal_alignment="left", vertical_alignment="center"):
-        bank = st.session_state.selected_bank
-        st.markdown(f'<span class="selected-bank {bank}" aria-label="البنك المختار {bank}">{bank}</span>',
-                    unsafe_allow_html=True, width="content")
-        st.button("تغيير البنك", key="ejada_change_bank_btn", width="content",
-                  on_click=set_page, args=("Home",))
-    with nav_col:
-        _render_ejada_main_navigation()
+    with st.container(key="bank_report_bar"):
+        nav_col, bank_col = st.columns([4, 1.4], gap="small", vertical_alignment="center")
+        with bank_col, st.container(key="bank_switch", horizontal=True, gap=None,
+                                    horizontal_alignment="left", vertical_alignment="center"):
+            bank = st.session_state.selected_bank
+            st.markdown(f'<span class="selected-bank {bank}" aria-label="البنك المختار {bank}">{bank}</span>',
+                        unsafe_allow_html=True, width="content")
+            st.button("تغيير البنك", key="ejada_change_bank_btn", width="content",
+                      on_click=set_page, args=("Home",))
+        with nav_col:
+            _render_ejada_main_navigation()
     if st.session_state.current_page == 'Overview':
         _overview_upload_header = st.container(key="overview_upload_header")
 else:
@@ -2054,7 +2060,7 @@ _BLANK_CLICK_SCRIPT = r"""
     const listener = e => {
       if (e.button !== 0 || !e.target || e.target.nodeType !== 1) return;
       if (e.target.closest(excluded) || !e.target.matches(empty)) return;
-      const home = doc.querySelector('div.st-key-nav_home_btn button');
+      const home = doc.querySelector('div.st-key-ejada_change_bank_btn button');
       if (home) home.click();
     };
     root.__ejadaBlankCloseHandler = listener;
