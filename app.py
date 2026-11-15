@@ -67,8 +67,6 @@ if 'current_page' not in st.session_state:
 if not st.session_state.get('_separate_home_overview_v1', False):
     st.session_state.current_page = 'Home'
     st.session_state['_separate_home_overview_v1'] = True
-if st.session_state.current_page == 'Neglect':
-    st.session_state.current_page = 'Overview'
 if 'theme_choice' not in st.session_state:
     st.session_state.theme_choice = 'ثيم إجادة (Navy)'
 if 'act_uploader_ver' not in st.session_state:
@@ -1992,6 +1990,7 @@ def _render_ejada_main_navigation():
     with st.container(key="report_nav_group"):
         st.button("🏠", key="nav_home_btn", type="primary" if st.session_state.current_page == 'Home' else "secondary", use_container_width=False, on_click=set_page, args=('Home',), help="الرئيسية")
         st.button("🤝 الوعود القائمة والمكسورة", key="nav_prom_btn", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=False, on_click=set_page, args=('Promises',))
+        st.button("🚨", help="فتح تقرير الإهمال", key="nav_neg_btn", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=False, on_click=set_page, args=('Neglect',))
         st.button("📈 النشاط", key="nav_act_btn", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=False, on_click=set_page, args=('Activity',))
 
 if st.session_state.current_page != 'Home':
@@ -10216,7 +10215,7 @@ if page_uploaded is None:
         st.markdown(f"""
         <div style="background-color:{card_color};border:1px solid {border_color};border-radius:15px;padding:22px 18px;margin:8px 0 18px;text-align:center;direction:rtl;">
             <h2 style="color:{text_color};margin:0 0 8px;font-weight:900;">📊 لوحة التحكم الرئيسية | EJADA Overview</h2>
-            <p style="color:{kpi_title_color};margin:0;font-weight:700;">اختاري البنك، ثم ارفعي تقرير النشاط وملف المحفظة لبناء لوحة المؤشرات.</p>
+            <p style="color:{kpi_title_color};margin:0;font-weight:700;">اختاري البنك، ثم ارفعي تقرير النشاط وتقرير الوعود والإهمال لبناء لوحة المؤشرات.</p>
         </div>
         """, unsafe_allow_html=True)
     elif curr_page == 'Activity':
@@ -10367,12 +10366,12 @@ else:
 
     if curr_page == 'Overview':
         st.markdown(f"<h2 style='text-align:center; margin:4px 0 0; color:{label_color}; font-weight:900;'>📊 لوحة القيادة الشاملة | {selected_bank}</h2>", unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align:center; color:{sub_text_color}; font-weight: bold; margin-bottom: 22px;'>ملخص المكالمات والوعود للبنك المختار</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align:center; color:{sub_text_color}; font-weight: bold; margin-bottom: 22px;'>ملخص المكالمات والوعود والإهمال للبنك المختار</p>", unsafe_allow_html=True)
 
         if not st.session_state.overview_uploads[selected_bank]['Activity']:
             st.warning('ارفعي تقرير النشاط لإظهار مؤشر إجمالي المكالمات ورسوم أداء المحصلين.')
         if not st.session_state.overview_uploads[selected_bank]['Promises']:
-            st.warning('ارفعي المحفظة لإظهار مؤشرات الوعود القائمة والمكسورة.')
+            st.warning('ارفعي تقرير الوعود والإهمال لإظهار مؤشرات الوعود القائمة والمكسورة والإهمال.')
 
         st.markdown(f"""
         <div class="kpi-grid-4">
@@ -10391,6 +10390,11 @@ else:
                 <div class="kpi-icon">⚠️</div>
                 <div class="kpi-title">الوعود المكسورة</div>
                 <div class="kpi-value">{broken_count:,}</div>
+            </div>
+            <div class="kpi-card" style="border-right-color:#99AABF;">
+                <div class="kpi-icon">🚨</div>
+                <div class="kpi-title">إجمالي الإهمال</div>
+                <div class="kpi-value">{neglect_count:,}</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -10454,31 +10458,63 @@ else:
                 else:
                     st.info('لا توجد بيانات وعود كافية لعرض توزيع الوعود.')
 
-        with st.container(border=True):
-            broken_collector_col = find_col_in(broken_promises_df, ['collecter', 'collector', 'المحصل', 'اسم المحصل', 'الموظف', 'user', 'agent'])
-            if broken_collector_col and not broken_promises_df.empty:
-                top_broken = broken_promises_df[broken_collector_col].dropna().astype(str).value_counts().head(10)
-                broken_labels = [_overview_clean_name(n) for n in top_broken.index]
-                fig_broken = go.Figure(go.Bar(
-                    x=top_broken.values, y=broken_labels, orientation='h',
-                    marker=dict(color='#586F8C', line=dict(width=0)),
-                    text=[f'<b>{int(v):,}</b>' for v in top_broken.values],
-                    textposition='outside', cliponaxis=False,
-                    textfont=dict(color='#1F4373', size=13, family='Tahoma')
-                ))
-                fig_broken.update_layout(
-                    title=dict(text='<b>أكثر المحصلين في الوعود المكسورة</b>', x=0.5, xanchor='center',
-                               font=dict(color='#1F4373', size=18, family='Tahoma')),
-                    paper_bgcolor='white', plot_bgcolor='white',
-                    font=dict(color='#1F4373', family='Tahoma'),
-                    height=max(350, len(top_broken) * 34 + 115),
-                    margin=dict(t=65, b=25, l=20, r=55), showlegend=False
-                )
-                fig_broken.update_xaxes(showticklabels=False, showgrid=False, zeroline=False, title='')
-                fig_broken.update_yaxes(autorange='reversed', showgrid=False, title='', tickfont=dict(size=12))
-                st.plotly_chart(fig_broken, use_container_width=True, config={'displayModeBar': False})
-            else:
-                st.info('لا توجد بيانات محصلين داخل تقرير الوعود المكسورة لعرض الرسم.')
+        overview_row2 = st.columns(2, gap='large')
+
+        with overview_row2[0]:
+            with st.container(border=True):
+                broken_collector_col = find_col_in(broken_promises_df, ['collecter', 'collector', 'المحصل', 'اسم المحصل', 'الموظف', 'user', 'agent'])
+                if broken_collector_col and not broken_promises_df.empty:
+                    top_broken = broken_promises_df[broken_collector_col].dropna().astype(str).value_counts().head(10)
+                    broken_labels = [_overview_clean_name(n) for n in top_broken.index]
+                    fig_broken = go.Figure(go.Bar(
+                        x=top_broken.values, y=broken_labels, orientation='h',
+                        marker=dict(color='#586F8C', line=dict(width=0)),
+                        text=[f'<b>{int(v):,}</b>' for v in top_broken.values],
+                        textposition='outside', cliponaxis=False,
+                        textfont=dict(color='#1F4373', size=13, family='Tahoma')
+                    ))
+                    fig_broken.update_layout(
+                        title=dict(text='<b>أكثر المحصلين في الوعود المكسورة</b>', x=0.5, xanchor='center',
+                                   font=dict(color='#1F4373', size=18, family='Tahoma')),
+                        paper_bgcolor='white', plot_bgcolor='white',
+                        font=dict(color='#1F4373', family='Tahoma'),
+                        height=max(350, len(top_broken) * 34 + 115),
+                        margin=dict(t=65, b=25, l=20, r=55), showlegend=False
+                    )
+                    fig_broken.update_xaxes(showticklabels=False, showgrid=False, zeroline=False, title='')
+                    fig_broken.update_yaxes(autorange='reversed', showgrid=False, title='', tickfont=dict(size=12))
+                    st.plotly_chart(fig_broken, use_container_width=True, config={'displayModeBar': False})
+                else:
+                    st.info('لا توجد بيانات محصلين داخل تقرير الوعود المكسورة لعرض الرسم.')
+
+        with overview_row2[1]:
+            with st.container(border=True):
+                neglect_group_col = find_col_in(neglect_df, ['Sub State', 'sub state', 'substate', 'الحالة الفرعية', 'حالة العميل'])
+                if not neglect_group_col:
+                    neglect_group_col = find_col_in(neglect_df, ['collecter', 'collector', 'المحصل', 'اسم المحصل', 'الموظف'])
+                if neglect_group_col and not neglect_df.empty:
+                    top_neglect = neglect_df[neglect_group_col].dropna().astype(str).value_counts().head(10)
+                    neglect_labels = [_overview_clean_name(n) for n in top_neglect.index]
+                    fig_neglect = go.Figure(go.Bar(
+                        x=top_neglect.values, y=neglect_labels, orientation='h',
+                        marker=dict(color='#000000', line=dict(color='rgba(0,0,0,0)', width=0)),
+                        text=[f'<b>{int(v):,}</b>' for v in top_neglect.values],
+                        textposition='outside', cliponaxis=False,
+                        textfont=dict(color='#1F4373', size=13, family='Tahoma')
+                    ))
+                    fig_neglect.update_layout(
+                        title=dict(text=f'<b>توزيع الإهمال حسب {neglect_group_col}</b>', x=0.5, xanchor='center',
+                                   font=dict(color='#1F4373', size=18, family='Tahoma')),
+                        paper_bgcolor='white', plot_bgcolor='white',
+                        font=dict(color='#1F4373', family='Tahoma'),
+                        height=max(350, len(top_neglect) * 34 + 115),
+                        margin=dict(t=65, b=25, l=20, r=55), showlegend=False
+                    )
+                    fig_neglect.update_xaxes(showticklabels=False, showgrid=False, zeroline=False, title='')
+                    fig_neglect.update_yaxes(autorange='reversed', showgrid=False, title='', tickfont=dict(size=12))
+                    st.plotly_chart(fig_neglect, use_container_width=True, config={'displayModeBar': False})
+                else:
+                    st.info('لا توجد بيانات كافية لعرض توزيع حالات الإهمال.')
 
         st.markdown("<br>", unsafe_allow_html=True)
         if report_bytes:
