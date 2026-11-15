@@ -6914,13 +6914,13 @@ def _stc_parse_activity_model(uploaded):
     invalid = 0
     for note, rating in zip(frame[note_col], frame[rating_col]):
         key = _snb_normalize_note(note)
-        value = str(rating).strip()
-        if value in ("0.0", "1.0", "5.0"):
+        value = str(rating).strip().translate(str.maketrans("٠١", "01"))
+        if value in ("0.0", "1.0"):
             value = value[0]
-        if not key or value not in ("0", "1", "5"):
+        if not key or value not in ("0", "1"):
             invalid += 1
             continue
-        score = 0 if value == "5" else int(value)
+        score = int(value)
         grouped.setdefault(key, {0: 0, 1: 0})[score] += 1
         labels.setdefault(key, str(note).strip())
     conflicts = {key: counts for key, counts in grouped.items()
@@ -6962,7 +6962,9 @@ def _stc_load_saved_activity_model():
         note = str(item.get("notes", "")).strip()
         key = _snb_normalize_note(note)
         rating = item.get("evaluation")
-        if key and type(rating) is int and rating in (0, 1):
+        if item.get("manual_review") is True:
+            rating = -1
+        if key and type(rating) is int and rating in (-1, 0, 1):
             if key in ratings and ratings[key] != rating:
                 raise ValueError("موديل STC الدائم يحتوي على تقييمين متعارضين.")
             ratings[key] = rating
@@ -6978,9 +6980,11 @@ def _stc_save_activity_model(additions, allow_overwrite=False):
     current, labels, sha = _stc_load_saved_activity_model()
     for note, rating in additions:
         key = _snb_normalize_note(note)
-        if not key or type(rating) is not int or rating not in (0, 1):
+        if not key or type(rating) is not int or rating not in (-1, 0, 1):
             raise ValueError("إفادة أو تقييم STC غير صالح.")
-        if key in current and current[key] != rating and not allow_overwrite:
+        if current.get(key) == -1:
+            continue
+        if key in current and rating != -1 and current[key] != rating and not allow_overwrite:
             raise ValueError(
                 "فيه إفادة محفوظة بتقييم مختلف. فعّلي الموافقة على الاستبدال."
             )
@@ -6990,7 +6994,8 @@ def _stc_save_activity_model(additions, allow_overwrite=False):
     document = {
         "schema_version": 1, "bank": "STC",
         "entries": [
-            {"notes": labels[key], "evaluation": current[key]}
+            ({"notes": labels[key], "manual_review": True} if current[key] == -1
+             else {"notes": labels[key], "evaluation": current[key]})
             for key in sorted(current)
         ]
     }
@@ -7013,6 +7018,10 @@ def _stc_save_activity_model(additions, allow_overwrite=False):
 
 def _stc_render_model_setup(uploaded, model_info, saved_ratings):
     """Allow one-time secure import, including manual resolution of model conflicts."""
+    with st.expander("صيغة ملف موديل STC"):
+        st.caption("اكتبي نص الإفادة في Notes والتقييم في التقييم: 1 للمكالمة الناجحة و0 لغير الناجحة.")
+        _stc_download({"موديل STC": pd.DataFrame(columns=["Notes", "التقييم"])},
+                      "تحميل قالب موديل STC", "STC_Activity_Model_Template.xlsx")
     if uploaded is None:
         if saved_ratings:
             st.success(
@@ -7048,21 +7057,8 @@ def _stc_render_model_setup(uploaded, model_info, saved_ratings):
         if not _snb_secret("GITHUB_TOKEN"):
             st.warning("لازم إعداد GITHUB_TOKEN في Streamlit Secrets.")
         with st.form("stc_model_import_form"):
-            decisions = {}
-            for ix, (key, counts) in enumerate(sorted(conflicts.items())):
-                note = model_info["labels"][key]
-                choice = st.selectbox(
-                    f"إفادة بتقييمين: {note[:120]} — "
-                    "اختاري التقييم الصحيح (1 = ناجحة، 0 = غير ناجحة)",
-                    ["اختاري التقييم", "ناجحة (1)", "غير ناجحة (0)"],
-                    key=f"stc_conflict_{ix}",
-                    help=(
-                        f"عدد مرات ظهور التقييم 1: {counts[1]}، "
-                        f"وعدد مرات ظهور التقييم 0: {counts[0]}. "
-                        "الأعداد دي تكرار الإفادة في الملف، مش رقم التقييم."
-                    ),
-                )
-                decisions[key] = choice
+            if conflicts:
+                st.info("الإفادات ذات التقييمات المتعارضة هتفضل للمراجعة لكل مكالمة.")
             overwrite = st.checkbox(
                 "أوافق على استبدال تقييم STC القديم عند اختلافه",
                 value=False,
@@ -7074,24 +7070,16 @@ def _stc_render_model_setup(uploaded, model_info, saved_ratings):
         if submit:
             configured = _snb_model_git_settings()
             if not configured["admin_password"] or not hmac.compare_digest(
-                password, configured["admin_password"]
+                password.encode(), configured["admin_password"].encode()
             ):
                 st.error("كلمة مرور إدارة الموديل غير صحيحة أو غير مُعدّة.")
-                return
-            unresolved = [key for key, val in decisions.items()
-                          if val == "اختاري التقييم"]
-            if unresolved:
-                st.error(
-                    f"راجعي {len(unresolved)} إفادة ذات تقييم متعارض أولًا."
-                )
                 return
             additions = [
                 (model_info["labels"][key], value)
                 for key, value in model_info["ratings"].items()
             ]
             additions.extend(
-                (model_info["labels"][key], 1 if choice == "ناجحة (1)" else 0)
-                for key, choice in decisions.items()
+                (model_info["labels"][key], -1) for key in conflicts
             )
             try:
                 total = _stc_save_activity_model(
@@ -8845,15 +8833,11 @@ def _stc_prepare_activity_data(uploaded):
     collector = _snb_find_column(
         frame, "Collector", "Collecter", "المحصل", "Agent"
     )
-    debtor = _snb_find_column(
-        frame, "Debitor", "Debtor", "ID Numer", "ID Number", "ID",
-        "رقم العميل", "رقم الهوية"
-    )
-    original_count = len(frame)
-    if collector is not None and debtor is not None:
-        frame = frame.drop_duplicates(
-            subset=[debtor, notes_col, collector], keep="first"
-        ).copy()
+    identity = _snb_find_column(frame, "رقم هوية العميل", "رقم الهوية", "هوية العميل",
+                                "National ID", "National ID Number", "Identity Number",
+                                "ID Number", "ID Numer", "ID", "Debitor", "Debtor")
+    if collector is None or identity is None:
+        raise ValueError("ملف النشاط محتاج عمود المحصل وعمود رقم هوية العميل.")
     date_col = _snb_find_column(
         frame, "Created on", "Created On", "CreatedOn",
         "التاريخ", "Date"
@@ -8870,252 +8854,338 @@ def _stc_prepare_activity_data(uploaded):
                     parsed = mixed
             except (TypeError, ValueError):
                 pass
-    return frame, notes_col, date_col, parsed, original_count - len(frame)
+    if parsed is None or parsed.isna().any() or parsed.empty:
+        raise ValueError("راجعي عمود Created On. كل مكالمة محتاجة تاريخ ووقت صالحين.")
+    if frame[collector].fillna("").str.strip().eq("").any():
+        raise ValueError("فيه مكالمات من غير اسم محصل. كمّلي الاسم لحساب المدة والترتيب.")
+    return frame, notes_col, collector, identity, parsed
 
 
-def _stc_status_to_rating(value):
-    """Only treat explicit 0/1/5 or success/failure text as evaluations."""
-    text_value = str(value).strip().casefold()
-    if text_value in ("1", "1.0", "ناجحة", "ناجح", "successful", "success"):
-        return 1
-    if text_value in (
-        "0", "0.0", "5", "5.0", "غير ناجحة", "غير ناجح",
-        "unsuccessful", "failed", "failure"
-    ):
-        return 0
-    return None
+def _activity_week_start(stamps, short):
+    start = 6 if short else 5  # Monday = 0.
+    return stamps.dt.normalize() - pd.to_timedelta((stamps.dt.weekday - start) % 7, unit="D")
 
 
-def render_stc_activity_report(model_upload, activity_upload,
-                               activity_kind="تلقائي", error_slot=None):
-    """Independent STC model setup, review, call classifications and export."""
-    try:
-        uploaded_model = _stc_parse_activity_model(model_upload)
-        saved_mapping, _, saved_sha = _stc_load_saved_activity_model()
-    except Exception as exc:
-        if error_slot is not None:
-            error_slot.error(f"تعذّر تحميل موديل STC: {exc}")
+def _activity_week_choice(stamps, key, monthly=False):
+    choice = st.selectbox("أيام الأسبوع", ["من السبت للجمعة", "من الأحد للخميس"],
+                          index=None, placeholder="اختاري أيام الأسبوع", key="week_" + key)
+    if choice is None:
+        return None, None
+    short = choice == "من الأحد للخميس"
+    starts = _activity_week_start(stamps, short)
+    valid = stamps.notna()
+    if short:
+        valid &= ~stamps.dt.weekday.isin([4, 5])
+    if not monthly and valid.any():
+        weeks = sorted(starts[valid].unique(), reverse=True)
+        week = st.selectbox("الأسبوع", weeks, format_func=lambda d: str(pd.Timestamp(d).date()),
+                            key="week_start_" + key) if len(weeks) > 1 else weeks[0]
+        valid &= starts.eq(week)
+    return valid, starts
+
+
+def _stc_duplicate_review(frame, notes, collector, identity, stamps, eligible, prefix):
+    # Review whole groups before applying the shift, including out-of-period alternatives.
+    keys = pd.DataFrame({"هوية": frame[identity].fillna("").str.strip(),
+                         "محصل": frame[collector].str.strip(),
+                         "إفادة": frame[notes].map(_snb_normalize_note),
+                         "يوم": stamps.dt.date})
+    repeated = keys.duplicated(keep=False) & keys["هوية"].ne("") & keys["إفادة"].ne("")
+    keep = eligible.copy()
+    approvals = st.session_state.setdefault("stc_duplicates_" + prefix, {})
+    pending = 0
+    for _, rows in keys[repeated].groupby(list(keys), sort=False):
+        ids = stamps.loc[rows.index].sort_values(kind="stable").index.tolist()
+        if not eligible.loc[ids].any():
+            continue
+        key = str(ids[0])
+        chosen = approvals.get(key)
+        with st.expander(f"تكرار · {rows.iloc[0]['محصل']} · {rows.iloc[0]['يوم']} · صف {ids[0]+2}",
+                         expanded=chosen is None):
+            view = frame.loc[ids, [identity, collector, notes]].copy()
+            view["الوقت"] = stamps.loc[ids].dt.strftime("%I:%M %p")
+            view["النطاق"] = eligible.loc[ids].map({True:"داخل الفترة", False:"خارج الفترة المختارة"})
+            view.insert(0, "صف الملف", [i+2 for i in ids])
+            st.dataframe(view, hide_index=True)
+            pick = st.selectbox("التسجيل المعتمد", ids, format_func=lambda i: f"صف {i+2}",
+                                key=f"pick_{prefix}_{key}")
+            if st.button("اعتماد التسجيل", key=f"approve_{prefix}_{key}"):
+                chosen = approvals[key] = pick
+            if chosen is not None:
+                st.caption(f"التسجيل المعتمد: صف {chosen+2}")
+        keep.loc[ids] = False
+        if chosen is None:
+            pending += 1
         else:
-            st.error(f"تعذّر تحميل موديل STC: {exc}")
+            keep.loc[chosen] = eligible.loc[chosen]
+    if pending:
+        st.info(f"راجعي مجموعات التكرار المتبقية قبل الحساب: {pending}")
+        return None
+    return keep
+
+
+def _stc_model_choices(frame, notes, collector, identity, stamps, mapping, labels, prefix):
+    keys = frame[notes].map(_snb_normalize_note)
+    manual = st.session_state.setdefault("stc_ratings_" + prefix, {})
+    needs = (~keys.map(mapping).isin([0, 1]) |
+             keys.str.contains(r"(?<!\w)(?:تم|معالج)(?!\w)|/", regex=True))
+    pending = frame.index[needs & ~frame.index.isin(manual)]
+    if len(pending):
+        names = {0: "غير ناجحة", 1: "ناجحة"}
+        known = [k for k,v in mapping.items() if v in names]
+        suggestions = {k: _snb_model_similarity(k, known) for k in keys.loc[pending].unique()}
+        rows = []
+        for i in pending:
+            percent, near = suggestions[keys[i]]
+            rows.append({"صف الملف": i+2, "المحصل": frame.at[i, collector],
+                         "رقم الهوية": frame.at[i, identity], "وقت المكالمة": stamps[i],
+                         "الإفادة": frame.at[i, notes], "أقرب إفادة": labels.get(near, near),
+                         "نسبة التشابه": percent, "التقييم المقترح": names.get(mapping.get(near), ""),
+                         "تقييم المكالمة": None})
+        with st.form("stc_call_form_" + prefix):
+            data = pd.DataFrame(rows)
+            edited = st.data_editor(data, hide_index=True, disabled=list(data.columns[:-1]),
+                                    column_config={"تقييم المكالمة": st.column_config.SelectboxColumn(
+                                        options=list(names.values()))},
+                                    key=f"stc_ed_{prefix}_{hash(tuple(pending))}")
+            if st.form_submit_button("اعتماد تقييم المكالمات"):
+                for row_id, rating in zip(edited["صف الملف"], edited["تقييم المكالمة"]):
+                    if rating in names.values():
+                        manual[int(row_id)-2] = int(rating == "ناجحة")
+                st.rerun()
+        st.info("اعتمدي تقييم كل مكالمة قبل تنزيل التقرير.")
+        return None
+    return pd.Series([manual[i] if i in manual else mapping[keys[i]] for i in frame.index],
+                     index=frame.index, dtype=int)
+
+
+def _stc_offer_model_save(source, notes, manual, mapping, prefix):
+    by_note = {}
+    for i, value in manual.items():
+        note = _snb_normalize_note(source.at[i, notes])
+        if note:
+            by_note.setdefault(note, set()).add(value)
+    candidates = {}
+    for note, values in by_note.items():
+        previous = mapping.get(note)
+        if previous == -1:
+            continue
+        if previous is not None:
+            values.add(previous)
+        rating = next(iter(values)) if len(values) == 1 else -1
+        if rating != previous:
+            candidates[note] = rating
+    if not candidates:
         return
+    token = hashlib.sha256(repr(sorted(candidates.items())).encode()).hexdigest()[:12]
+    scope = prefix + token
+    with st.expander("إضافة الإفادات المعتمدة لموديل STC"):
+        if -1 in candidates.values():
+            st.caption("الإفادة اللي ليها تقييمين مختلفين احفظيها بحالة «مراجعة يدوية كل مرة» علشان تتراجع في كل ملف جديد.")
+        select_all = st.session_state.get("bulk_" + scope, 0)
+        with st.container(horizontal=True, vertical_alignment="center", gap="small"):
+            st.markdown("**إضافة للموديل**", width="content")
+            with st.popover("⋮", help="خيارات إضافة للموديل"):
+                if st.button("تحديد الكل · Select All", key="all_" + scope):
+                    select_all += 1
+                    st.session_state["bulk_" + scope] = select_all
+        items = pd.DataFrame({"إضافة للموديل": bool(select_all), "الإفادة": list(candidates),
+                              "قرار الموديل": [{-1:"مراجعة يدوية كل مرة", 1:"ناجحة", 0:"غير ناجحة"}[v]
+                                               for v in candidates.values()]})
+        with st.form("stc_save_" + scope):
+            selected = st.data_editor(items, hide_index=True, disabled=["الإفادة", "قرار الموديل"],
+                                      key=f"stc_add_{scope}_{select_all}")
+            password = st.text_input("كلمة مرور إدارة موديل STC", type="password")
+            if st.form_submit_button("حفظ في موديل STC"):
+                secret = _snb_model_git_settings()["admin_password"]
+                if not secret or not hmac.compare_digest(password.encode(), secret.encode()):
+                    st.error("راجعي كلمة مرور إدارة الموديل.")
+                else:
+                    additions = [(note, candidates[note]) for note in
+                                 selected.loc[selected["إضافة للموديل"], "الإفادة"]]
+                    if not additions:
+                        st.info("اختاري الإفادات المراد حفظها أولًا.")
+                    if additions:
+                        try:
+                            _stc_save_activity_model(additions)
+                        except (ValueError, RuntimeError) as exc:
+                            st.error(str(exc))
+                        else:
+                            st.session_state["stc_model_last_save_notice"] = "تم حفظ تحديث موديل STC."
+                            st.rerun()
 
-    saved_notice = st.session_state.pop("stc_model_last_save_notice", None)
-    if saved_notice:
-        st.success(saved_notice)
-    # Outer container, not an expander: the setup function has its own
-    # collapsible import section (Streamlit disallows nested expanders).
-    with st.container(border=True):
-        _stc_render_model_setup(model_upload, uploaded_model, saved_mapping)
 
-    # Stored ratings take priority over an uploaded baseline, so explicit
-    # administrative corrections are not silently undone by a stale file.
-    mapping = dict(uploaded_model["ratings"])
-    mapping.update(saved_mapping)
-    for key in uploaded_model["conflicts"]:
-        if key not in saved_mapping:
-            mapping.pop(key, None)
+def _stc_metrics(frame, collector, stamps, ratings):
+    result = frame.loc[stamps.loc[frame.index].sort_values(kind="stable").index].copy()
+    now = stamps.loc[result.index]
+    days = now.dt.normalize()
+    prev = now.groupby([result[collector], days]).shift()
+    start, end = days + pd.Timedelta(hours=14), days + pd.Timedelta(hours=14, minutes=45)
+    overlap = (now.clip(upper=end) - prev.clip(lower=start)).dt.total_seconds().clip(lower=0)
+    duration = ((now-prev).dt.total_seconds()-overlap).fillna(0)/60
+    result["التاريخ"] = now.dt.date
+    result["الوقت"] = now.dt.strftime("%I:%M %p")
+    result["تقييم المكالمات"] = ratings.map({1:"ناجحة", 0:"غير ناجحة"})
+    result["مدة المكالمة بالدقائق"] = duration
+    result["الوقت المهدر بالدقائق"] = (duration-7).clip(lower=0)
+    return result
 
+
+def _stc_summary(result, groups):
+    agg = result.groupby(groups, sort=True).agg(**{
+        "المكالمات المغطاة": ("تقييم المكالمات","size"),
+        "ناجحة": ("تقييم المكالمات",lambda v: v.eq("ناجحة").sum()),
+        "غير ناجحة": ("تقييم المكالمات",lambda v: v.eq("غير ناجحة").sum()),
+        "الوقت المهدر بالدقائق": ("الوقت المهدر بالدقائق","sum")})
+    return agg.reset_index()
+
+
+def _stc_download(sheets, title, filename):
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        for name, data in sheets.items():
+            data.to_excel(writer, sheet_name=name, index=False)
+        _style_snb_activity_workbook(writer.book)
+    st.download_button(title, buf.getvalue(), file_name=filename,
+                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+def _stc_dashboard(summary, collector, scope):
+    if not _ejada_activity_dashboard_is_open("STC"):
+        return
+    total = int(summary["المكالمات المغطاة"].sum())
+    good = int(summary["ناجحة"].sum())
+    fragment, document = _activity_dashboard_html("STC", total, good, total-good, 0, scope)
+    charts = []
+    for metric, title in [("ناجحة","المكالمات الناجحة لكل محصل"),
+                          ("المكالمات المغطاة","المكالمات المغطاة لكل محصل")]:
+        bars = []
+        maximum = max(1, summary[metric].max())
+        for _, row in summary.sort_values(metric, ascending=False, kind="stable").iterrows():
+            value = int(row[metric])
+            bars.append(f'<div class="ea-row"><span>{_xml_escape(str(row[collector]))}</span>'
+                        f'<b>{value:,}</b></div><div class="ea-track"><i style="width:'
+                        f'{100*value/maximum:.3f}%;background:#1f4373"></i></div>')
+        charts.append(f'<section class="ea-dashboard"><h3>{title}</h3>{"".join(bars)}</section>')
+    extra = "".join(charts)
+    st.html(fragment + extra)
+    st.download_button("تحميل داشبورد النشاط HTML", document.replace("</body>",extra+"</body>"),
+                       file_name="STC_Activity_Dashboard.html", mime="text/html", key="activity_html_STC")
+
+
+def render_stc_activity_report(model_upload, activity_upload, activity_kind="تلقائي",
+                               error_slot=None, shift_selector=None):
+    try:
+        model = _stc_parse_activity_model(model_upload)
+        saved, labels, _ = _stc_load_saved_activity_model()
+    except (RuntimeError, ValueError, OSError) as exc:
+        st.error(f"تعذر تحميل موديل STC: {exc}")
+        return
+    notice = st.session_state.pop("stc_model_last_save_notice", None)
+    if notice:
+        st.success(notice)
+    _stc_render_model_setup(model_upload, model, saved)
+    mapping = {**model["ratings"], **saved}
+    # An uploaded conflict remains manual even if a previous import rated the note.
+    mapping.update(dict.fromkeys(model["conflicts"], -1))
+    labels = {**model["labels"], **labels}
     if activity_upload is None:
         return
     if not mapping:
-        st.warning("ارفعي موديل STC أو احفظيه أولًا قبل تقييم مكالمات البنك.")
+        st.info("ارفعي موديل STC بعمود Notes وعمود التقييم (١ أو ٠).")
         return
-
     try:
-        frame, notes_col, date_col, parsed, removed = _stc_prepare_activity_data(
-            activity_upload
-        )
+        source, notes, collector, identity, stamps = _stc_prepare_activity_data(activity_upload)
     except Exception as exc:
-        if error_slot is not None:
-            error_slot.error(f"تعذّر قراءة نشاط STC: {exc}")
-        else:
-            st.error(f"تعذّر قراءة نشاط STC: {exc}")
+        st.error(f"تعذر تجهيز ملف STC: {exc}")
         return
+    digest = hashlib.sha256(activity_upload.getvalue()).hexdigest()[:20]
+    version = st.session_state.activity_upload_versions["STC"]["activity"]
+    key = f"stc_{digest}_{version}"
+    kind = _activity_period(stamps)[0] if activity_kind == "تلقائي" else activity_kind
+    day = stamps.dt.normalize()
+    first = False
+    starts = weekly_mask = None
+    if kind == "يومي":
+        dates = sorted(day.unique(), reverse=True)
+        report_day = st.selectbox("تاريخ النشاط", dates, format_func=lambda d: str(pd.Timestamp(d).date()),
+                                  key="day_"+key) if len(dates)>1 else dates[0]
+        eligible = day.eq(report_day)
+        slot = shift_selector if shift_selector is not None else st
+        shift = slot.selectbox("فترة التقرير", ["الفترة الأولى","اليوم كله"], index=None,
+                               placeholder="اختاري فترة التقرير", key="shift_"+key)
+        if shift is None:
+            return
+        first = shift == "الفترة الأولى"
+        scope = f"{shift} · {pd.Timestamp(report_day).date()}"
+        if first:
+            offset = stamps - day
+            extra = offset.gt(pd.Timedelta(hours=14))
+            include_extra = False
+            if (eligible & extra).any():
+                answer = st.radio("فيه مكالمات بعد ٢ الظهر. تحبي تحسبيها؟", ["احسبيها","استبعديها"],
+                                  index=None, horizontal=True, key=f"extra_{key}_{report_day}")
+                if answer is None:
+                    return
+                include_extra = answer == "احسبيها"
+            last = st.checkbox("استبعاد آخر ساعة من الفترة (١–٢ الظهر)", key="last_"+key)
+            within = offset.between(pd.Timedelta(hours=7), pd.Timedelta(hours=14))
+            if last:
+                within &= offset.lt(pd.Timedelta(hours=13))
+            eligible &= within | (extra & include_extra)
+    elif kind == "أسبوعي":
+        eligible, starts = _activity_week_choice(stamps, key)
+        if eligible is None:
+            return
+        scope = f"أسبوعي · {day[eligible].min():%Y-%m-%d} – {day[eligible].max():%Y-%m-%d}" if eligible.any() else "أسبوعي"
+    else:
+        months = stamps.dt.to_period("M")
+        options = sorted(months.unique(), reverse=True)
+        month = st.selectbox("الشهر", options,format_func=str,key="month_"+key) if len(options)>1 else options[0]
+        eligible = months.eq(month)
+        weekly_mask, starts = _activity_week_choice(stamps, key+"_month", monthly=True)
+        if weekly_mask is None:
+            return
+        scope = f"شهري · {month}"
+    if not eligible.any():
+        st.info("مفيش مكالمات في النطاق المختار.")
+        return
+    # Separate approval state for each scope so excluded choices are visible for review.
+    scope_key = key + hashlib.sha256(eligible.to_numpy().tobytes()).hexdigest()[:12]
+    keep = _stc_duplicate_review(source, notes, collector, identity, stamps, eligible, scope_key)
+    if keep is None:
+        return
+    frame = source.loc[keep].copy()
     if frame.empty:
-        st.warning("ملف نشاط STC خالٍ من المكالمات.")
+        st.info("مفيش مكالمات محتسبة بعد مراجعة التكرار.")
         return
-
-    effective_kind = activity_kind
-    if effective_kind == "تلقائي" and parsed is not None:
-        effective_kind, message = _activity_period(parsed)
-        st.info(message)
-    if parsed is not None and parsed.notna().any():
-        date_end = parsed.max().normalize()
-        if effective_kind == "يومي":
-            take = parsed.dt.normalize().eq(date_end)
-        elif effective_kind == "أسبوعي":
-            take = parsed.ge(date_end - pd.Timedelta(days=6))
-        elif effective_kind == "شهري":
-            take = parsed.ge(date_end - pd.Timedelta(days=29))
-        else:
-            take = pd.Series(True, index=frame.index)
-        frame = frame.loc[take].copy()
-    if frame.empty:
-        st.info("لا توجد مكالمات STC في الفترة المحددة.")
+    model_key = hashlib.sha256(model_upload.getvalue()).hexdigest()[:12] if model_upload else "saved"
+    review_key = key + model_key
+    ratings = _stc_model_choices(frame, notes, collector, identity, stamps, mapping, labels, review_key)
+    if ratings is None:
         return
-
-    raw_keys = frame[notes_col].map(_snb_normalize_note)
-    ratings = raw_keys.map(mapping)
-    explicit_col = _snb_find_column(
-        frame, "تقييم المكالمات", "Call Status", "Evaluation",
-        "Call Result", "Result"
-    )
-    if explicit_col is not None:
-        explicit = frame[explicit_col].map(_stc_status_to_rating)
-        # Existing explicit call evaluation applies only where the model
-        # has no approved evaluation; unknowns are never guessed.
-        ratings = ratings.combine_first(explicit)
-
-    digest = hashlib.sha256(activity_upload.getvalue()).hexdigest()
-    stored = st.session_state.get("stc_activity_manual_reviews")
-    if not isinstance(stored, dict) or stored.get("digest") != digest:
-        stored = {"digest": digest, "ratings": {}}
-        st.session_state["stc_activity_manual_reviews"] = stored
-    manual = stored["ratings"]
-    ratings = ratings.combine_first(raw_keys.map(manual))
-
-    unreviewed_keys = [
-        key for key in raw_keys.unique()
-        if key not in mapping and key not in manual
-        and pd.isna(ratings.loc[raw_keys.eq(key)]).any()
-    ]
-    if unreviewed_keys:
-        counts = raw_keys.value_counts()
-        display_notes = (
-            pd.DataFrame({
-                "key": raw_keys,
-                "note": frame[notes_col].fillna("").astype(str)
-            }).drop_duplicates("key").set_index("key")["note"].to_dict()
-        )
-        pending = sorted(unreviewed_keys,
-                         key=lambda key: (-counts.get(key, 0), key))
-        with st.expander(
-            f"📋 مراجعة إفادات STC غير الموجودة بالموديل ({len(pending):,})",
-            expanded=True,
-        ):
-            st.warning(
-                "حددي نجاح أو فشل كل إفادة جديدة قبل اعتماد التقرير. "
-                "التقييمات دي مستقلة عن موديل SNB."
-            )
-            data = pd.DataFrame([
-                {
-                    "الإفادة": display_notes.get(key, "") or "(إفادة فارغة)",
-                    "عدد المكالمات": int(counts.get(key, 0)),
-                    "التقييم": "اختاري التقييم",
-                }
-                for key in pending
-            ])
-            with st.form("stc_new_call_notes_review_form"):
-                edited = st.data_editor(
-                    data, hide_index=True, use_container_width=True,
-                    disabled=["الإفادة", "عدد المكالمات"],
-                    column_config={
-                        "التقييم": st.column_config.SelectboxColumn(
-                            "تقييم الإفادة",
-                            options=["اختاري التقييم", "ناجحة", "غير ناجحة"],
-                            required=True,
-                        )
-                    },
-                    key="stc_new_notes_review_editor",
-                )
-                approved = st.form_submit_button(
-                    "✅ اعتماد تقييم الإفادات في STC"
-                )
-            if approved:
-                for index, row in edited.iterrows():
-                    if row["التقييم"] in ("ناجحة", "غير ناجحة"):
-                        manual[pending[index]] = (
-                            1 if row["التقييم"] == "ناجحة" else 0
-                        )
-                st.rerun()
-
-    # Re-evaluate after the user approves new Notes; keep already-rated
-    # calls from an explicit source status intact.
-    ratings = raw_keys.map(mapping)
-    if explicit_col is not None:
-        ratings = ratings.combine_first(
-            frame[explicit_col].map(_stc_status_to_rating)
-        )
-    ratings = ratings.combine_first(raw_keys.map(manual))
-    good = int((ratings == 1).sum())
-    bad = int((ratings == 0).sum())
-    unknown = int(len(frame) - good - bad)
-    if _ejada_activity_dashboard_is_open("STC"):
-        scope = effective_kind if effective_kind and effective_kind != "تلقائي" else "الملف المرفوع"
-        dates = parsed.reindex(frame.index).dropna() if parsed is not None else pd.Series(dtype="datetime64[ns]")
-        if not dates.empty:
-            scope += f" | {dates.min():%Y-%m-%d} – {dates.max():%Y-%m-%d}"
-        _ejada_activity_kpis("STC", len(frame), good, bad, unknown, period=scope)
-    st.caption(
-        f"STC | مكالمات الفترة: {len(frame):,} | ناجحة: {good:,} | "
-        f"غير ناجحة: {bad:,} | تحتاج مراجعة: {unknown:,} | "
-        f"التكرارات المحذوفة: {removed:,}"
-    )
-    result = frame.drop(columns=["تقييم المكالمات"], errors="ignore").copy()
-    position = result.columns.get_loc(notes_col) + 1
-    result.insert(
-        position, "تقييم المكالمات",
-        ratings.map({1: "ناجحة", 0: "غير ناجحة"}).fillna("تحتاج مراجعة")
-    )
-    st.dataframe(result, use_container_width=True, hide_index=True, height=420)
-    if unknown:
-        st.info(
-            f"لا يمكن تنزيل تقرير STC النهائي قبل مراجعة {unknown:,} مكالمة."
-        )
-        return
-
-    new_approved = [
-        (key, int(value)) for key, value in manual.items()
-        if key and key not in saved_mapping and value in (0, 1)
-    ]
-    if new_approved:
-        with st.expander("💾 حفظ الإفادات الجديدة في موديل STC", expanded=False):
-            st.caption(
-                f"يوجد {len(new_approved):,} إفادة معتمدة في الجلسة الحالية "
-                "ويمكن إضافتها للموديل الدائم دون التأثير على SNB."
-            )
-            with st.form("stc_save_new_approved_form"):
-                password = st.text_input(
-                    "كلمة مرور إدارة موديل STC", type="password"
-                )
-                save_new = st.form_submit_button(
-                    "💾 حفظ الإفادات المعتمدة"
-                )
-            if save_new:
-                settings = _snb_model_git_settings()
-                if not settings["admin_password"] or not hmac.compare_digest(
-                    password, settings["admin_password"]
-                ):
-                    st.error("كلمة مرور الموديل غير صحيحة.")
-                else:
-                    labels = (
-                        pd.DataFrame({
-                            "key": raw_keys, "note": frame[notes_col]
-                        }).drop_duplicates("key").set_index("key")["note"].to_dict()
-                    )
-                    try:
-                        total = _stc_save_activity_model([
-                            (labels[key], rating)
-                            for key, rating in new_approved
-                        ])
-                        st.session_state["stc_model_last_save_notice"] = (
-                            f"تم تحديث موديل STC المستقل: {total:,} إفادة."
-                        )
-                        st.rerun()
-                    except (ValueError, RuntimeError) as exc:
-                        st.error(f"لم يتم حفظ الإفادات: {exc}")
-
-    export = io.BytesIO()
-    with pd.ExcelWriter(export, engine="openpyxl") as writer:
-        result.to_excel(writer, sheet_name="STC_Activity", index=False)
-        _style_snb_activity_workbook(writer.book)
-    st.download_button(
-        "📥 تحميل نشاط STC بعد التقييم",
-        data=export.getvalue(),
-        file_name=f"STC_Activity_{effective_kind}_Processed.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        key="download_stc_evaluated_activity",
-    )
+    _stc_offer_model_save(source, notes, st.session_state["stc_ratings_"+review_key], mapping, review_key)
+    result = _stc_metrics(frame, collector, stamps, ratings)
+    summary = _stc_summary(result, [collector])
+    daily = _stc_summary(result, ["التاريخ", collector])
+    _stc_dashboard(summary, collector, scope)
+    st.dataframe(result, hide_index=True)
+    if kind == "يومي":
+        sheets = {"المكالمات": result, "ملخص المحصلين": summary}
+        if not first:
+            afternoon = stamps.loc[result.index] - day.loc[result.index] >= pd.Timedelta(hours=14, minutes=45)
+            after = result.loc[afternoon].drop_duplicates(collector)
+            sheets["أول إفادة بعد البريك"] = after[[collector, notes,"الوقت","تقييم المكالمات"]]
+        _stc_download(sheets, "تحميل تقرير النشاط اليومي", "STC_Daily.xlsx")
+    else:
+        name = "Weekly" if kind == "أسبوعي" else "Monthly"
+        _stc_download({"ملخص المحصلين": summary}, f"تحميل ملخص النشاط · {kind}", f"STC_{name}_Summary.xlsx")
+        details = {"تفاصيل كل يوم": daily}
+        if kind == "شهري":
+            part = result.loc[weekly_mask.reindex(result.index)].copy()
+            part["بداية الأسبوع"] = starts.loc[part.index].dt.date
+            details["تفاصيل كل أسبوع"] = _stc_summary(part, ["بداية الأسبوع",collector])
+        _stc_download(details, f"تحميل تفاصيل النشاط · {kind}", f"STC_{name}_Details.xlsx")
 
 
 def render_snb_activity_report(model_upload, activity_upload, activity_kind, error_slot, shift_selector, shift_notice):
@@ -9190,7 +9260,14 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
             st.info(message)
             if activity_kind is None:
                 return
-            if automatic:
+            if activity_kind == "أسبوعي":
+                stamps = prepared["__ejada_parsed_created"]
+                token = hashlib.sha256(activity_upload.getvalue()).hexdigest()[:16]
+                mask, _ = _activity_week_choice(stamps, "snb_" + token)
+                if mask is None:
+                    return
+                selected = prepared.loc[mask].copy()
+            elif automatic:
                 selected = prepared.dropna(subset=["__ejada_parsed_created"]).copy()
             else:
                 selected, _ = _filter_snb_activity_period(prepared, activity_kind, period)
@@ -9332,7 +9409,7 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
         )
         first_shift = activity_kind == "يومي" and period == "first"
         after_break = _snb_after_break_notes(
-            selected if activity_kind == "يومي" else prepared, selected,
+            selected if activity_kind in ("يومي", "أسبوعي") else prepared, selected,
             stats["notes"], stats["collector"]
         )
         if first_shift:
@@ -10321,7 +10398,7 @@ if page_uploaded is None:
             _stc_uploaded = st.session_state.activity_page_uploads["STC"]
             render_stc_activity_report(
                 _stc_uploaded.get("model"), _stc_uploaded.get("activity"),
-                activity_kind=activity_kind,
+                activity_kind=activity_kind, shift_selector=shift_selector,
                 error_slot=activity_error_slot,
             )
         if (
