@@ -1978,6 +1978,11 @@ st.markdown(f"""
     .stApp [class*="st-key-upload_box_"] [data-testid="stFileUploaderDropzone"] button {{height:36px !important;min-height:36px !important;margin:auto !important;padding:4px 12px !important;}}
     .stApp .st-key-snb_model_manager_panel {{gap:4px !important;padding-block:0 !important;}}
     .stApp .st-key-snb_model_manager_panel h3 {{margin:0;padding-block:2px;}}
+    .ejada-shift-notice {{direction:rtl;text-align:center;width:fit-content;max-width:100%;margin:3px auto;padding:7px 14px;background:#edf5ff;color:#1f4373;border-radius:10px;font-weight:700;}}
+    .st-key-activity_toggle_align {{direction:ltr !important;justify-content:flex-start !important;}}
+    .stApp .st-key-activity_toggle_align button {{width:max-content !important;max-width:100% !important;padding:5px 10px !important;}}
+    .stApp .st-key-snb_activity_work_area [data-testid="stCaptionContainer"],
+    .stApp .st-key-snb_activity_work_area [data-testid="stCaptionContainer"] p {{direction:rtl;text-align:right;color:{label_color} !important;-webkit-text-fill-color:{label_color} !important;}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -2025,6 +2030,9 @@ if st.session_state.current_page != 'Home':
 else:
     # The Home screen exposes bank logos only, not report navigation.
     pass
+
+if st.session_state.current_page == "Activity" and st.session_state.selected_bank == "SNB":
+    shift_notice = st.empty()
 
 st.markdown(
     f"<hr style='margin: 10px 0 20px 0; border-color: {border_color}; clear: both;'>",
@@ -9110,7 +9118,7 @@ def render_stc_activity_report(model_upload, activity_upload,
     )
 
 
-def render_snb_activity_report(model_upload, activity_upload, activity_kind="يومي", error_slot=None):
+def render_snb_activity_report(model_upload, activity_upload, activity_kind, error_slot, shift_selector, shift_notice):
     """Report screen opens with both upload boxes still visible above."""
     if activity_upload is None:
         return
@@ -9163,9 +9171,10 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             if unsure:
                 st.warning("رنا، المواعيد مش كفاية لتأكيد الفترة. اختاري الفترة المناسبة للملف.")
             with st.container(key="snb_activity_daily_options"):
-                period = st.selectbox("فترة التقرير", list(names), index=list(names).index(suggestion),
+                period = shift_selector.selectbox("فترة التقرير", list(names), index=list(names).index(suggestion),
                                       format_func=names.get, key="snb_activity_daily_shift")
-                st.info(f"رنا إحنا في {names[period]}")
+                shift_notice.markdown(f'<div class="ejada-shift-notice">رنا إحنا في {names[period]}</div>',
+                                      unsafe_allow_html=True)
                 end_hour = 12 if period == "first" else 16
                 remove_extra = st.checkbox(
                     "استبعاد الساعة الزيادة بعد نهاية الفترة " +
@@ -10242,8 +10251,8 @@ if page_uploaded is None:
         )
         with st.container(key="snb_activity_header_row"):
             # Rightmost uploader, compact adjacent activity type, free space left.
-            activity_col, kind_col, dashboard_col, _left_space = st.columns(
-                [1.8, 1.15, 1.25, 5.4], gap="small",
+            activity_col, kind_col, period_col, _space, dashboard_col = st.columns(
+                [1.8, 1.15, 1.15, 3.6, 1.5], gap="small",
                 vertical_alignment="center"
             )
             with activity_col:
@@ -10270,13 +10279,15 @@ if page_uploaded is None:
                         "نوع النشاط", options=["تلقائي", "يومي", "أسبوعي", "شهري"],
                         key="snb_activity_kind_auto"
                     )
-            with dashboard_col:
+            with period_col:
+                shift_selector = st.empty()
+            with dashboard_col, st.container(horizontal=True, horizontal_alignment="left", key="activity_toggle_align"):
                 is_open = _ejada_activity_dashboard_is_open(selected_bank)
                 st.button(
                     "📊 إخفاء الداشبورد" if is_open else "📊 عرض الداشبورد",
                     key=f"activity_dashboard_toggle_{selected_bank}",
                     help="فتح وإغلاق لوحة مؤشرات النشاط والشارتات القادمة",
-                    use_container_width=True,
+                    width="content",
                     type="primary" if is_open else "secondary",
                     on_click=_ejada_toggle_activity_dashboard,
                     args=(selected_bank,),
@@ -10349,7 +10360,7 @@ if page_uploaded is None:
                 render_snb_activity_report(
                     _uploaded['model'], _uploaded['activity'],
                     activity_kind=activity_kind,
-                    error_slot=activity_error_slot
+                    error_slot=activity_error_slot, shift_selector=shift_selector, shift_notice=shift_notice
                 )
     else:
         st.markdown(f"<p style='color:{label_color};font-weight:800;font-size:15px;text-align:right;direction:rtl;margin-top:8px;'>ارفعي الملف من الخانة اللي فوق لعرض التقرير.</p>", unsafe_allow_html=True)
