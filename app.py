@@ -1941,7 +1941,7 @@ st.markdown(f"""
     .st-key-ejada_change_bank_btn button {{width:max-content !important;min-width:0 !important;padding:4px 9px !important;}}
     .st-key-promise_comparison div[class*="st-key-promise_diagnostic_"] {{max-width:100% !important;margin:0 !important;}}
     .st-key-promise_comparison table.ejada-diagnostic-table {{width:100% !important;margin:0 !important;}}
-    .st-key-promise_comparison div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] {{padding-inline:0 !important;padding-bottom:0 !important;}}
+    .st-key-promise_comparison div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] {{padding:8px 0 12px !important;}}
     @media(min-width: 700px) {{
         .st-key-promise_comparison [data-testid="stHorizontalBlock"] {{position:relative;display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr));gap:2rem !important;}}
         .st-key-promise_comparison [data-testid="stColumn"] {{width:100% !important;min-width:0 !important;}}
@@ -1952,6 +1952,12 @@ st.markdown(f"""
     .stApp div[class*="st-key-uploaded_chip_"] [data-testid="stButton"] button {{width:25px !important;min-width:25px !important;height:25px !important;min-height:25px !important;padding:0 !important;background:#ae3034 !important;color:white !important;}}
     .stApp div[class*="st-key-uploaded_chip_"] button p {{color:white !important;line-height:1 !important;}}
     .stApp div[class*="_upload_card"], .stApp [data-testid="stVerticalBlockBorderWrapper"]:has([class*="st-key-uploaded_chip_"]) {{height:auto !important;min-height:0 !important;max-height:none !important;}}
+    .st-key-promise_comparison {{margin-top:16px;}}
+    .st-key-promise_comparison [data-testid="stExpander"] details[open] {{height:auto !important;max-height:none !important;overflow:visible !important;}}
+    .st-key-promise_comparison table.ejada-diagnostic-table {{display:table !important;}}
+    .st-key-promise_comparison table.ejada-diagnostic-table :is(td, th) {{padding:6px 10px !important;line-height:1.4;}}
+    .stApp div[class*="st-key-uploaded_chip_"] {{min-height:40px !important;padding:6px 8px !important;align-items:center !important;}}
+    .stApp div[class*="st-key-uploaded_chip_"] .uploaded-filename {{line-height:1.5;direction:ltr;text-align:left;}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -9577,20 +9583,9 @@ def render_report_upload_bar(page, promise_metrics=None):
     uploader_version = st.session_state.report_uploader_versions[selected_bank][page]
 
     with st.container(key=f"report_upload_bar_{selected_bank}_{page}"):
-        if current_files:
-            names = "، ".join(x.name for x in current_files)
-            status_message = f"الملف الحالي: {names}"
-        else:
-            status_message = "مفيش ملف مرفوع لسه يا رنا"
-
-        # A separate status line ensures filenames never push down either box.
-        status_col, _, _ = st.columns([1.7, 3.9, 4.4], gap='small')
-        with status_col:
-            st.markdown(
-                f'<div class="ejada-upload-name" title="{_xml_escape(status_message)}" '
-                f'style="color:{label_color};">{_xml_escape(status_message)}</div>',
-                unsafe_allow_html=True
-            )
+        if not current_files:
+            st.markdown(f'<div class="ejada-upload-name" style="color:{label_color};">مفيش ملف مرفوع لسه يا رنا</div>',
+                        unsafe_allow_html=True)
 
         # Top-aligned row used by all three reports for both banks.
         upload_col, title_col, _left_balance = st.columns(
@@ -9633,20 +9628,8 @@ def render_report_upload_bar(page, promise_metrics=None):
                     """,
                     unsafe_allow_html=True
                 )
-            else:
-                title_font_size = 20
-                st.markdown(
-                    f"""
-                    <div class="ejada-report-title-holder">
-                    <div class="ejada-report-title"
-                         style="background:{card_color};border-color:{border_color};
-                                color:{text_color};font-size:{title_font_size}px;">
-                        {titles[page]}
-                    </div>
-                </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+            elif page == "Neglect":
+                st.markdown('<span role="img" aria-label="تقرير الإهمال">🚨</span>', unsafe_allow_html=True)
 
 # دالة معالجة بيانات أي صفحة
 
