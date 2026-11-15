@@ -7300,37 +7300,25 @@ def _prepare_snb_activity_file(uploaded_file):
 
 
 def _infer_snb_daily_period(frame):
-    """Infer shift suggestion: 02:00–12:00 / 12:30–16:00 / full day."""
-    times = frame["__ejada_parsed_created"].dropna()
-    if times.empty:
+    """Use the latest report date; noon to 13:00 can also be first-shift overtime."""
+    stamps = frame["__ejada_parsed_created"].dropna()
+    if stamps.empty:
         return "full", True
-    latest_day = times.max().normalize()
-    # Infer from the most recent calendar date in this upload.
-    current_day = times[times.dt.normalize() == latest_day]
-    minute_of_day = current_day.dt.hour * 60 + current_day.dt.minute
-    first = ((minute_of_day >= 120) & (minute_of_day < 720)).any()
-    second = ((minute_of_day >= 750) & (minute_of_day < 960)).any()
-    outside = ((minute_of_day < 120) | (minute_of_day >= 960)).any()
-
-    # Full-day uploads must have activity in BOTH shift windows.
-    # An isolated out-of-shift/overtime call does not prove full-day coverage.
+    stamps = stamps[stamps.dt.normalize() == stamps.max().normalize()]
+    minutes = stamps.dt.hour * 60 + stamps.dt.minute
+    first = minutes.between(120, 719).any()
+    second = minutes.between(720, 959).any()
     if first and second:
-        return "full", False
+        return ("full", False) if minutes.between(780, 959).any() else ("first", True)
     if first:
         return "first", False
     if second:
         return "second", False
-    # Without evidence for either shift we cannot assume a full-day file.
     return "full", True
 
 
 def _filter_snb_activity_period(frame, activity_kind, daily_period,
-                                exclude_after_shift=True):
-    """Select the daily shift; optionally discard overtime AFTER its end.
-
-    The original end-of-shift hour is always included: 11:00-12:00 first,
-    and 15:00-16:00 second. The optional extra hour starts at 12:00/16:00.
-    """
+                                exclude_after_shift=True, exclude_last_hour=False):
     valid = frame.dropna(subset=["__ejada_parsed_created"]).copy()
     if valid.empty:
         return valid, 0
@@ -7339,32 +7327,20 @@ def _filter_snb_activity_period(frame, activity_kind, daily_period,
     overtime_excluded = 0
 
     if activity_kind == "يومي":
-        if daily_period == "first":
-            lower = day_start + pd.Timedelta(hours=2)
-            shift_end = day_start + pd.Timedelta(hours=12)
-        elif daily_period == "second":
-            lower = day_start + pd.Timedelta(hours=12, minutes=30)
-            shift_end = day_start + pd.Timedelta(hours=16)
+        start_hour, end_hour = {"first": (2, 12), "second": (12, 16),
+                                "full": (2, 16)}[daily_period]
+        start = day_start + pd.Timedelta(hours=start_hour)
+        end = day_start + pd.Timedelta(hours=end_hour)
+        hour = pd.Timedelta(hours=1)
+        within_shift = (timestamps >= start) & (timestamps < end)
+        if exclude_last_hour:
+            within_shift &= timestamps < end - hour
+        extra = (timestamps >= end) & (timestamps < end + hour)
+        if exclude_after_shift:
+            overtime_excluded = int(extra.sum())
         else:
-            lower, shift_end = day_start, day_start + pd.Timedelta(days=1)
-
-        # The extra after-shift hour can be kept only when explicitly allowed.
-        if daily_period in ("first", "second"):
-            upper = shift_end if exclude_after_shift else (
-                shift_end + pd.Timedelta(hours=1)
-            )
-            in_overtime = (
-                (timestamps >= shift_end)
-                & (timestamps < shift_end + pd.Timedelta(hours=1))
-                & (timestamps.dt.normalize() == day_start)
-            )
-            if exclude_after_shift:
-                overtime_excluded = int(in_overtime.sum())
-        else:
-            upper = shift_end
-        valid = valid.loc[
-            (timestamps >= lower) & (timestamps < upper)
-        ].copy()
+            within_shift |= extra
+        valid = valid.loc[within_shift].copy()
     elif activity_kind == "أسبوعي":
         valid = valid.loc[
             timestamps >= day_start - pd.Timedelta(days=6)
@@ -9151,62 +9127,39 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             )
 
         detected_kind, message = _activity_period(prepared["__ejada_parsed_created"])
-        st.info(message)
         automatic = activity_kind == "تلقائي"
         if automatic:
-            if detected_kind is None:
-                return
             activity_kind = detected_kind
         period = "full"
-        exclude_after_shift = True
-        if not automatic and activity_kind == "يومي":
-            suggested_period, unsure = _infer_snb_daily_period(prepared)
-            if suggested_period == "full" and not unsure:
-                # Automatically honor a file containing both shift windows:
-                # no manual shift selector and no overtime checkbox.
-                period = "full"
-                st.caption(
-                    "✅ تم اكتشاف ملف اليوم الكامل (الفترتان الأولى والثانية). "
-                    "تم عرض جميع مكالمات اليوم بدون اختيار فترة أو حذف ساعة."
-                )
-            else:
-                shift_labels = [
-                    "الفترة الأولى (2:00 ص – 12:00 ظ)",
-                    "الفترة الثانية (12:30 م – 4:00 م)",
-                ]
-                with st.container(key="snb_activity_daily_options"):
-                    shift_col, last_hour_col, _controls_space = st.columns(
-                        [1.8, 1.3, 5.0], gap="small", vertical_alignment="bottom"
-                    )
-                    with shift_col:
-                        shift_choice = st.selectbox(
-                            "اختاري الفترة اليومية",
-                            shift_labels,
-                            index=1 if suggested_period == "second" else 0,
-                            key="snb_activity_daily_shift"
-                        )
-                    with last_hour_col:
-                        exclude_after_shift = st.checkbox(
-                            "استبعاد الساعة الزيادة بعد نهاية الفترة",
-                            value=True,
-                            key="snb_activity_exclude_after_shift"
-                        )
-                period = "first" if shift_choice == shift_labels[0] else "second"
-                st.caption(
-                    "البريك من 12:00 إلى 12:30. "
-                    "لو فعلتي الاستبعاد: هتتحذف تسجيلات الساعة 12:00–1:00 ظهرًا "
-                    "للفترة الأولى، أو 4:00–5:00 عصرًا للفترة الثانية. "
-                    "آخر ساعة داخل الشيفت نفسه هتفضل محسوبة."
-                )
-
-        if automatic:
-            selected = prepared.dropna(subset=["__ejada_parsed_created"]).copy()
-            excluded_after_shift = 0
-        else:
+        excluded_after_shift = 0
+        if activity_kind == "يومي":
+            suggestion, unsure = _infer_snb_daily_period(prepared)
+            names = {"first": "الفترة الأولى", "second": "الفترة التانية", "full": "اليوم كله"}
+            if unsure:
+                st.warning("رنا، المواعيد مش كفاية لتأكيد الفترة. اختاري الفترة المناسبة للملف.")
+            with st.container(key="snb_activity_daily_options"):
+                period = st.selectbox("فترة التقرير", list(names), index=list(names).index(suggestion),
+                                      format_func=names.get, key="snb_activity_daily_shift")
+                st.info(f"رنا إحنا في {names[period]}")
+                end_hour = 12 if period == "first" else 16
+                remove_extra = st.checkbox(
+                    "استبعاد الساعة الزيادة بعد نهاية الفترة " +
+                    ("(12–1 ظهرًا)" if end_hour == 12 else "(4–5 عصرًا)"),
+                    value=True, key="snb_activity_exclude_after_shift")
+                remove_last = st.checkbox(
+                    "حذف آخر ساعة من الفترة " +
+                    ("(11–12 ظهرًا)" if end_hour == 12 else "(3–4 عصرًا)"),
+                    value=False, key="snb_activity_exclude_last_hour")
             selected, excluded_after_shift = _filter_snb_activity_period(
-                prepared, activity_kind, period,
-                exclude_after_shift=exclude_after_shift
-            )
+                prepared, activity_kind, period, remove_extra, remove_last)
+        else:
+            st.info(message)
+            if activity_kind is None:
+                return
+            if automatic:
+                selected = prepared.dropna(subset=["__ejada_parsed_created"]).copy()
+            else:
+                selected, _ = _filter_snb_activity_period(prepared, activity_kind, period)
         manual_decisions = _snb_manual_evaluations(model_upload)
         slash_row_decisions = _snb_slash_row_decisions(activity_upload)
         if _ejada_activity_dashboard_is_open("SNB"):
@@ -9333,9 +9286,14 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
             final, use_container_width=True, hide_index=True,
             height=460
         )
+        first_shift = activity_kind == "يومي" and period == "first"
         after_break = _snb_after_break_notes(
-            prepared, selected, stats["notes"], stats["collector"]
+            selected if activity_kind == "يومي" else prepared, selected,
+            stats["notes"], stats["collector"]
         )
+        if first_shift:
+            after_break = after_break[["التاريخ", "المحصل", "ميعاد أول إفادة",
+                                       "ميعاد آخر إفادة", "مدة الدوام"]]
         wasted_details, wasted_summary = _snb_wasted_time_reports(
             result, stats["collector"], stats["notes"],
             activity_kind=activity_kind
@@ -9364,10 +9322,11 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
         duty_col, waste_col = st.columns(2, gap="small")
         with duty_col:
             with st.expander(
-                "🕧 أول وآخر إفادة وحالتهما + أول إفادة بعد البريك",
+                "أول وآخر إفادة ومدة الدوام" if first_shift else "🕧 أول وآخر إفادة وحالتهما + أول إفادة بعد البريك",
                 expanded=False,
             ):
                 st.caption(
+                    "بداية ونهاية النشاط لكل محصل في الفترة الأولى." if first_shift else
                     "صف لكل محصل في كل يوم. في النشاط الأسبوعي تعرض حالة "
                     "أول إفادة وأول إفادة بعد البريك وآخر إفادة من المكالمات "
                     "المعتمدة في الأسبوع؛ والدوام من الأولى إلى الأخيرة."
@@ -9472,7 +9431,7 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
                 writer,
                 sheet_name=(
                     "Weekly_First_Last_Notes" if weekly_report
-                    else "After_Break_Notes"
+                    else "First_Last_Notes" if first_shift else "After_Break_Notes"
                 ),
                 index=False,
             )
