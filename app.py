@@ -52,6 +52,14 @@ if 'selected_bank' not in st.session_state:
 def set_bank(bank):
     st.session_state.selected_bank = bank
 
+
+def open_bank_reports(bank):
+    """Bank selection happens on Home, then open its independent reports hub."""
+    if bank not in BANKS:
+        return
+    st.session_state.selected_bank = bank
+    st.session_state.current_page = "Overview"
+
 if 'current_page' not in st.session_state:
     st.session_state.current_page = 'Overview'
 
@@ -1872,7 +1880,10 @@ with top_cols[0]:
     st.button("🌓", key="theme_toggle", on_click=toggle_theme, help="تغيير الثيم (كحلي / أسود / أبيض)")
 
 with top_cols[1]:
-    st.button("📊 Overview", key="top_overview_btn", type="primary" if st.session_state.current_page == 'Overview' else "secondary", use_container_width=False, on_click=set_page, args=('Overview',))
+    if st.session_state.current_page != 'Home':
+        st.button("📊 Overview", key="top_overview_btn",
+                  type="primary" if st.session_state.current_page == 'Overview' else "secondary",
+                  use_container_width=False, on_click=set_page, args=('Overview',))
 
 # ==========================================
 # 1. الهيدر الرئيسي
@@ -1895,36 +1906,33 @@ def _render_ejada_main_navigation():
     with st.container(key="report_nav_group"):
         st.button("🏠", key="nav_home_btn", type="primary" if st.session_state.current_page == 'Home' else "secondary", use_container_width=False, on_click=set_page, args=('Home',), help="الرئيسية")
         st.button("🤝 الوعود القائمة والمكسورة", key="nav_prom_btn", type="primary" if st.session_state.current_page == 'Promises' else "secondary", use_container_width=False, on_click=set_page, args=('Promises',))
-        st.button("🚨 تقرير الإهمال", key="nav_neg_btn", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=False, on_click=set_page, args=('Neglect',))
+        st.button("🚨 الإهمال", key="nav_neg_btn", type="primary" if st.session_state.current_page == 'Neglect' else "secondary", use_container_width=False, on_click=set_page, args=('Neglect',))
         st.button("📈 النشاط", key="nav_act_btn", type="primary" if st.session_state.current_page == 'Activity' else "secondary", use_container_width=False, on_click=set_page, args=('Activity',))
 
-if st.session_state.current_page not in ('Overview', 'Home'):
-    bank_snb_col, bank_stc_col, nav_col = st.columns([0.82, 0.82, 8.36], gap='small', vertical_alignment='top')
-    with bank_snb_col:
-        st.button('🏦 SNB', key='bank_SNB',
-                  type='primary' if st.session_state.selected_bank == 'SNB' else 'secondary',
-                  use_container_width=False, on_click=set_bank, args=('SNB',))
-        if st.session_state.selected_bank == 'SNB':
-            st.markdown(
-                f'<div style="color:{snb_green};font-size:19px;font-weight:900;'
-                'width:116px;text-align:center;direction:ltr;white-space:nowrap;'
-                'margin-top:-12px;">(30-60-NPL)</div>',
-                unsafe_allow_html=True
-            )
-    with bank_stc_col:
-        st.button('🏦 STC', key='bank_STC',
-                  type='primary' if st.session_state.selected_bank == 'STC' else 'secondary',
-                  use_container_width=False, on_click=set_bank, args=('STC',))
-
+if st.session_state.current_page != 'Home':
+    # A bank is selected on Home; its reports stay grouped behind that choice.
+    current_bank_col, switch_bank_col, nav_col = st.columns(
+        [1.3, 1.35, 7.35], gap='small', vertical_alignment='top'
+    )
+    with current_bank_col:
+        st.markdown(
+            f'<div style="color:{label_color};font-weight:900;font-size:17px;'
+            f'direction:rtl;text-align:center;padding-top:10px;">'
+            f'🏦 {BANKS[st.session_state.selected_bank]}</div>',
+            unsafe_allow_html=True
+        )
+    with switch_bank_col:
+        st.button(
+            "تغيير البنك", key="ejada_change_bank_btn",
+            on_click=set_page, args=("Home",), use_container_width=True
+        )
     with nav_col:
         _render_ejada_main_navigation()
-elif st.session_state.current_page == 'Overview':
-    # Overview must always expose navigation back to the three report pages.
-    # Place the original upload widgets directly below this navigation row.
-    _render_ejada_main_navigation()
-    _overview_upload_header = st.container(key="overview_upload_header")
+    if st.session_state.current_page == 'Overview':
+        _overview_upload_header = st.container(key="overview_upload_header")
 else:
-    _render_ejada_main_navigation()
+    # The Home screen exposes bank logos only, not report navigation.
+    pass
 
 st.markdown(
     f"<hr style='margin: 10px 0 20px 0; border-color: {border_color}; clear: both;'>",
@@ -6071,93 +6079,38 @@ def _can_pivot(df):
 
 
 def build_report_xlsx(active_df, broken_df, neglect_df=None, bank="SNB"):
+    """Two-sheet promises workbook for SNB and STC; no Pivot or summary sheets."""
     wb = Workbook()
-    ws = wb.active
-    ws.title = 'تقرير الوعود القائمة'
-    _write_df_sheet(ws, active_df)
-
-    can_pv_active = _can_pivot(active_df)
-    p_active = build_pivot(active_df, order='first')
-    ws = wb.create_sheet('ملخص تقرير الوعود القائمة')
-    if bank == 'SNB':
-        active_title = 'تقرير الوعود القائمة البنك الاهلي السعودي SNB (NPL&60Dpd)'
-        broken_title = 'تقرير الوعود المكسورة البنك الاهلي SNB (NPL&60Dpd)'
-    else:
-        active_title = f'تقرير الوعود القائمة {BANKS[bank]} {bank}'
-        broken_title = f'تقرير الوعود المكسورة {BANKS[bank]} {bank}'
-    _write_pivot_sheet(ws, p_active, active_title, is_real_pivot=can_pv_active)
-
-    ws = wb.create_sheet('تقرير الوعود المكسورة')
-    _write_df_sheet(ws, broken_df)
-
-    can_pv_broken = _can_pivot(broken_df)
-    p_broken = build_pivot(broken_df, order='desc')
-    ws = wb.create_sheet('ملخص تقرير الوعود المكسورة')
-    _write_pivot_sheet(ws, p_broken, broken_title, is_real_pivot=can_pv_broken)
-
-    buf = io.BytesIO()
-    wb.save(buf)
-
-    specs = []
-    if can_pv_active:
-        specs.append({'summary_sheet': 'ملخص تقرير الوعود القائمة', 'data_sheet': 'تقرير الوعود القائمة',
-                      'data_df': active_df, 'pivot': p_active, 'order': 'first'})
-    if can_pv_broken:
-        specs.append({'summary_sheet': 'ملخص تقرير الوعود المكسورة', 'data_sheet': 'تقرير الوعود المكسورة',
-                      'data_df': broken_df, 'pivot': p_broken, 'order': 'desc'})
-    if specs:
-        return inject_pivot_tables(buf.getvalue(), specs)
-    buf.seek(0)
-    return buf
+    current = wb.active
+    current.title = "تقرير الوعود القائمة"
+    _write_df_sheet(current, active_df)
+    broken = wb.create_sheet("تقرير الوعود المكسورة")
+    _write_df_sheet(broken, broken_df)
+    for ws in wb.worksheets:
+        ws.sheet_view.rightToLeft = True
+        ws.freeze_panes = "A2"
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output
 
 
 def build_single_promise_report_xlsx(df, report_kind="active", bank="STC"):
-    """Build one standalone promises workbook (active OR broken) with its summary."""
-    is_active = report_kind == "active"
-    data_sheet = 'تقرير الوعود القائمة' if is_active else 'تقرير الوعود المكسورة'
-    summary_sheet = 'ملخص تقرير الوعود القائمة' if is_active else 'ملخص تقرير الوعود المكسورة'
-    order = 'first' if is_active else 'desc'
-
-    if bank == 'SNB':
-        title = (
-            'تقرير الوعود القائمة البنك الاهلي السعودي SNB (NPL&60Dpd)'
-            if is_active
-            else 'تقرير الوعود المكسورة البنك الاهلي SNB (NPL&60Dpd)'
-        )
-    else:
-        title = (
-            f'تقرير الوعود القائمة {BANKS[bank]} {bank}'
-            if is_active
-            else f'تقرير الوعود المكسورة {BANKS[bank]} {bank}'
-        )
-
+    """One STC promises report with only its data worksheet (no Pivot)."""
+    ws_name = (
+        "تقرير الوعود القائمة" if report_kind == "active"
+        else "تقرير الوعود المكسورة"
+    )
     wb = Workbook()
     ws = wb.active
-    ws.title = data_sheet
+    ws.title = ws_name
     _write_df_sheet(ws, df)
-
-    can_pv = _can_pivot(df)
-    pivot_df = build_pivot(df, order=order)
-    ws = wb.create_sheet(summary_sheet)
-    _write_pivot_sheet(ws, pivot_df, title, is_real_pivot=can_pv)
-
-    buf = io.BytesIO()
-    wb.save(buf)
-
-    if can_pv:
-        return inject_pivot_tables(
-            buf.getvalue(),
-            [{
-                'summary_sheet': summary_sheet,
-                'data_sheet': data_sheet,
-                'data_df': df,
-                'pivot': pivot_df,
-                'order': order,
-            }]
-        )
-
-    buf.seek(0)
-    return buf
+    ws.sheet_view.rightToLeft = True
+    ws.freeze_panes = "A2"
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output
 
 
 # ==========================================
@@ -9525,7 +9478,7 @@ def render_report_upload_bar(page, promise_metrics=None):
     """Compact report header: file details and stacked X/+ alongside the title."""
     titles = {
         'Promises': '🤝 إدارة ومتابعة الوعود (القائمة والمكسورة)',
-        'Neglect': '🚨 تقرير الإهمال',
+        'Neglect': '🚨 الإهمال',
         'Activity': '📈 تقرير نشاط المحصلين',
     }
     current_files = bank_files.get(page) or []
@@ -10092,32 +10045,9 @@ if curr_page == 'Overview':
 .kpi-grid-4 .kpi-value{font-size:34px!important}
 .overview-title{direction:rtl;text-align:right;color:#162d25;font-size:32px;font-weight:750;margin:10px 0 14px}
 </style><div class="overview-title">نظرة عامة على التحصيل</div>""", unsafe_allow_html=True)
-    overview_snb_col, overview_stc_col, _overview_bank_spacer = st.columns([0.82, 0.82, 8.36], gap='small')
-    with overview_snb_col:
-        st.button(
-            '🏦 SNB',
-            key='overview_choose_SNB',
-            type='primary' if selected_bank == 'SNB' else 'secondary',
-            use_container_width=False,
-            on_click=set_bank,
-            args=('SNB',)
-        )
-        if selected_bank == 'SNB':
-            st.markdown(
-                f'<div style="color:{snb_green};font-size:19px;font-weight:900;'
-                'width:116px;text-align:center;direction:ltr;white-space:nowrap;'
-                'margin-top:-12px;">(30-60-NPL)</div>',
-                unsafe_allow_html=True
-            )
-    with overview_stc_col:
-        st.button(
-            '🏦 STC',
-            key='overview_choose_STC',
-            type='primary' if selected_bank == 'STC' else 'secondary',
-            use_container_width=False,
-            on_click=set_bank,
-            args=('STC',)
-        )
+    st.caption(
+        f"تقارير {BANKS[selected_bank]} — استخدمي «تغيير البنك» للعودة إلى الرئيسية."
+    )
 
     # Widgets live here only once. Their screen position is the earlier header.
     with _overview_upload_header:
@@ -10239,13 +10169,53 @@ page_uploaded = None if curr_page == 'Activity' else bank_files[curr_page]
 
 if page_uploaded is None:
     if curr_page == 'Home':
-        st.markdown(f"""
-        <div style="background-color:{card_color};border:1px solid {border_color};border-radius:15px;padding:42px 24px;margin:28px 0 18px;text-align:center;direction:rtl;box-shadow:0 4px 14px rgba(0,0,0,0.08);">
-            <h2 style="color:{text_color};margin:0 0 12px;font-weight:900;font-size:30px;">أهلاً بيكي يا رنا في تقارير شركة إجادة لتحصيل الديون</h2>
-            <p style="color:{kpi_title_color};margin:0 0 10px;font-weight:800;font-size:18px;line-height:1.7;">تابعي أداء التحصيل والوعود والنشاط بسهولة من مكان واحد.</p>
-            <p style="color:{snb_green};margin:0;font-weight:900;font-size:17px;line-height:1.7;">🏦 اختاري البنك لعرض التقارير الخاصة به.</p>
-        </div>
-        """, unsafe_allow_html=True)
+        with st.container(border=True, key="ejada_home_bank_picker"):
+            st.markdown(
+                """
+                <div style="text-align:center;direction:rtl;padding:18px 8px 12px;">
+                  <h2 style="color:#1F4373;font-weight:900;font-size:30px;">
+                    أهلاً بيكي يا رنا في تقارير شركة إجادة لتحصيل الديون
+                  </h2>
+                  <p style="color:#304D73;font-weight:800;font-size:17px;">
+                    اختاري البنك من شعاره لفتح تقاريره الخاصة
+                  </p>
+                </div>
+                """, unsafe_allow_html=True
+            )
+            spacer_right, snb_home_col, stc_home_col, spacer_left = st.columns(
+                [1, 2.2, 2.2, 1], gap="large"
+            )
+            with snb_home_col:
+                st.markdown(
+                    '<div style="height:134px;display:flex;align-items:center;'
+                    'justify-content:center;background:white;border-radius:12px;">'
+                    '<img alt="شعار البنك الأهلي السعودي SNB" '
+                    'src="https://roshem.sa/photos/partners/1723882007.png" '
+                    'style="max-height:112px;max-width:92%;object-fit:contain;">'
+                    '</div>', unsafe_allow_html=True
+                )
+                st.button(
+                    "فتح تقارير البنك الأهلي SNB", key="home_open_bank_SNB",
+                    use_container_width=True, type="primary",
+                    on_click=open_bank_reports, args=("SNB",),
+                )
+            with stc_home_col:
+                st.markdown(
+                    '<div style="height:134px;display:flex;align-items:center;'
+                    'justify-content:center;background:white;border-radius:12px;">'
+                    '<img alt="شعار بنك STC" '
+                    'src="https://mma.prnewswire.com/media/2379425/4631613/STC_Bank_Logo_Logo.jpg?p=publish" '
+                    'style="max-height:104px;max-width:92%;object-fit:contain;">'
+                    '</div>', unsafe_allow_html=True
+                )
+                st.button(
+                    "فتح تقارير بنك STC", key="home_open_bank_STC",
+                    use_container_width=True, type="primary",
+                    on_click=open_bank_reports, args=("STC",),
+                )
+            st.markdown(
+                '<div style="height:14px;"></div>', unsafe_allow_html=True
+            )
     elif curr_page == 'Overview':
         st.markdown(f"""
         <div style="background-color:{card_color};border:1px solid {border_color};border-radius:15px;padding:22px 18px;margin:8px 0 18px;text-align:center;direction:rtl;">
