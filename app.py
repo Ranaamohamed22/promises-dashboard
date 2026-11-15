@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -1967,6 +1969,12 @@ st.markdown(f"""
     html body .stApp .st-key-report_pills [data-testid="stButton"] button[kind="primary"] {{background:#fff !important;border-color:#e0e2e4 !important;box-shadow:0 1px 3px #1f334518 !important;}}
     html body .stApp .st-key-report_pills [data-testid="stButton"] button[kind] p {{color:#263745 !important;-webkit-text-fill-color:#263745 !important;font-size:15px !important;}}
     html body .stApp .st-key-report_pills [data-testid="stButton"] button[kind="secondary"] p {{font-weight:500 !important;}}
+    .stApp [class*="st-key-upload_field_"] {{width:min(315px,100%) !important;min-width:0;gap:5px !important;margin-left:auto;}}
+    .stApp .upload-field-label {{direction:rtl;text-align:center;font-size:17px;font-weight:800;line-height:1.4;color:{label_color};}}
+    .stApp [class*="st-key-upload_box_"] {{box-sizing:border-box;width:100% !important;padding:8px !important;border:1px solid {border_color} !important;border-radius:10px;background:transparent !important;}}
+    .stApp [class*="st-key-upload_box_"] [data-testid="stFileUploaderDropzone"] {{box-sizing:border-box;display:flex !important;align-items:center !important;justify-content:center !important;width:100%;min-height:54px !important;height:auto !important;padding:6px !important;background:white !important;border:1px dashed #a9bbd0 !important;border-radius:8px !important;}}
+    .stApp [class*="st-key-upload_box_"] [data-testid="stFileUploaderDropzoneInstructions"] {{display:none !important;}}
+    .stApp [class*="st-key-upload_box_"] [data-testid="stFileUploaderDropzone"] button {{height:36px !important;min-height:36px !important;margin:auto !important;padding:4px 12px !important;}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -9564,6 +9572,14 @@ def render_promise_filter_diagnostics(bank, kind):
                 )
 
 
+@contextmanager
+def upload_field(title, key):
+    with st.container(key=f"upload_field_{key}"):
+        st.markdown(f'<div class="upload-field-label">{_xml_escape(title)}</div>', unsafe_allow_html=True)
+        with st.container(border=True, key=f"upload_box_{key}"):
+            yield
+
+
 def uploaded_chip(files, key, clear, args):
     names = "، ".join(f.name for f in files) if isinstance(files, list) else files.name
     with st.container(key=f"uploaded_chip_{key}", horizontal=True, wrap=False, vertical_alignment="center"):
@@ -9592,7 +9608,8 @@ def render_report_upload_bar(page, promise_metrics=None):
         )
 
         with upload_col:
-            with st.container(border=True, key=f"ejada_shared_upload_card_{selected_bank}_{page}"):
+            with upload_field("رفع ملف الوعود" if page == "Promises" else "رفع ملف المحفظة",
+                              f"report_{selected_bank}_{page}"):
                 widget_key = f"report_uploader_{selected_bank}_{page}_{uploader_version}"
                 if current_files:
                     uploaded_chip(current_files, f"small_clear_report_{selected_bank}_{page}",
@@ -10117,8 +10134,7 @@ if curr_page == 'Overview':
         upload_cols = st.columns([1] * len(fields) + [2.7], gap='small')
         card_names = {'Activity': 'activity', 'ActivityModel': 'model', 'Promises': 'promises'}
         for col, (kind, title, extensions) in zip(upload_cols, fields):
-            with col, st.container(border=True, key=f'overview_{card_names[kind]}_upload_card'):
-                st.markdown(f'<div style="text-align:center;font-weight:900;color:{label_color}">{title}</div>', unsafe_allow_html=True)
+            with col, upload_field(title, f"overview_{card_names[kind]}"):
                 key = f"overview_file_{selected_bank}_{kind}_{overview_versions[kind]}"
                 saved = st.session_state.overview_uploads[selected_bank][kind]
                 if saved:
@@ -10213,13 +10229,7 @@ if page_uploaded is None:
                 vertical_alignment="center"
             )
             with activity_col:
-                with st.container(border=True, key="activity_file_upload_card"):
-                    st.markdown(
-                        f'<div style="color:{label_color};direction:rtl;text-align:center;'
-                        'font-size:18px;font-weight:900;margin-bottom:8px;">'
-                        'رفع ملف النشاط</div>',
-                        unsafe_allow_html=True
-                    )
+                with upload_field("رفع ملف النشاط", "activity_file"):
                     activity_key = (
                         f"activity_data_file_{selected_bank}_"
                         f"{st.session_state.activity_upload_versions[selected_bank]['activity']}"
@@ -10259,13 +10269,7 @@ if page_uploaded is None:
         if selected_bank == "STC":
             model_col, _model_space = st.columns([1.8, 7.8], gap="small")
             with model_col:
-                with st.container(border=True, key="activity_model_upload_card"):
-                    st.markdown(
-                        f'<div style="color:{label_color};direction:rtl;'
-                        'text-align:center;font-size:18px;font-weight:900;'
-                        'margin-bottom:8px;">خانة رفع موديل النشاط</div>',
-                        unsafe_allow_html=True
-                    )
+                with upload_field("رفع موديل النشاط", "activity_model"):
                     model_key = (
                         f"activity_model_file_{selected_bank}_"
                         f"{st.session_state.activity_upload_versions[selected_bank]['model']}"
