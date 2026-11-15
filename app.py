@@ -1976,6 +1976,8 @@ st.markdown(f"""
     .stApp [class*="st-key-upload_box_"] [data-testid="stFileUploaderDropzone"] {{box-sizing:border-box;display:flex !important;align-items:center !important;justify-content:center !important;width:100%;min-height:54px !important;height:auto !important;padding:6px !important;background:white !important;border:1px dashed #a9bbd0 !important;border-radius:8px !important;}}
     .stApp [class*="st-key-upload_box_"] [data-testid="stFileUploaderDropzoneInstructions"] {{display:none !important;}}
     .stApp [class*="st-key-upload_box_"] [data-testid="stFileUploaderDropzone"] button {{height:36px !important;min-height:36px !important;margin:auto !important;padding:4px 12px !important;}}
+    .stApp .st-key-snb_model_manager_panel {{gap:4px !important;padding-block:0 !important;}}
+    .stApp .st-key-snb_model_manager_panel h3 {{margin:0;padding-block:2px;}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -6627,13 +6629,13 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
     note_counts = normalized.value_counts(dropna=False)
     special_candidates = set()
     for index, (note, key) in zip(notes.index, zip(notes, normalized)):
-        if not key:
+        if not key or key in base_mapping or key in persisted:
             continue
         is_special = bool(_snb_review_trigger_reasons(note))
         # Special notes use the explicitly approved per-row rating, not a
         # similarity suggestion. Never turn conflicting row ratings into a rule.
         if is_special:
-            value = row_decisions.get(str(index))
+            value = row_decisions.get(str(index), manual.get(key))
             if value not in (0, 1):
                 continue
             special_candidates.add(key)
@@ -6695,30 +6697,47 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
     if not rows:
         st.info("لا توجد إفادات جديدة معتمدة لإضافتها حاليًا.")
     st.caption("اختاري ناجحة أو غير ناجحة لكل إفادة قبل تحديد إضافتها للموديل.")
+    if rows:
+        signature = hashlib.sha256(json.dumps(rows, ensure_ascii=False).encode()).hexdigest()[:16]
+        bulk = st.session_state.setdefault("snb_bulk_selection", {})
+        if bulk.get("signature") != signature:
+            bulk.clear()
+            bulk.update(signature=signature, version=0, ratings={})
+        editor_key = f"snb_model_manager_editor_{signature}_{bulk['version']}"
+        if st.button("تحديد الكل · Select All", key="snb_model_select_all"):
+            edits = st.session_state.get(editor_key, {}).get("edited_rows", {})
+            for index, changes in edits.items():
+                if "التقييم" in changes:
+                    bulk["ratings"][int(index)] = changes["التقييم"]
+            bulk["version"] += 1
+            st.rerun()
+        if bulk["version"]:
+            for index, row in enumerate(rows):
+                row["إضافة للموديل"] = True
+                row["التقييم"] = bulk["ratings"].get(index, row["التقييم"])
+        edited = st.data_editor(
+            pd.DataFrame(rows),
+            hide_index=True,
+            use_container_width=True,
+            disabled=["الإفادة المعتمدة", "عدد المكالمات", "الحالة"],
+            column_config={
+                "إضافة للموديل": st.column_config.CheckboxColumn(
+                    "إضافة للموديل", default=False
+                ),
+                "التقييم": st.column_config.SelectboxColumn(
+                    "التقييم: ناجحة أم غير ناجحة؟",
+                    options=["ناجحة", "غير ناجحة"],
+                    required=True,
+                ),
+                "عدد المكالمات": st.column_config.NumberColumn(
+                    "عدد المكالمات", format="%d",
+                ),
+            },
+            key=editor_key,
+        )
+    else:
+        edited = pd.DataFrame()
     with st.form("snb_model_manager_approved_form"):
-        if rows:
-            edited = st.data_editor(
-                pd.DataFrame(rows),
-                hide_index=True,
-                use_container_width=True,
-                disabled=["الإفادة المعتمدة", "عدد المكالمات", "الحالة"],
-                column_config={
-                    "إضافة للموديل": st.column_config.CheckboxColumn(
-                        "إضافة للموديل", default=False
-                    ),
-                    "التقييم": st.column_config.SelectboxColumn(
-                        "التقييم: ناجحة أم غير ناجحة؟",
-                        options=["ناجحة", "غير ناجحة"],
-                        required=True,
-                    ),
-                    "عدد المكالمات": st.column_config.NumberColumn(
-                        "عدد المكالمات", format="%d",
-                    ),
-                },
-                key="snb_model_manager_editor",
-            )
-        else:
-            edited = pd.DataFrame()
         add_note = st.text_input("إضافة إفادة جديدة يدويًا (اختياري)")
         add_rating = st.selectbox(
             "تقييم الإفادة الجديدة",
@@ -7686,7 +7705,7 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload, model_mapping,
     """Review each special row unless its exact text was explicitly approved."""
     decisions = _snb_slash_row_decisions(activity_upload)
     marked = _snb_special_review_mask(frame[notes_col], approved_special_keys)
-    flagged = frame.loc[marked].copy()
+    flagged = frame.loc[marked & ~frame.index.map(str).isin(decisions)].copy()
     if flagged.empty:
         return decisions, True
 
@@ -7699,7 +7718,8 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload, model_mapping,
         "، ".join(_snb_review_trigger_reasons(note))
         for note in flagged[notes_col]
     ]
-    manual_mapping = manual_mapping or {}
+    if manual_mapping is None:
+        manual_mapping = {}
     # Model values are ONLY editable suggestions here, never approvals.
     # Previously approved row choices override the suggestion.
     model_keys = list(model_mapping)
@@ -7753,7 +7773,7 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload, model_mapping,
         st.warning(
             "تم تحديد الصفوف التي تحتوي على / أو // أو «معالج» أو «تم» "
             "(باستثناء الإفادات الخاصة بالسداد والخصم والسحب التي تُقيَّم من الموديل). "
-            "راجعي كل صف ظاهر حتى لو طابق موديل النشاط."
+            "راجعي الإفادات الجديدة الظاهرة قبل اعتمادها."
         )
         st.caption("التقييم مقترح من أقرب إفادة في الموديل. الأصفر يعني تقارب أقل من 50%. تقدري تعدّلي التقييم قبل الاعتماد.")
         order = st.selectbox("ترتيب حسب اللون · Sort by color",
@@ -7811,6 +7831,12 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload, model_mapping,
             else:
                 decisions.pop(str(original_index), None)
         if all(str(i) in decisions for i in original_indices):
+            if manual_mapping is not None:
+                approved_rows = frame.loc[marked, notes_col]
+                for key, group in approved_rows.groupby(approved_rows.map(_snb_normalize_note)):
+                    ratings = {decisions.get(str(i)) for i in group.index}
+                    if key and len(ratings) == 1 and None not in ratings:
+                        manual_mapping[key] = ratings.pop()
             st.rerun()
         st.error("اختاري ناجحة أو غير ناجحة لكل صف قبل استخراج التقرير.")
     pending = sum(str(i) not in decisions for i in original_indices)
@@ -7920,9 +7946,6 @@ def _snb_kpi_counts(selected, notes_col, mapping, manual, row_decisions):
     """Compute current SNB KPIs without auto-rating any special/unknown note."""
     keys = selected[notes_col].map(_snb_normalize_note)
     values = keys.map(mapping).combine_first(keys.map(manual))
-    special = _snb_special_review_mask(selected[notes_col])
-    # Special Notes ALWAYS require a per-row explicit decision.
-    values.loc[special] = None
     if row_decisions:
         overrides = pd.Series(
             [row_decisions.get(str(index)) for index in selected.index],
@@ -9192,6 +9215,7 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
                 manual_decisions, slash_row_decisions
             )
             _ejada_activity_kpis("SNB", *counts)
+        approved_special_keys = set(model_mapping) | set(manual_decisions)
         slash_row_decisions, slash_reviewed = _snb_review_slash_rows(
             selected, stats["notes"], activity_upload,
             model_mapping, manual_decisions,
@@ -9418,10 +9442,11 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
                 key="snb_activity_approval_choice",
             )
         if approval_choice == "فتح إدارة موديل النشاط (اختياري)":
-            _snb_render_model_management(
-                selected[stats["notes"]], model_mapping,
-                manual_decisions, slash_row_decisions,
-            )
+            with st.container(key="snb_model_manager_panel", gap="small"):
+                _snb_render_model_management(
+                    selected[stats["notes"]], model_mapping,
+                    manual_decisions, slash_row_decisions,
+                )
         else:
             st.caption(
                 "✅ التقرير جاهز للتحميل بالتقييمات المعتمدة بالفعل. "
