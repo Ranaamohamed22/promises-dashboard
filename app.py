@@ -1952,7 +1952,10 @@ st.markdown(f"""
     .stApp div[class*="st-key-uploaded_chip_"] [data-testid="stButton"] button {{width:25px !important;min-width:25px !important;height:25px !important;min-height:25px !important;padding:0 !important;background:#ae3034 !important;color:white !important;}}
     .stApp div[class*="st-key-uploaded_chip_"] button p {{color:white !important;line-height:1 !important;}}
     .stApp div[class*="_upload_card"], .stApp [data-testid="stVerticalBlockBorderWrapper"]:has([class*="st-key-uploaded_chip_"]) {{height:auto !important;min-height:0 !important;max-height:none !important;}}
-    .st-key-promise_comparison {{margin-top:16px;}}
+    .st-key-promise_comparison {{margin-top:calc(16px + 0.5cm);}}
+    .st-key-promise_comparison table.ejada-diagnostic-table th.step-heading {{text-align:center !important;}}
+    .st-key-brand_header {{position:relative;padding:0 0 10px;}}
+    .st-key-brand_header .st-key-theme_toggle {{position:absolute !important;right:0;top:0;width:fit-content !important;}}
     .st-key-promise_comparison [data-testid="stExpander"] details[open] {{height:auto !important;max-height:none !important;overflow:visible !important;}}
     .st-key-promise_comparison table.ejada-diagnostic-table {{display:table !important;}}
     .st-key-promise_comparison table.ejada-diagnostic-table :is(td, th) {{padding:9px 10px !important;line-height:1.4;}}
@@ -1970,24 +1973,13 @@ st.markdown(f"""
 # ==========================================
 # 0. الصف العلوي: Overview وبجواره زر القمر
 # ==========================================
-top_cols = st.columns([0.48, 1.55, 7.97], gap="small")
-
-with top_cols[0]:
+with st.container(key="brand_header"):
     st.button("🌓", key="theme_toggle", on_click=toggle_theme, help=f"الثيم الحالي: {st.session_state.theme_choice} · اضغطي لتغيير اللون")
-
-# ==========================================
-# 1. الهيدر الرئيسي
-# ==========================================
-# وضع اسم البنك على يسار الشاشة مباشرة، بعيداً عن انعكاس أعمدة RTL.
-# الشعار في منتصف الصفحة، ولا نستخدم وسوماً غير مغلقة.
-# Keep EJADA centered; no duplicate green bank title above the bank selectors.
-st.markdown(f"""
-<div class="ejada-header" style="position:relative;width:100%;height:72px;margin-top:-54px;direction:ltr;pointer-events:none;z-index:1;">
-  <div style="position:absolute;left:50%;top:0;transform:translateX(-50%);text-align:center;line-height:1.03;white-space:nowrap;">
-    <div style="color:{header_logo_color};font-size:43px;font-weight:900;font-family:Tahoma,sans-serif;">إجـــادة</div>
-    <div style="color:{header_logo_color};font-size:18px;letter-spacing:9px;font-weight:900;">EJADA</div>
-    <div style="color:{header_logo_color};font-size:16px;font-weight:900;">لتحصيل الديون</div>
-  </div>
+    st.markdown(f"""
+<div class="ejada-header" style="text-align:center;direction:ltr;line-height:1.12;color:{header_logo_color};font-weight:900;">
+  <div style="font-size:43px;font-family:Tahoma,sans-serif;">إجـــادة</div>
+  <div style="font-size:18px;letter-spacing:9px;">EJADA</div>
+  <div style="font-size:16px;">لتحصيل الديون</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -9514,9 +9506,10 @@ def render_promise_filter_diagnostics(bank, kind):
         return
 
     def _table_html(items, name_col):
+        heading_class = "step-heading" if name_col == "الخطوة" else ""
         html_parts = [
             '<table class="ejada-diagnostic-table" dir="rtl">',
-            f'<thead><tr><th>{name_col}</th><th>العدد</th></tr></thead><tbody>'
+            f'<thead><tr><th class="{heading_class}">{name_col}</th><th>العدد</th></tr></thead><tbody>'
         ]
         for item in items:
             label = _xml_escape(str(item.get(name_col, '')))
