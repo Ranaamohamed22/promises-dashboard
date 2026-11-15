@@ -6677,10 +6677,6 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
             ["ناجحة", "غير ناجحة"],
             key="snb_model_manager_new_rating",
         )
-        overwrite = st.checkbox(
-            "أوافق على استبدال التقييم القديم لو الإفادة موجودة",
-            value=False,
-        )
         allow_special = st.checkbox(
             "أوافق على حفظ الإفادات الخاصة أيضًا كتقييم ثابت عند تطابق النص تمامًا",
             value=False,
@@ -6691,6 +6687,62 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
             ),
         )
         save = st.form_submit_button("💾 حفظ الإفادات المحددة في الموديل")
+    pending = st.session_state.get("snb_model_manager_pending_changes")
+    if isinstance(pending, dict):
+        st.warning("يوجد اختلاف في تقييم بعض الإفادات. راجعي القديم والجديد قبل الحفظ.")
+        comparison = pd.DataFrame([
+            {
+                "اعتماد التغيير": False,
+                "الإفادة": item["note"],
+                "التقييم القديم": "ناجحة (1)" if item["old"] == 1 else "غير ناجحة (0)",
+                "التقييم الجديد": "ناجحة (1)" if item["new"] == 1 else "غير ناجحة (0)",
+                "مصدر التقييم القديم": item["source"],
+            }
+            for item in pending["conflicts"]
+        ])
+        with st.form("snb_model_manager_conflict_approval_form"):
+            reviewed = st.data_editor(
+                comparison, use_container_width=True, hide_index=True,
+                disabled=["الإفادة", "التقييم القديم", "التقييم الجديد",
+                          "مصدر التقييم القديم"],
+                column_config={
+                    "اعتماد التغيير": st.column_config.CheckboxColumn(
+                        "أوافق على التغيير", default=False
+                    ),
+                    "الإفادة": st.column_config.TextColumn("الإفادة", width="large"),
+                },
+                key="snb_model_manager_conflict_editor",
+            )
+            confirm = st.form_submit_button("✅ اعتماد التقييمات الجديدة وحفظها")
+            cancel = st.form_submit_button("إلغاء التعديل")
+        if cancel:
+            st.session_state.pop("snb_model_manager_pending_changes", None)
+            st.rerun()
+        if confirm:
+            if reviewed.empty or not reviewed["اعتماد التغيير"].fillna(False).all():
+                st.error("وافقي على جميع الإفادات المختلفة قبل الحفظ.")
+                return
+            try:
+                latest, _, _, _ = _snb_load_saved_model_notes(settings)
+                for item in pending["conflicts"]:
+                    existing = latest.get(item["key"], base_mapping.get(item["key"]))
+                    if existing != item["old"]:
+                        st.session_state.pop("snb_model_manager_pending_changes", None)
+                        st.warning("تقييم إحدى الإفادات اتغير في جلسة تانية. راجعيه من جديد.")
+                        return
+                count = _snb_save_model_notes(
+                    settings, pending["additions"],
+                    allow_special=pending["allow_special"],
+                )
+            except (RuntimeError, ValueError) as exc:
+                st.error(f"تعذّر الحفظ بعد الموافقة: {exc}")
+                return
+            st.session_state.pop("snb_model_manager_pending_changes", None)
+            st.session_state.snb_model_manager_saved = (
+                f"اتحفظت {count} إفادة بعد الموافقة على تغييرات التقييم."
+            )
+            st.rerun()
+        return
     if not save:
         return
     additions = []
@@ -6712,6 +6764,7 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
         return
     batch = {}
     batch_labels = {}
+    conflicts_to_approve = []
     for note, rating in additions:
         key = _snb_normalize_note(note)
         if not key:
@@ -6727,11 +6780,23 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
             st.error("نفس الإفادة موجودة بتقييمين مختلفين.")
             return
         existing = persisted.get(key, base_mapping.get(key))
-        if existing is not None and existing != rating and not overwrite:
-            st.warning("فيه إفادة بتقييم مختلف عن الموديل؛ فعّلي الموافقة على الاستبدال أولًا.")
-            return
+        if existing is not None and existing != rating:
+            conflicts_to_approve.append({
+                "key": key, "note": note.strip(),
+                "old": int(existing), "new": int(rating),
+                "source": "موديل SNB المحفوظ" if key in persisted else "موديل SNB الأساسي",
+            })
         batch[key] = rating
         batch_labels[key] = note.strip()
+    if conflicts_to_approve:
+        st.session_state["snb_model_manager_pending_changes"] = {
+            "conflicts": conflicts_to_approve,
+            "additions": [
+                (batch_labels[key], rating) for key, rating in batch.items()
+            ],
+            "allow_special": allow_special,
+        }
+        st.rerun()
     try:
         count = _snb_save_model_notes(
             settings,
