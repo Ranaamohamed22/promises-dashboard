@@ -7884,38 +7884,59 @@ def _ejada_toggle_activity_dashboard(bank):
     st.session_state[key] = not bool(st.session_state.get(key, False))
 
 
-def _ejada_activity_kpis(bank, covered, successful=None,
-                           unsuccessful=None, unresolved=0):
-    """Dashboard section for call KPIs and future Activity charts."""
+def _activity_dashboard_html(bank, covered, successful, unsuccessful, unresolved, period):
+    labels = ("إجمالي المكالمات المغطاة", "المكالمات الناجحة", "المكالمات غير الناجحة")
+    cards = "".join(
+        f'<div class="ea-card"><span>{label}</span><strong>{int(value):,}</strong></div>'
+        if value is not None else f'<div class="ea-card"><span>{label}</span><strong>—</strong></div>'
+        for label, value in zip(labels, (covered, successful, unsuccessful))
+    )
+    chart = ""
+    if covered and successful is not None and unsuccessful is not None:
+        bars = []
+        groups = [("ناجحة", successful, "#1F4373"), ("غير ناجحة", unsuccessful, "#151515")]
+        if unresolved:
+            groups.append(("تحتاج مراجعة", unresolved, "#9b6926"))
+        for label, count, color in groups:
+            pct = 100 * count / covered
+            bars.append(f'<div class="ea-row"><span>{label}</span><b>{pct:.1f}%</b></div>'
+                        f'<div class="ea-track"><i style="width:{pct:.4f}%;background:{color}"></i></div>')
+        chart = '<h3>توزيع المكالمات حسب التقييم</h3>' + "".join(bars)
+    pending = f'<p>مكالمات تحتاج مراجعة: {int(unresolved):,}</p>' if unresolved else ""
+    title = f"لوحة مؤشرات النشاط | {bank}"
+    css = """
+.ea-dashboard{direction:rtl;background:#f4f7fb;color:#193858;border:1px solid #b9c9da;
+border-radius:16px;padding:22px;font-family:Tahoma,Arial,sans-serif;text-align:right;box-sizing:border-box}
+.ea-dashboard h2,.ea-dashboard h3{color:#193858;margin:0 0 12px}
+.ea-dashboard p{margin:0 0 14px}.ea-dashboard h3{margin-top:20px;font-size:16px}
+.ea-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(155px,100%),1fr));gap:10px}
+.ea-card{background:white;border:1px solid #ced9e5;border-radius:10px;text-align:center;padding:14px}
+.ea-card strong{display:block;font-size:28px;margin-top:8px}
+.ea-row{display:flex;justify-content:space-between;margin-top:8px;font-size:14px}
+.ea-track{height:9px;border-radius:6px;overflow:hidden;background:#dce5ee}.ea-track i{display:block;height:100%}
+"""
+    body = (f'<section class="ea-dashboard"><h2>{title}</h2><p>{_xml_escape(period)}</p>'
+            f'<div class="ea-cards">{cards}</div>{chart}{pending}</section>')
+    fragment = f"<style>{css}</style>{body}"
+    document = (f'<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">'
+                f'<meta name="viewport" content="width=device-width,initial-scale=1"><title>{title}</title>'
+                '<style>body{max-width:1050px;margin:24px auto;padding:0 12px;background:#fff}</style>'
+                f'</head><body>{fragment}</body></html>')
+    return fragment, document
+
+
+def _ejada_activity_kpis(bank, covered, successful=None, unsuccessful=None, unresolved=0,
+                         period=""):
     if not _ejada_activity_dashboard_is_open(bank):
         return
+    fragment, document = _activity_dashboard_html(bank, covered, successful, unsuccessful,
+                                                  unresolved, period)
     with st.container(key=f"ejada_activity_dashboard_{bank}"):
-        st.markdown(
-            f'<div style="color:{label_color};font-weight:900;'
-            'font-size:20px;text-align:center;margin:12px 0 8px;">'
-            f'📊 لوحة مؤشرات النشاط | {bank}</div>',
-            unsafe_allow_html=True
-        )
-        with st.container(key="ejada_activity_kpi_panel"):
-            left, center, right = st.columns(3, gap="small")
-            with left:
-                st.metric("📞 إجمالي المكالمات المغطاة", f"{int(covered):,}")
-            with center:
-                st.metric(
-                    "✅ إجمالي المكالمات الناجحة",
-                    f"{int(successful):,}" if successful is not None else "—"
-                )
-            with right:
-                st.metric(
-                    "❌ إجمالي المكالمات غير الناجحة",
-                    f"{int(unsuccessful):,}" if unsuccessful is not None else "—"
-                )
-        if unresolved:
-            st.caption(
-                f"يوجد {int(unresolved):,} مكالمة لم تُعتمد نتيجتها بعد؛ "
-                "لا تُحتسب ناجحة ولا غير ناجحة."
-            )
-        # Future chart widgets are added beneath the KPI panel here.
+        st.html(fragment)
+        if period:
+            st.download_button("تحميل داشبورد النشاط HTML", data=document.encode("utf-8"),
+                               file_name=f"{bank}_Activity_Dashboard.html", mime="text/html",
+                               key=f"activity_html_{bank}")
 
 
 def _snb_kpi_counts(selected, notes_col, mapping, manual, row_decisions):
@@ -9012,7 +9033,11 @@ def render_stc_activity_report(model_upload, activity_upload,
     bad = int((ratings == 0).sum())
     unknown = int(len(frame) - good - bad)
     if _ejada_activity_dashboard_is_open("STC"):
-        _ejada_activity_kpis("STC", len(frame), good, bad, unknown)
+        scope = effective_kind if effective_kind and effective_kind != "تلقائي" else "الملف المرفوع"
+        dates = parsed.reindex(frame.index).dropna() if parsed is not None else pd.Series(dtype="datetime64[ns]")
+        if not dates.empty:
+            scope += f" | {dates.min():%Y-%m-%d} – {dates.max():%Y-%m-%d}"
+        _ejada_activity_kpis("STC", len(frame), good, bad, unknown, period=scope)
     st.caption(
         f"STC | مكالمات الفترة: {len(frame):,} | ناجحة: {good:,} | "
         f"غير ناجحة: {bad:,} | تحتاج مراجعة: {unknown:,} | "
@@ -9167,7 +9192,17 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind="ي�
                 selected, stats["notes"], model_mapping,
                 manual_decisions, slash_row_decisions
             )
-            _ejada_activity_kpis("SNB", *counts)
+            scope = activity_kind
+            if activity_kind == "يومي":
+                scope += f" | {names[period]}"
+                if remove_last:
+                    scope += " | بعد حذف آخر ساعة"
+                if not remove_extra:
+                    scope += " | يشمل الساعة الإضافية"
+            dates = selected["__ejada_parsed_created"].dropna()
+            if not dates.empty:
+                scope += f" | {dates.min():%Y-%m-%d} – {dates.max():%Y-%m-%d}"
+            _ejada_activity_kpis("SNB", *counts, period=scope)
         approved_special_keys = set(model_mapping) | set(manual_decisions)
         slash_row_decisions, slash_reviewed = _snb_review_slash_rows(
             selected, stats["notes"], activity_upload,
