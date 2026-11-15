@@ -9479,11 +9479,12 @@ def render_promise_filter_diagnostics(bank, kind):
     kind_label = {
         "active": "القائمة", "broken": "المكسورة", "neglect": "الإهمال"
     }.get(kind, kind)
+    heading = (
+        f"🔎 تشخيص فلترة الإهمال {bank}" if kind == "neglect"
+        else f"🔎 تشخيص فلترة الوعود {kind_label} {bank}"
+    )
     with st.container(key=f'promise_diagnostic_{bank}_{kind}'):
-        with st.expander(
-            f'🔎 تشخيص فلترة الوعود {kind_label} {bank}',
-            expanded=True
-        ):
+        with st.expander(heading, expanded=True):
             st.markdown(
                 "<div style='font-size:12px;font-weight:800;"
                 "text-align:right;color:#586F8C;margin-bottom:7px;'>"
