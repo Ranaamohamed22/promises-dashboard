@@ -2121,7 +2121,7 @@ st.markdown(f"""
     .selected-bank.SNB {{color:#005645;}}
     .selected-bank.STC {{color:#4f008c;}}
     .selected-bank::before {{content:"";width:10px;height:10px;background:#24a145;border-radius:50%;}}
-    .st-key-ejada_change_bank_btn button {{width:max-content !important;min-width:0 !important;padding:4px 9px !important;}}
+    .st-key-ejada_change_bank_btn button, .st-key-ejada_model_manager_btn button {{width:max-content !important;min-width:0 !important;padding:4px 9px !important;white-space:nowrap !important;}}
     .st-key-promise_comparison div[class*="st-key-promise_diagnostic_"] {{max-width:100% !important;margin:0 !important;}}
     .st-key-promise_comparison table.ejada-diagnostic-table {{width:100% !important;margin:0 !important;}}
     .st-key-promise_comparison div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] {{padding:8px 0 12px !important;}}
@@ -2204,7 +2204,7 @@ def _render_ejada_main_navigation():
 if st.session_state.current_page != 'Home':
     # A bank is selected on Home; its reports stay grouped behind that choice.
     with st.container(key="bank_report_bar"):
-        nav_col, bank_col = st.columns([4, 1.4], gap="small", vertical_alignment="center")
+        nav_col, bank_col = st.columns([3.45, 2.55], gap="small", vertical_alignment="center")
         with bank_col, st.container(key="bank_switch", horizontal=True, gap=None,
                                     horizontal_alignment="left", vertical_alignment="center"):
             bank = st.session_state.selected_bank
@@ -2212,6 +2212,11 @@ if st.session_state.current_page != 'Home':
                         unsafe_allow_html=True, width="content")
             st.button("تغيير البنك", key="ejada_change_bank_btn", width="content",
                       on_click=set_page, args=("Home",))
+            st.button(
+                "إدارة موديل النشاط", key="ejada_model_manager_btn",
+                width="content", on_click=set_page, args=("ModelManagement",),
+                type="primary" if st.session_state.current_page == "ModelManagement" else "secondary",
+            )
         with nav_col:
             _render_ejada_main_navigation()
     if st.session_state.current_page == 'Overview':
@@ -7250,6 +7255,126 @@ def _stc_save_activity_model(additions, allow_overwrite=False):
     return len(current)
 
 
+
+def _render_bank_activity_model_manager(bank):
+    """Independent, password-protected editor for the selected bank's encrypted model."""
+    st.markdown(f"## إدارة موديل النشاط — {bank}")
+    st.caption(
+        "إدارة إفادات البنك المختار فقط. الموديلان منفصلان، "
+        "ولا يتم حفظ أي ملف نشاط أو بيانات عملاء هنا."
+    )
+    settings = _snb_model_git_settings()
+    missing = [
+        name for name, enabled in (
+            ("GITHUB_TOKEN", settings["token"]),
+            ("MODEL_ADMIN_PASSWORD", settings["admin_password"]),
+            ("MODEL_ENCRYPTION_KEY", _snb_secret("MODEL_ENCRYPTION_KEY")),
+        ) if not enabled
+    ]
+    if missing:
+        st.warning("إدارة الموديل تحتاج إعدادات Streamlit Secrets: " + "، ".join(missing))
+        return
+
+    auth_key = f"ejada_model_admin_{bank}"
+    if not st.session_state.get(auth_key, False):
+        with st.form(f"ejada_model_login_{bank}"):
+            password = st.text_input("كلمة مرور إدارة موديل النشاط", type="password")
+            login = st.form_submit_button("فتح موديل " + bank)
+        if login:
+            if hmac.compare_digest(password, settings["admin_password"]):
+                st.session_state[auth_key] = True
+                st.rerun()
+            else:
+                st.error("كلمة مرور الإدارة غير صحيحة.")
+        return
+
+    if st.button("قفل إدارة الموديل", key=f"ejada_model_logout_{bank}"):
+        st.session_state[auth_key] = False
+        st.rerun()
+
+    try:
+        if bank == "SNB":
+            saved, labels, _, approved_special = _snb_load_saved_model_notes(settings)
+            base = {}
+            if _snb_secret("SNB_MODEL_ENCRYPTED"):
+                base, _, _ = _snb_secret_model_evaluations()
+        else:
+            saved, labels, _ = _stc_load_saved_activity_model()
+            approved_special, base = set(), {}
+    except (ValueError, RuntimeError) as exc:
+        st.error(f"تعذّر تحميل موديل {bank}: {exc}")
+        return
+
+    st.metric("الإفادات المحفوظة في الموديل الدائم", len(saved))
+    if bank == "SNB":
+        st.caption(
+            f"الموديل الأساسي المشفّر: {len(base)} إفادة. "
+            "الجدول يعرض الإضافات المحفوظة فقط؛ التعديل لا يمس ملف الموديل الأساسي."
+        )
+    if saved:
+        search = st.text_input("البحث داخل الإفادات المحفوظة", key=f"ejada_model_search_{bank}")
+        filtered = [
+            {"الإفادة": labels.get(key, key),
+             "التقييم": ("مراجعة يدوية كل مرة" if rating == -1 else
+                        "ناجحة" if rating == 1 else "غير ناجحة"),
+             "حالة خاصة": "معتمدة" if key in approved_special else ""}
+            for key, rating in sorted(saved.items())
+            if not search.strip() or search.strip().casefold() in labels.get(key, key).casefold()
+        ]
+        st.dataframe(pd.DataFrame(filtered), hide_index=True, use_container_width=True)
+
+    st.markdown("### إضافة إفادة أو تعديل تقييم محفوظ")
+    with st.form(f"ejada_model_edit_{bank}"):
+        note = st.text_area("نص الإفادة كما يظهر في التقرير")
+        rating_name = st.selectbox(
+            "التقييم", ["ناجحة", "غير ناجحة"] +
+            (["مراجعة يدوية كل مرة"] if bank == "STC" else [])
+        )
+        allow_special = (
+            st.checkbox(
+                "أوافق على اعتماد الإفادة الخاصة كتقييم ثابت عند تطابق النص تمامًا"
+            ) if bank == "SNB" else False
+        )
+        confirm_change = st.checkbox("أؤكد تغيير أي تقييم محفوظ مختلف عن التقييم الجديد")
+        submitted = st.form_submit_button("حفظ في موديل " + bank, type="primary")
+    if not submitted:
+        return
+
+    note = note.strip()
+    key = _snb_normalize_note(note)
+    if not key:
+        st.error("اكتبي نص الإفادة أولًا.")
+        return
+    value = {"ناجحة": 1, "غير ناجحة": 0, "مراجعة يدوية كل مرة": -1}[rating_name]
+    previous = saved.get(key, base.get(key))
+    if bank == "SNB" and _snb_review_trigger_reasons(note) and not (
+        allow_special or key in approved_special
+    ):
+        st.error("هذه إفادة خاصة؛ يلزم تفعيل الموافقة الصريحة قبل الحفظ.")
+        return
+    if bank == "STC" and previous == -1:
+        st.warning("هذه الإفادة محفوظة للمراجعة اليدوية كل مرة، ولا يمكن استبدالها من هذه الصفحة.")
+        return
+    if previous is not None and previous != value and not confirm_change:
+        st.warning("التقييم الحالي مختلف. راجعيه ثم فعّلي تأكيد تغيير التقييم.")
+        return
+    try:
+        if bank == "SNB":
+            _snb_save_model_notes(
+                settings, [(note, value)],
+                allow_special=bool(allow_special or key in approved_special),
+            )
+        else:
+            _stc_save_activity_model(
+                [(note, value)], allow_overwrite=bool(confirm_change)
+            )
+    except (RuntimeError, ValueError) as exc:
+        st.error(f"تعذّر حفظ التعديل: {exc}")
+        return
+    st.session_state[f"ejada_model_saved_{bank}"] = "تم حفظ الإفادة في موديل " + bank
+    st.rerun()
+
+
 def _stc_render_saved_model(saved_ratings):
     with st.expander("صيغة ملف موديل STC"):
         st.caption("اكتبي نص الإفادة في Notes والتقييم في التقييم: 1 للمكالمة الناجحة و0 لغير الناجحة.")
@@ -10685,7 +10810,7 @@ if curr_page in ('Promises', 'Neglect'):
 
 # Activity is intentionally a blank design canvas until the new report is specified.
 # Keep other pages and their upload state completely unchanged.
-page_uploaded = None if curr_page == 'Activity' else bank_files[curr_page]
+page_uploaded = None if curr_page in ('Activity', 'ModelManagement') else bank_files[curr_page]
 
 if page_uploaded is None:
     if curr_page == 'Home':
@@ -10729,6 +10854,11 @@ if page_uploaded is None:
             <p style="color:{kpi_title_color};margin:0;font-weight:700;">اختاري البنك، ثم ارفعي تقرير النشاط وتقرير الوعود والإهمال لبناء لوحة المؤشرات.</p>
         </div>
         """, unsafe_allow_html=True)
+    elif curr_page == 'ModelManagement':
+        notice = st.session_state.pop(f"ejada_model_saved_{selected_bank}", None)
+        if notice:
+            st.success(notice)
+        _render_bank_activity_model_manager(selected_bank)
     elif curr_page == 'Activity':
         # Put file uploader, title and compact activity-type selector on ONE row.
         activity_error_slot = st.empty()
