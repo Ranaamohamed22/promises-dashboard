@@ -6662,6 +6662,12 @@ def _snb_github_model_request(settings, method="GET", payload=None,
 
 
 
+@st.cache_data(ttl=20, show_spinner=False, max_entries=8)
+def _cached_model_github_get(token, repo, branch, model_path):
+    settings = {"token": token, "repo": repo, "branch": branch}
+    return _snb_github_model_request(settings, model_path=model_path)
+
+
 def _snb_get_fernet():
     """Require private encryption key; never place the key in a public repository."""
     secret = _snb_secret("MODEL_ENCRYPTION_KEY")
@@ -6723,7 +6729,10 @@ def _snb_load_saved_model_notes(settings):
     """Return ratings, labels, SHA and explicitly approved special-note keys."""
     if not settings["token"]:
         return {}, {}, None, set()
-    response = _snb_github_model_request(settings)
+    response = _cached_model_github_get(
+        settings["token"], settings["repo"], settings["branch"],
+        _SNB_MODEL_OVERRIDES_PATH
+    )
     if response is None:
         return {}, {}, None, set()
     if not isinstance(response, dict) or response.get("type") != "file":
@@ -6801,6 +6810,7 @@ def _snb_save_model_notes(settings, additions, allow_special=False):
     if sha:
         payload["sha"] = sha
     _snb_github_model_request(settings, method="PUT", payload=payload)
+    _cached_model_github_get.clear()
     return len(additions)
 
 
@@ -7160,8 +7170,9 @@ def _stc_load_saved_activity_model():
     settings = _snb_model_git_settings()
     if not settings["token"]:
         return {}, {}, None
-    response = _snb_github_model_request(
-        settings, model_path=_STC_MODEL_FILE_PATH
+    response = _cached_model_github_get(
+        settings["token"], settings["repo"], settings["branch"],
+        _STC_MODEL_FILE_PATH
     )
     if response is None:
         return {}, {}, None
@@ -7235,6 +7246,7 @@ def _stc_save_activity_model(additions, allow_overwrite=False):
         settings, method="PUT", payload=payload,
         model_path=_STC_MODEL_FILE_PATH
     )
+    _cached_model_github_get.clear()
     return len(current)
 
 
@@ -7300,10 +7312,9 @@ def _snb_model_evaluations(uploaded_model):
     return mapping, len(conflict_keys), rejected
 
 
-def _prepare_snb_activity_file(uploaded_file):
-    """Deduplicate Debitor+Notes+Collector, create Time, and combine CC/PF."""
-    file_name = uploaded_file.name
-    file_bytes = uploaded_file.getvalue()
+@st.cache_data(show_spinner=False, max_entries=8)
+def _prepare_snb_activity_bytes(file_bytes, file_name):
+    """Cached SNB activity preparation keyed by the exact uploaded bytes."""
     if file_name.lower().endswith(".csv"):
         try:
             frame = pd.read_csv(
@@ -7448,6 +7459,12 @@ def _prepare_snb_activity_file(uploaded_file):
         "combined_products": combined_products,
         "bad_created": int(parsed.isna().sum())
     }
+
+
+def _prepare_snb_activity_file(uploaded_file):
+    return _prepare_snb_activity_bytes(
+        uploaded_file.getvalue(), uploaded_file.name
+    )
 
 
 def _infer_snb_daily_period(frame):
@@ -7603,6 +7620,15 @@ def _snb_model_similarity(note_key, model_keys):
     return percent, match
 
 
+@st.cache_data(show_spinner=False, max_entries=32)
+def _cached_model_similarities(note_keys, model_keys):
+    model_list = list(model_keys)
+    return {
+        key: _snb_model_similarity(key, model_list)
+        for key in note_keys
+    }
+
+
 def _snb_manual_evaluations(model_upload):
     """Decisions persist across reruns, but NEVER across a changed model."""
     if model_upload is None:
@@ -7625,9 +7651,9 @@ def _snb_review_new_notes(notes, mapping, manual, conflicted=0):
     """
     normalized = notes.map(_snb_normalize_note)
     unresolved_keys = set(normalized.unique()) - set(mapping) - set(manual)
-    similarity = {}
-    for key in normalized.unique():
-        similarity[key] = _snb_model_similarity(key, list(mapping))
+    similarity = _cached_model_similarities(
+        tuple(normalized.unique()), tuple(mapping.keys())
+    )
 
     if not unresolved_keys:
         return similarity, True
@@ -8885,21 +8911,22 @@ def _activity_period(stamps):
 
 
 
-def _stc_prepare_activity_data(uploaded):
-    """Read STC activity without requiring the SNB-specific source columns."""
-    if uploaded.name.lower().endswith(".csv"):
+@st.cache_data(show_spinner=False, max_entries=8)
+def _stc_prepare_activity_bytes(file_bytes, file_name):
+    """Cached STC activity preparation keyed by the exact uploaded bytes."""
+    if file_name.lower().endswith(".csv"):
         try:
             frame = pd.read_csv(
-                io.BytesIO(uploaded.getvalue()), dtype=str,
+                io.BytesIO(file_bytes), dtype=str,
                 encoding="utf-8-sig", low_memory=False
             )
         except UnicodeDecodeError:
             frame = pd.read_csv(
-                io.BytesIO(uploaded.getvalue()), dtype=str,
+                io.BytesIO(file_bytes), dtype=str,
                 encoding="cp1256", low_memory=False
             )
     else:
-        frame = pd.read_excel(io.BytesIO(uploaded.getvalue()), dtype=str)
+        frame = pd.read_excel(io.BytesIO(file_bytes), dtype=str)
     frame.columns = frame.columns.astype(str).str.strip()
     notes_col = _snb_find_column(
         frame, "Notes", "Note", "الإفادة", "ملاحظات", "Feedback"
@@ -8937,6 +8964,12 @@ def _stc_prepare_activity_data(uploaded):
     return frame, notes_col, collector, identity, parsed
 
 
+def _stc_prepare_activity_data(uploaded):
+    return _stc_prepare_activity_bytes(
+        uploaded.getvalue(), uploaded.name
+    )
+
+
 def _activity_week_start(stamps, short):
     start = 6 if short else 5  # Monday = 0.
     return stamps.dt.normalize() - pd.to_timedelta((stamps.dt.weekday - start) % 7, unit="D")
@@ -8960,6 +8993,7 @@ def _activity_week_choice(stamps, key, monthly=False):
     return valid, starts
 
 
+@st.cache_data(show_spinner=False, max_entries=8)
 def _stc_duplicate_mask(frame, collector, identity, stamps):
     keys = pd.DataFrame({"collector": frame[collector].str.strip(),
                          "identity": frame[identity].fillna("").str.strip(),
@@ -8975,7 +9009,9 @@ def _stc_model_choices(frame, notes, collector, identity, stamps, mapping, label
     if len(pending):
         names = {0: "غير ناجحة", 1: "ناجحة"}
         known = [k for k,v in mapping.items() if v in names]
-        suggestions = {k: _snb_model_similarity(k, known) for k in keys.loc[pending].unique()}
+        suggestions = _cached_model_similarities(
+            tuple(keys.loc[pending].unique()), tuple(known)
+        )
         rows = []
         for i in pending:
             percent, near = suggestions[keys[i]]
