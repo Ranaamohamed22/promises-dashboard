@@ -7360,7 +7360,7 @@ def _snb_first_last_notes(result, collector_col, notes_col, activity_kind, perio
     show_break = activity_kind == "يومي" and period in ("second", "full")
     if not show_break:
         columns = [col for col in columns if "البريك" not in col]
-    if activity_kind != "يومي" or period != "full":
+    if activity_kind == "يومي" and period != "full":
         columns.remove("مدة الدوام")
     stamp = "__ejada_parsed_created"
     if (result is None or result.empty or collector_col not in result.columns
@@ -8952,12 +8952,31 @@ def _stc_metrics(frame, collector, stamps, ratings):
     return result
 
 
-def _stc_summary(result, groups):
+def _format_duty_span(span):
+    seconds = int(round(span.total_seconds()))
+    hours, rest = divmod(seconds, 3600)
+    minutes, seconds = divmod(rest, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def _snb_duty_totals(time_notes):
+    daily = pd.to_timedelta(time_notes["مدة الدوام"])
+    totals = daily.groupby(time_notes["المحصل"]).sum().map(_format_duty_span)
+    return totals.rename("مدة الدوام").reset_index()
+
+
+def _stc_summary(result, groups, stamps=None):
     agg = result.groupby(groups, sort=True).agg(**{
         "المكالمات المغطاة": ("تقييم المكالمات","size"),
         "ناجحة": ("تقييم المكالمات",lambda v: v.eq("ناجحة").sum()),
         "غير ناجحة": ("تقييم المكالمات",lambda v: v.eq("غير ناجحة").sum()),
         "الوقت المهدر بالدقائق": ("الوقت المهدر بالدقائق","sum")})
+    if stamps is not None:
+        day_groups = list(dict.fromkeys([*groups, "التاريخ"]))
+        grouped = stamps.loc[result.index].groupby([result[col] for col in day_groups])
+        daily = grouped.max() - grouped.min()
+        spans = daily.groupby(level=groups).sum() if day_groups != groups else daily
+        agg["مدة الدوام"] = spans.map(_format_duty_span)
     return agg.reset_index()
 
 
@@ -9087,25 +9106,25 @@ def render_stc_activity_report(model_upload, activity_upload, activity_kind="ت�
         return
     _stc_offer_model_save(source, notes, st.session_state["stc_ratings_"+review_key], mapping, review_key)
     result = _stc_metrics(frame, collector, stamps, ratings)
-    summary = _stc_summary(result, [collector])
-    daily = _stc_summary(result, ["التاريخ", collector])
+    duty_stamps = None if first else stamps
+    summary = _stc_summary(result, [collector], duty_stamps)
+    daily = _stc_summary(result, ["التاريخ", collector], duty_stamps)
     _stc_dashboard(summary, collector, scope)
     st.dataframe(result, hide_index=True)
+    if duty_stamps is not None:
+        with st.expander("مدة الدوام لكل محصل"):
+            st.dataframe(summary[[collector, "مدة الدوام"]], hide_index=True)
+            if kind != "يومي":
+                st.dataframe(daily[["التاريخ", collector, "مدة الدوام"]], hide_index=True)
     if kind == "يومي":
         sheets = {"المكالمات": result, "ملخص المحصلين": summary}
         if not first:
-            spans = stamps.loc[result.index].groupby(result[collector]).agg(["min", "max"])
-            summary["مدة الدوام"] = summary[collector].map(
-                (spans["max"] - spans["min"]).map(lambda span: str(span).split()[-1])
-            )
             afternoon = stamps.loc[result.index] - day.loc[result.index] >= pd.Timedelta(hours=14, minutes=45)
             after = result.loc[afternoon].drop_duplicates(collector)
             sheets["أول إفادة بعد البريك"] = after[
                 [collector, notes, "الوقت", "تقييم المكالمات"]
             ].rename(columns={notes: "أول إفادة بعد البريك",
                               "تقييم المكالمات": "حالة أول إفادة بعد البريك"})
-            with st.expander("مدة الدوام لكل محصل"):
-                st.dataframe(summary[[collector, "مدة الدوام"]], hide_index=True)
             with st.expander("أول إفادة بعد البريك وحالتها"):
                 st.dataframe(sheets["أول إفادة بعد البريك"], hide_index=True)
         _stc_download(sheets, "تحميل تقرير النشاط اليومي", "STC_Daily.xlsx")
@@ -9116,7 +9135,7 @@ def render_stc_activity_report(model_upload, activity_upload, activity_kind="ت�
         if kind == "شهري":
             part = result.loc[weekly_mask.reindex(result.index)].copy()
             part["بداية الأسبوع"] = starts.loc[part.index].dt.date
-            details["تفاصيل كل أسبوع"] = _stc_summary(part, ["بداية الأسبوع",collector])
+            details["تفاصيل كل أسبوع"] = _stc_summary(part, ["بداية الأسبوع", collector], stamps)
         _stc_download(details, f"تحميل تفاصيل النشاط · {kind}", f"STC_{name}_Details.xlsx")
 
 
@@ -9360,12 +9379,18 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
             _snb_weekly_activity_trend(result, stats["collector"])
             if activity_kind == "أسبوعي" else (None, None)
         )
+        duty_totals = (_snb_duty_totals(time_notes)
+                       if activity_kind in ("أسبوعي", "شهري") else None)
         duty_col, waste_col = st.columns(2, gap="small")
         with duty_col:
             title = "أول وآخر إفادة وحالتهما"
+            if duty_totals is not None:
+                title += " ومدة الدوام"
             if show_break:
                 title += " وأول إفادة بعد البريك وحالتها"
             with st.expander(title, expanded=False):
+                if duty_totals is not None:
+                    _expander_table(duty_totals, "snb_total_duty")
                 _expander_table(time_notes, "snb_collector_time_notes")
         with waste_col:
             with st.expander(
@@ -9467,6 +9492,8 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                 ),
                 index=False,
             )
+            if duty_totals is not None:
+                duty_totals.to_excel(writer, sheet_name="إجمالي مدة الدوام", index=False)
             _snb_export_visible_columns(wasted_details).to_excel(
                 writer, sheet_name=details_sheet, index=False
             )
