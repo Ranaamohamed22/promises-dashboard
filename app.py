@@ -1862,6 +1862,12 @@ st.markdown(f"""
         margin-bottom: 10px !important;
     }}
 
+    div.st-key-snb_activity_header_row .st-key-stc_duplicate_prompt [data-testid="stRadio"]
+        :is(label, label *, [data-testid="stMarkdownContainer"] p, [data-testid="stTooltipIcon"]) {{
+        color: {label_color} !important;
+        -webkit-text-fill-color: {label_color} !important;
+    }}
+
     /* SNB report approval: legible white radio title/options on navy theme.
        Scope styling to this widget and retain theme-aware colors elsewhere. */
     div.st-key-snb_activity_approval_panel {{
@@ -8914,7 +8920,7 @@ def _stc_dashboard(summary, collector, scope):
 
 
 def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
-                               error_slot=None, shift_selector=None):
+                               error_slot=None, shift_selector=None, duplicate_slot=None):
     if activity_upload is not None:
         try:
             source, notes, collector, identity, stamps = _stc_prepare_activity_data(activity_upload)
@@ -8927,7 +8933,7 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
         duplicates = _stc_duplicate_mask(source, collector, identity, stamps)
         count = int(duplicates.sum())
         if count:
-            choice = st.radio(
+            choice = duplicate_slot.radio(
                 f"فيه {count:,} صف متكرر حسب Created by وDebitor وCreated on (التاريخ والوقت).",
                 ["تأكيد حذف التكرارات والاحتفاظ بأول صف", "الاحتفاظ بكل الصفوف"],
                 index=None, horizontal=True, key="duplicate_choice_" + key,
@@ -10163,8 +10169,10 @@ if page_uploaded is None:
         )
         with st.container(key="snb_activity_header_row"):
             # Rightmost uploader, compact adjacent activity type, free space left.
-            activity_col, kind_col, period_col, _space, dashboard_col = st.columns(
-                [1.8, 1.15, 1.15, 3.6, 1.5], gap="small",
+            is_stc = selected_bank == "STC"
+            widths = [1.8, 1.15, 3.6, 1.15, 1.5] if is_stc else [1.8, 1.15, 1.15, 3.6, 1.5]
+            activity_col, kind_col, third_col, fourth_col, dashboard_col = st.columns(
+                widths, gap="small",
                 vertical_alignment="center"
             )
             with activity_col:
@@ -10191,6 +10199,10 @@ if page_uploaded is None:
                         "نوع النشاط", options=["تلقائي", "يومي", "أسبوعي", "شهري"],
                         key="snb_activity_kind_auto"
                     )
+            period_col = fourth_col if is_stc else third_col
+            if is_stc:
+                with third_col, st.container(key="stc_duplicate_prompt"):
+                    duplicate_slot = st.empty()
             with period_col:
                 shift_selector = st.empty()
             with dashboard_col, st.container(horizontal=True, horizontal_alignment="left", key="activity_toggle_align"):
@@ -10211,7 +10223,7 @@ if page_uploaded is None:
             render_stc_activity_report(
                 _stc_uploaded.get("activity"),
                 activity_kind=activity_kind, shift_selector=shift_selector,
-                error_slot=activity_error_slot,
+                duplicate_slot=duplicate_slot, error_slot=activity_error_slot,
             )
         if (
             selected_bank == "SNB"
