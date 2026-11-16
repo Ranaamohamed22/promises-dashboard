@@ -9593,7 +9593,7 @@ def uploaded_chip(files, key, clear, args):
         st.button("×", key=key, help="مسح الملف المرفوع", on_click=clear, args=args, width="content")
 
 
-def render_report_upload_bar(page, promise_metrics=None):
+def render_report_upload_bar(page, promise_metrics=None, neglect_metrics=None):
     """Compact report header: file details and stacked X/+ alongside the title."""
     titles = {
         'Promises': '🤝 إدارة ومتابعة الوعود (القائمة والمكسورة)',
@@ -9604,10 +9604,15 @@ def render_report_upload_bar(page, promise_metrics=None):
     uploader_version = st.session_state.report_uploader_versions[selected_bank][page]
 
     with st.container(key=f"report_upload_bar_{selected_bank}_{page}"):
-        # Top-aligned row used by all three reports for both banks.
-        upload_col, title_col, _left_balance = st.columns(
-            [1.7, 3.9, 4.4], gap='small', vertical_alignment='top'
-        )
+        # Keep the neglect workflow selector immediately beside the portfolio uploader.
+        if page == "Neglect":
+            upload_col, mode_col, title_col, _left_balance = st.columns(
+                [1.65, 1.65, 4.0, 2.8], gap='small', vertical_alignment='center'
+            )
+        else:
+            upload_col, title_col, _left_balance = st.columns(
+                [1.7, 3.9, 4.4], gap='small', vertical_alignment='top'
+            )
 
         with upload_col:
             field_title = "رفع ملف الوعود" if page == "Promises" else "رفع ملف المحفظة"
@@ -9624,6 +9629,26 @@ def render_report_upload_bar(page, promise_metrics=None):
                         accept_multiple_files=True, label_visibility='collapsed',
                         key=widget_key, on_change=save_uploaded_files,
                         args=('page_files', selected_bank, page, widget_key)
+                    )
+
+        if page == "Neglect":
+            _neglect_mode_value = st.session_state.get(f"neglect_mode_{selected_bank}")
+            with mode_col:
+                with st.container(
+                    horizontal=True, vertical_alignment="center",
+                    key=f"neglect_mode_choices_{selected_bank}"
+                ):
+                    st.button(
+                        "🟢 إهمال" if _neglect_mode_value == "regular" else "⚪ إهمال",
+                        key=f"neglect_choice_regular_{selected_bank}",
+                        type="secondary", width="content",
+                        on_click=choose_neglect_mode, args=("regular",)
+                    )
+                    st.button(
+                        "🟢 متابعة إهمال" if _neglect_mode_value == "followup" else "⚪ متابعة إهمال",
+                        key=f"neglect_choice_followup_{selected_bank}",
+                        type="secondary", width="content",
+                        on_click=choose_neglect_mode, args=("followup",)
                     )
 
         with title_col:
@@ -9648,8 +9673,23 @@ def render_report_upload_bar(page, promise_metrics=None):
                     """,
                     unsafe_allow_html=True
                 )
-            elif page == "Neglect":
-                pass
+            elif page == "Neglect" and neglect_metrics is not None:
+                _n_total_rows, _n_neglect_accounts = neglect_metrics
+                st.markdown(
+                    f"""
+                    <div style="display:flex;gap:10px;align-items:stretch;justify-content:flex-start;direction:rtl;flex-wrap:wrap;padding-top:2px;">
+                        <div style="background:#FFFFFF;border:1px solid #D5DFEA;border-right:5px solid #1F4373;border-radius:10px;padding:9px 16px;min-width:155px;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,.10);">
+                            <div style="font-size:13px;font-weight:800;color:#586F8C;">إجمالي صفوف الملف</div>
+                            <div style="font-size:24px;line-height:1.2;font-weight:900;color:#1F4373;">{int(_n_total_rows):,}</div>
+                        </div>
+                        <div style="background:#FFFFFF;border:1px solid #D5DFEA;border-right:5px solid #29A64A;border-radius:10px;padding:9px 16px;min-width:170px;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,.10);">
+                            <div style="font-size:13px;font-weight:800;color:#586F8C;">عدد حسابات الإهمال</div>
+                            <div style="font-size:24px;line-height:1.2;font-weight:900;color:#29A64A;">{int(_n_neglect_accounts):,}</div>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
 
 # دالة معالجة بيانات أي صفحة
 
@@ -10154,54 +10194,37 @@ if curr_page == 'Overview':
     overview_combined_files = (overview_activity_files or []) + (overview_promises_files or [])
     bank_files['Overview'] = overview_combined_files if overview_combined_files else None
 
-# Process Promise data once before rendering the header KPIs.
+# Process uploaded report data once before rendering the header KPIs.
 # Reuse the same result below; no duplicate parsing or filtering.
 _promise_header_result = None
+_neglect_header_result = None
 if curr_page == 'Promises' and bank_files.get('Promises'):
     _promise_header_result = process_page_data(
         bank_files['Promises'], bank=selected_bank
     )
+if curr_page == 'Neglect' and bank_files.get('Neglect'):
+    _neglect_header_result = process_page_data(
+        bank_files['Neglect'], bank=selected_bank
+    )
 
 if curr_page in ('Promises', 'Neglect'):
     _promise_metrics = None
+    _neglect_metrics = None
     if curr_page == 'Promises' and _promise_header_result is not None:
         _promise_metrics = (
             _promise_header_result[5],
             _promise_header_result[7],
             _promise_header_result[8],
         )
-    render_report_upload_bar(curr_page, promise_metrics=_promise_metrics)
-
-# Opening the Neglect page always starts by asking which workflow is needed.
-if curr_page == "Neglect":
-    _neglect_mode_key = f"neglect_mode_{selected_bank}"
-    _neglect_mode_value = st.session_state.get(_neglect_mode_key)
-    with st.container(border=True, key=f"neglect_mode_picker_{selected_bank}"):
-        st.markdown(
-            "<div style='direction:rtl;text-align:center;font-size:20px;"
-            "font-weight:900;color:#1F4373;padding:4px 0 10px;'>"
-            "هنعمل إهمال ولا متابعة إهمال؟</div>",
-            unsafe_allow_html=True
+    if curr_page == 'Neglect' and _neglect_header_result is not None:
+        _neglect_metrics = (
+            _neglect_header_result[5],
+            _neglect_header_result[9],
         )
-        _regular_mode_col, _followup_mode_col = st.columns(2, gap="large")
-        with _regular_mode_col:
-            st.button(
-                "إهمال",
-                key=f"choose_regular_neglect_{selected_bank}",
-                type="primary" if _neglect_mode_value == "regular" else "secondary",
-                use_container_width=True,
-                on_click=choose_neglect_mode,
-                args=("regular",)
-            )
-        with _followup_mode_col:
-            st.button(
-                "متابعة إهمال",
-                key=f"choose_followup_neglect_{selected_bank}",
-                type="primary" if _neglect_mode_value == "followup" else "secondary",
-                use_container_width=True,
-                on_click=choose_neglect_mode,
-                args=("followup",)
-            )
+    render_report_upload_bar(
+        curr_page, promise_metrics=_promise_metrics,
+        neglect_metrics=_neglect_metrics
+    )
 
 # Activity is intentionally a blank design canvas until the new report is specified.
 # Keep other pages and their upload state completely unchanged.
@@ -10364,6 +10387,11 @@ else:
          activity_base_df, report_bytes, total_rows, total_unhandled,
          active_count, broken_count, neglect_count,
          total_activity_count) = _promise_header_result
+    elif curr_page == 'Neglect' and _neglect_header_result is not None:
+        (active_promises_df, broken_promises_df, neglect_df,
+         activity_base_df, report_bytes, total_rows, total_unhandled,
+         active_count, broken_count, neglect_count,
+         total_activity_count) = _neglect_header_result
     else:
         active_promises_df, broken_promises_df, neglect_df, activity_base_df, report_bytes, total_rows, total_unhandled, active_count, broken_count, neglect_count, total_activity_count = process_page_data(bank_files[curr_page], bank=selected_bank)
 
@@ -10588,11 +10616,29 @@ else:
                 "الحالة الفرعية", "حالة العميل"
             )
             with st.container(key=f"neglect_diagnostic_row_{selected_bank}"):
-                diag_col, data_col = st.columns(
-                    [1.0, 2.4], gap="small", vertical_alignment="top"
+                # In RTL layout the first column is on the right: put states right and diagnostics left.
+                data_col, diag_col = st.columns(
+                    [2.15, 1.0], gap="small", vertical_alignment="top"
                 )
                 with data_col:
-                    if sub_col:
+                    st.markdown(
+                        f"""
+                        <style>
+                        .st-key-neglect_states_outer_{selected_bank} {{
+                            width: 97% !important;
+                            max-width: 97% !important;
+                            margin-left: auto !important;
+                            margin-right: auto !important;
+                        }}
+                        .st-key-neglect_states_outer_{selected_bank} [data-testid="stExpander"] {{
+                            border-radius: 12px !important;
+                        }}
+                        </style>
+                        """,
+                        unsafe_allow_html=True
+                    )
+                    with st.container(key=f"neglect_states_outer_{selected_bank}"):
+                        if sub_col:
                         states = st.session_state.get(
                             "neglect_substate_options", {}
                         ).get(selected_bank) or sorted({
@@ -10610,39 +10656,39 @@ else:
                         if state_key not in st.session_state:
                             st.session_state[state_key] = list(states)
 
-                        with st.expander(
-                            "اختيار الحالات (Sub State)",
-                            expanded=False
-                        ):
-                            st.caption(
-                                "اكتبي اسم الحالة للبحث، واختاري الحالات المطلوبة. "
-                                "يمكنك تحديد الكل أو إلغاء التحديد."
-                            )
-                            _select_all_col, _clear_all_col = st.columns(2, gap="small")
-                            with _select_all_col:
-                                st.button(
-                                    "تحديد كل الحالات",
-                                    key=f"neglect_select_all_{selected_bank}_{key_digest}",
-                                    use_container_width=True,
-                                    on_click=_set_neglect_state_selection,
-                                    args=(state_key, states)
+                            with st.expander(
+                                "اختيار الحالات (Sub State)",
+                                expanded=False
+                            ):
+                                st.caption(
+                                    "اكتبي اسم الحالة للبحث، واختاري الحالات المطلوبة. "
+                                    "يمكنك تحديد الكل أو إلغاء التحديد."
                                 )
-                            with _clear_all_col:
-                                st.button(
-                                    "إلغاء التحديد",
-                                    key=f"neglect_clear_all_{selected_bank}_{key_digest}",
-                                    use_container_width=True,
-                                    on_click=_set_neglect_state_selection,
-                                    args=(state_key, [])
+                                _select_all_col, _clear_all_col = st.columns(2, gap="small")
+                                with _select_all_col:
+                                    st.button(
+                                        "تحديد كل الحالات",
+                                        key=f"neglect_select_all_{selected_bank}_{key_digest}",
+                                        use_container_width=True,
+                                        on_click=_set_neglect_state_selection,
+                                        args=(state_key, states)
+                                    )
+                                with _clear_all_col:
+                                    st.button(
+                                        "إلغاء التحديد",
+                                        key=f"neglect_clear_all_{selected_bank}_{key_digest}",
+                                        use_container_width=True,
+                                        on_click=_set_neglect_state_selection,
+                                        args=(state_key, [])
+                                    )
+                                selected_sub_states = st.multiselect(
+                                    "ابحثي واختاري حالة أو أكثر:",
+                                    options=states,
+                                    key=state_key,
+                                    help="اكتبي جزءًا من اسم الحالة لتصفية القائمة."
                                 )
-                            selected_sub_states = st.multiselect(
-                                "ابحثي واختاري حالة أو أكثر:",
-                                options=states,
-                                key=state_key,
-                                help="اكتبي جزءًا من اسم الحالة لتصفية القائمة."
-                            )
 
-                        selected_sub_states = st.session_state.get(state_key, [])
+                            selected_sub_states = st.session_state.get(state_key, [])
                         final_neglect_df = neglect_df.loc[
                             neglect_df[sub_col].fillna("").astype(str).str.strip()
                             .isin(selected_sub_states)
