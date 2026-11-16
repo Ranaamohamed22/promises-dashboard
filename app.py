@@ -9786,18 +9786,17 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                     _expander_table(duty_totals, "snb_total_duty")
                 _expander_table(time_notes, "snb_collector_time_notes")
         with waste_col:
-            if not (activity_kind == "يومي" and period == "first"):
-                with st.expander(
-                    f"⏱️ تفاصيل الوقت المهدر وإجماليه ${'الأسبوعي' if activity_kind == 'أسبوعي' else 'اليومي'}",
-                    expanded=False,
-                ):
-                    st.caption(
-                        "الوقت المهدر = الفاصل بين الإفادات بعد خصم البريك "
-                        "ناقص 20 دقيقة للناجحة أو 5 دقائق لغير الناجحة؛ "
-                        "ولا يمكن أن يقل عن صفر."
-                    )
-                    _expander_table(wasted_details, "wasted_details")
-                    _expander_table(wasted_summary, "wasted_summary")
+            with st.expander(
+                f"⏱️ تفاصيل الوقت المهدر وإجماليه ${'الأسبوعي' if activity_kind == 'أسبوعي' else 'اليومي'}",
+                expanded=False,
+            ):
+                st.caption(
+                    "الوقت المهدر = الفاصل بين الإفادات بعد خصم البريك "
+                    "ناقص 20 دقيقة للناجحة أو 5 دقائق لغير الناجحة؛ "
+                    "ولا يمكن أن يقل عن صفر."
+                )
+                _expander_table(wasted_details, "wasted_details")
+                _expander_table(wasted_summary, "wasted_summary")
         if efficiency_quality is not None:
             stage_source, product_source = _snb_stage_product_columns(result)
             if stage_source is None:
