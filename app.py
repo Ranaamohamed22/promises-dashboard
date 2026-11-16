@@ -6416,6 +6416,25 @@ def build_neglect_report_xlsx(df):
     return output
 
 
+@st.cache_data(show_spinner=False, max_entries=12)
+def _cached_promises_xlsx_bytes(active_df, broken_df, neglect_df, bank):
+    return build_report_xlsx(
+        active_df, broken_df, neglect_df, bank=bank
+    ).getvalue()
+
+
+@st.cache_data(show_spinner=False, max_entries=12)
+def _cached_single_promise_xlsx_bytes(df, report_kind, bank):
+    return build_single_promise_report_xlsx(
+        df, report_kind=report_kind, bank=bank
+    ).getvalue()
+
+
+@st.cache_data(show_spinner=False, max_entries=12)
+def _cached_neglect_xlsx_bytes(df):
+    return build_neglect_report_xlsx(df).getvalue()
+
+
 # ==========================================
 # إدارة الملفات لكل صفحة تقرير بشكل منفصل تماماً
 # ==========================================
@@ -9961,7 +9980,7 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
             with download_col:
                 with st.container(key="neglect_download_header"):
                     _xlsx_bytes = (
-                        build_neglect_report_xlsx(_download_df).getvalue()
+                        _cached_neglect_xlsx_bytes(_download_df)
                         if not _download_df.empty else b""
                     )
                     st.download_button(
@@ -10061,10 +10080,23 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
                 )
 
 
-# دالة معالجة بيانات أي صفحة
+# Cache uploaded Excel/CSV parsing by exact file content.
+# A changed upload automatically gets a new cache key.
+@st.cache_data(show_spinner=False, max_entries=24)
+def _read_uploaded_frame_cached(file_bytes, file_name):
+    if str(file_name).lower().endswith(".csv"):
+        frame = pd.read_csv(io.BytesIO(file_bytes), dtype=str)
+    else:
+        frame = pd.read_excel(io.BytesIO(file_bytes), dtype=str)
+    frame.columns = frame.columns.astype(str).str.strip()
+    return frame
+
 
 # دالة معالجة بيانات أي صفحة
-def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, promises_files=None):
+def process_page_data(
+    uploaded_files=None, bank="SNB", activity_files=None,
+    promises_files=None, include_report=True
+):
     explicit_sources = activity_files is not None or promises_files is not None
     if explicit_sources:
         source_files = (
@@ -10085,11 +10117,18 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
     for f, source_type in source_files:
         try:
             try:
-                f.seek(0)
+                file_bytes = f.getvalue()
             except Exception:
-                pass
-            temp_df = pd.read_csv(f, dtype=str) if f.name.endswith('.csv') else pd.read_excel(f, dtype=str)
-            temp_df.columns = temp_df.columns.astype(str).str.strip()
+                try:
+                    f.seek(0)
+                except Exception:
+                    pass
+                file_bytes = f.read()
+                try:
+                    f.seek(0)
+                except Exception:
+                    pass
+            temp_df = _read_uploaded_frame_cached(bytes(file_bytes), f.name)
 
             # حماية من رفع محفظة بنك في خانة البنك الآخر.
             # نعتمد أولاً على Portfolio Type لأنه أوضح بصمة داخل ملف المحفظة.
@@ -10159,7 +10198,7 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
     df_all = pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
     df_promises = pd.concat(promises_dfs, ignore_index=True) if promises_dfs else pd.DataFrame()
     # Retain the raw portfolio for the interactive, sequential neglect diagnostics.
-    st.session_state.setdefault("neglect_source_df", {})[bank] = df_promises.copy()
+    st.session_state.setdefault("neglect_source_df", {})[bank] = df_promises
     # Keep ALL Sub State values from the uploaded bank portfolio available for
     # Neglect selection, even if no row with that value survives the date filters.
     raw_sub_col = find_col_in(
@@ -10509,8 +10548,12 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
 
             total_unhandled = int(stc_base_condition.sum())
 
-    output_buffer = build_report_xlsx(active_promises_df, broken_promises_df, neglect_df, bank=bank)
-    report_bytes = output_buffer.getvalue()
+    report_bytes = (
+        _cached_promises_xlsx_bytes(
+            active_promises_df, broken_promises_df, neglect_df, bank
+        )
+        if include_report else None
+    )
 
     total_rows = len(df_promises) if not df_promises.empty else len(df_all)
     active_count = len(active_promises_df)
@@ -10574,9 +10617,10 @@ if curr_page == 'Promises' and bank_files.get('Promises'):
     _promise_header_result = process_page_data(
         bank_files['Promises'], bank=selected_bank
     )
+_header_filter_result = None
 if curr_page == 'Neglect' and bank_files.get('Neglect'):
     _neglect_header_result = process_page_data(
-        bank_files['Neglect'], bank=selected_bank
+        bank_files['Neglect'], bank=selected_bank, include_report=False
     )
 
 if curr_page in ('Promises', 'Neglect'):
@@ -10937,16 +10981,12 @@ else:
                 render_promise_filter_diagnostics(selected_bank, "broken")
         with st.container(key="promise_exports", horizontal=True, horizontal_alignment="center"):
             if selected_bank == 'STC':
-                stc_active_report = build_single_promise_report_xlsx(
-                    active_promises_df,
-                    report_kind='active',
-                    bank='STC'
-                ).getvalue()
-                stc_broken_report = build_single_promise_report_xlsx(
-                    broken_promises_df,
-                    report_kind='broken',
-                    bank='STC'
-                ).getvalue()
+                stc_active_report = _cached_single_promise_xlsx_bytes(
+                    active_promises_df, report_kind='active', bank='STC'
+                )
+                stc_broken_report = _cached_single_promise_xlsx_bytes(
+                    broken_promises_df, report_kind='broken', bank='STC'
+                )
 
                 with st.container(horizontal=True, horizontal_alignment="center"):
                     # Full-width RTL container: buttons stacked at the far right.
@@ -10993,7 +11033,11 @@ else:
             if raw_neglect_source is None or raw_neglect_source.empty:
                 raw_neglect_source = neglect_df.copy()
 
-            _filter = calculate_neglect_filters(raw_neglect_source, selected_bank)
+            _filter = (
+                _header_filter_result
+                if _header_filter_result is not None
+                else calculate_neglect_filters(raw_neglect_source, selected_bank)
+            )
             states = _filter["states"]
             digest = _filter["digest"]
             checkbox_prefix = _filter["checkbox_prefix"]
