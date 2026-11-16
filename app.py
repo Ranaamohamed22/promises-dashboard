@@ -193,7 +193,16 @@ def calculate_neglect_filters(raw_df, bank):
     state_key = f"neglect_states_{bank}_{digest}"
     checkbox_prefix = f"neglect_state_choice_{bank}_{digest}"
     if state_key not in st.session_state:
-        st.session_state[state_key] = list(states)
+        # Match the approved mockup's initial green selections when these states exist.
+        preferred_defaults = {
+            "رافض السداد", "مسجون", "مستحيل",
+            "الجوال مغلق", "تم سداد كامل المبلغ"
+        }
+        matched_defaults = [
+            state for state in states
+            if re.sub(r"\\s+", " ", state).strip() in preferred_defaults
+        ]
+        st.session_state[state_key] = matched_defaults or list(states)
     initial_selected = set(st.session_state.get(state_key, []))
     for state in states:
         checkbox_key = _neglect_state_checkbox_key(checkbox_prefix, state)
@@ -9810,7 +9819,7 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key=f"dl_neglect_report_header_{selected_bank}",
                         use_container_width=True,
-                        disabled=_download_df.empty
+                        disabled=_download_df.empty or _mode_value != "regular"
                     )
             with mode_col:
                 with st.container(key="neglect_mode_controls"):
