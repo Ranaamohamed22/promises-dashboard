@@ -7671,7 +7671,7 @@ def _snb_first_last_notes(result, collector_col, notes_col, activity_kind, perio
         "ميعاد أول إفادة بعد البريك", "حالة أول إفادة بعد البريك",
         "ميعاد آخر إفادة", "حالة آخر إفادة",
         "أول إفادة بعد البريك", "مدة الدوام",
-        "دقائق من نهاية البريك", "حالة البريك",
+        "دقائق من نهاية البريك",
     ]
     show_break = activity_kind == "يومي" and period in ("second", "full")
     if not show_break:
@@ -7742,10 +7742,6 @@ def _snb_first_last_notes(result, collector_col, notes_col, activity_kind, perio
             "أول إفادة بعد البريك": post_note,
             "مدة الدوام": duty_text,
             "دقائق من نهاية البريك": wait_minutes,
-            "حالة البريك": (
-                "سجل أول إفادة بعد البريك" if post is not None
-                else "لم يسجل إفادة بعد البريك"
-            ),
         })
     return pd.DataFrame(rows, columns=columns)
 
@@ -9514,15 +9510,14 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                                       format_func=names.get, key="snb_activity_daily_shift")
                 shift_notice.markdown(f'<div class="ejada-shift-notice">رنا إحنا في {names[period]}</div>',
                                       unsafe_allow_html=True)
-                end_hour = 12 if period == "first" else 16
-                remove_extra = st.checkbox(
-                    "استبعاد الساعة الزيادة بعد نهاية الفترة " +
-                    ("(12–1 ظهرًا)" if end_hour == 12 else "(4–5 عصرًا)"),
-                    value=True, key="snb_activity_exclude_after_shift")
-                remove_last = st.checkbox(
-                    "حذف آخر ساعة من الفترة " +
-                    ("(11–12 ظهرًا)" if end_hour == 12 else "(3–4 عصرًا)"),
-                    value=False, key="snb_activity_exclude_last_hour")
+                remove_extra, remove_last = True, False
+                if period != "first":
+                    remove_extra = st.checkbox(
+                        "استبعاد الساعة الزيادة بعد نهاية الفترة (4–5 عصرًا)",
+                        value=True, key="snb_activity_exclude_after_shift")
+                    remove_last = st.checkbox(
+                        "حذف آخر ساعة من الفترة (3–4 عصرًا)",
+                        value=False, key="snb_activity_exclude_last_hour")
             selected, excluded_after_shift = _filter_snb_activity_period(
                 prepared, activity_kind, period, remove_extra, remove_last)
         else:
@@ -9678,6 +9673,11 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
             result, stats["collector"], stats["notes"],
             activity_kind=activity_kind
         )
+        calls_under_one_min = _snb_calls_under_one_minute(
+            result, stats["collector"], stats["notes"]
+        )
+        waste_collector_table = _snb_waste_collector_reference_table(wasted_details)
+        main_state_table = _snb_main_state_reference_table(result)
         efficiency_quality = (
             _build_snb_efficiency_call_quality(
                 result, stats["collector"], stats["notes"]
@@ -9706,17 +9706,18 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                     _expander_table(duty_totals, "snb_total_duty")
                 _expander_table(time_notes, "snb_collector_time_notes")
         with waste_col:
-            with st.expander(
-                f"⏱️ تفاصيل الوقت المهدر وإجماليه ${'الأسبوعي' if activity_kind == 'أسبوعي' else 'اليومي'}",
-                expanded=False,
-            ):
-                st.caption(
-                    "الوقت المهدر = الفاصل بين الإفادات بعد خصم البريك "
-                    "ناقص 20 دقيقة للناجحة أو 5 دقائق لغير الناجحة؛ "
-                    "ولا يمكن أن يقل عن صفر."
-                )
-                _expander_table(wasted_details, "wasted_details")
-                _expander_table(wasted_summary, "wasted_summary")
+            if not (activity_kind == "يومي" and period == "first"):
+                with st.expander(
+                    f"⏱️ تفاصيل الوقت المهدر وإجماليه ${'الأسبوعي' if activity_kind == 'أسبوعي' else 'اليومي'}",
+                    expanded=False,
+                ):
+                    st.caption(
+                        "الوقت المهدر = الفاصل بين الإفادات بعد خصم البريك "
+                        "ناقص 20 دقيقة للناجحة أو 5 دقائق لغير الناجحة؛ "
+                        "ولا يمكن أن يقل عن صفر."
+                    )
+                    _expander_table(wasted_details, "wasted_details")
+                    _expander_table(wasted_summary, "wasted_summary")
         if efficiency_quality is not None:
             stage_source, product_source = _snb_stage_product_columns(result)
             if stage_source is None:
@@ -9801,7 +9802,9 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                 writer,
                 sheet_name=(
                     "Weekly_First_Last_Notes" if weekly_report
-                    else "After_Break_Notes" if show_break else "First_Last_Notes"
+                    else "First_Shift_Notes" if period == "first"
+                    else "Second_Shift_Notes" if period == "second"
+                    else "Full_Day_Notes"
                 ),
                 index=False,
             )
@@ -9812,6 +9815,15 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
             )
             _snb_export_visible_columns(wasted_summary).to_excel(
                 writer, sheet_name=summary_sheet, index=False
+            )
+            calls_under_one_min.to_excel(
+                writer, sheet_name="Calls_Under_1_Min", index=False
+            )
+            waste_collector_table.to_excel(
+                writer, sheet_name="Wasted_Time_Per_Collector", index=False
+            )
+            main_state_table.to_excel(
+                writer, sheet_name="Main_State_Distribution", index=False
             )
             if efficiency_quality is not None:
                 _snb_export_visible_columns(efficiency_quality).to_excel(
