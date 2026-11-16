@@ -7347,92 +7347,8 @@ def _filter_snb_activity_period(frame, activity_kind, daily_period,
         ].copy()
     return valid, overtime_excluded
 
-def _snb_after_break_notes(prepared, selected, notes_col, collector_col):
-    """ONE row per collector per day with first post-break Note and duty span.
-
-    After-break range is 12:30–16:00. The first/last daily Notes and duty
-    span use the full uploaded activity on the dates represented in the report.
-    Duty means last timestamp minus first timestamp, with no inferred shift
-    start/end or payroll adjustments.
-    """
-    columns = [
-        "التاريخ", "المحصل", "أول إفادة بعد البريك",
-        "ميعاد أول إفادة بعد البريك", "ميعاد أول إفادة",
-        "ميعاد آخر إفادة", "مدة الدوام",
-        "دقائق من نهاية البريك", "الحالة"
-    ]
-    stamp = "__ejada_parsed_created"
-    if prepared.empty or selected.empty:
-        return pd.DataFrame(columns=columns)
-    active_days = selected[stamp].dropna().dt.normalize().unique()
-    source = prepared.dropna(subset=[stamp]).copy()
-    source["__ejada_day"] = source[stamp].dt.normalize()
-    source = source.loc[source["__ejada_day"].isin(active_days)].copy()
-    if source.empty:
-        return pd.DataFrame(columns=columns)
-
-    source["__ejada_collector"] = (
-        source[collector_col].fillna("").astype(str).str.strip()
-        .replace("", "(بدون اسم)")
-    )
-    source = source.sort_values(
-        ["__ejada_day", "__ejada_collector", stamp], kind="stable"
-    )
-    rows = []
-    for (day, collector), group in source.groupby(
-        ["__ejada_day", "__ejada_collector"], sort=True, dropna=False
-    ):
-        first_time = group.iloc[0][stamp]
-        last_time = group.iloc[-1][stamp]
-        duty_seconds = max(
-            0, int(round((last_time - first_time).total_seconds()))
-        )
-        duty_text = (
-            f"{duty_seconds // 3600:02d}:"
-            f"{(duty_seconds % 3600) // 60:02d}:"
-            f"{duty_seconds % 60:02d}"
-        )
-        minute_of_day = group[stamp].dt.hour * 60 + group[stamp].dt.minute
-        post_break = group.loc[
-            (minute_of_day >= 750) & (minute_of_day < 960)
-        ]
-        post_note, post_time, post_wait = "", "", ""
-        status = "لم يسجل إفادة بعد البريك"
-        if not post_break.empty:
-            first_post = post_break.iloc[0]
-            when = first_post[stamp]
-            post_note = (
-                "" if pd.isna(first_post[notes_col])
-                else str(first_post[notes_col])
-            )
-            post_time = when.strftime("%I:%M:%S %p")
-            break_end = pd.Timestamp(day) + pd.Timedelta(
-                hours=12, minutes=30
-            )
-            post_wait = round(
-                max(0, (when - break_end).total_seconds() / 60), 2
-            )
-            status = "سجل أول إفادة بعد البريك"
-        rows.append({
-            "التاريخ": pd.Timestamp(day).strftime("%Y-%m-%d"),
-            "المحصل": collector,
-            "أول إفادة بعد البريك": post_note,
-            "ميعاد أول إفادة بعد البريك": post_time,
-            "ميعاد أول إفادة": first_time.strftime("%I:%M:%S %p"),
-            "ميعاد آخر إفادة": last_time.strftime("%I:%M:%S %p"),
-            "مدة الدوام": duty_text,
-            "دقائق من نهاية البريك": post_wait,
-            "الحالة": status,
-        })
-    return pd.DataFrame(rows, columns=columns)
-
-
-def _snb_weekly_first_last_notes(result, collector_col, notes_col):
-    """First, first post-break and last evaluated call per collector per day.
-
-    Uses the exact selected and reviewed weekly activity records, not the raw
-    source, so the time and successful/unsuccessful label belong to one row.
-    """
+def _snb_first_last_notes(result, collector_col, notes_col, activity_kind, period):
+    """Select daily collector fields from the same reviewed rows used in the report."""
     columns = [
         "التاريخ", "المحصل",
         "ميعاد أول إفادة", "حالة أول إفادة",
@@ -7441,6 +7357,11 @@ def _snb_weekly_first_last_notes(result, collector_col, notes_col):
         "أول إفادة بعد البريك", "مدة الدوام",
         "دقائق من نهاية البريك", "حالة البريك",
     ]
+    show_break = activity_kind == "يومي" and period in ("second", "full")
+    if not show_break:
+        columns = [col for col in columns if "البريك" not in col]
+    if activity_kind != "يومي" or period != "full":
+        columns.remove("مدة الدوام")
     stamp = "__ejada_parsed_created"
     if (result is None or result.empty or collector_col not in result.columns
             or notes_col not in result.columns or stamp not in result.columns):
@@ -7477,7 +7398,7 @@ def _snb_weekly_first_last_notes(result, collector_col, notes_col):
             f"{duty_seconds % 60:02d}"
         )
         minutes = group[stamp].dt.hour * 60 + group[stamp].dt.minute
-        after_break = group.loc[(minutes >= 750) & (minutes < 960)]
+        after_break = group.loc[minutes >= 750]
         post = after_break.iloc[0] if not after_break.empty else None
         post_time = post[stamp] if post is not None else None
         wait_minutes = (
@@ -9173,9 +9094,20 @@ def render_stc_activity_report(model_upload, activity_upload, activity_kind="ت�
     if kind == "يومي":
         sheets = {"المكالمات": result, "ملخص المحصلين": summary}
         if not first:
+            spans = stamps.loc[result.index].groupby(result[collector]).agg(["min", "max"])
+            summary["مدة الدوام"] = summary[collector].map(
+                (spans["max"] - spans["min"]).map(lambda span: str(span).split()[-1])
+            )
             afternoon = stamps.loc[result.index] - day.loc[result.index] >= pd.Timedelta(hours=14, minutes=45)
             after = result.loc[afternoon].drop_duplicates(collector)
-            sheets["أول إفادة بعد البريك"] = after[[collector, notes,"الوقت","تقييم المكالمات"]]
+            sheets["أول إفادة بعد البريك"] = after[
+                [collector, notes, "الوقت", "تقييم المكالمات"]
+            ].rename(columns={notes: "أول إفادة بعد البريك",
+                              "تقييم المكالمات": "حالة أول إفادة بعد البريك"})
+            with st.expander("مدة الدوام لكل محصل"):
+                st.dataframe(summary[[collector, "مدة الدوام"]], hide_index=True)
+            with st.expander("أول إفادة بعد البريك وحالتها"):
+                st.dataframe(sheets["أول إفادة بعد البريك"], hide_index=True)
         _stc_download(sheets, "تحميل تقرير النشاط اليومي", "STC_Daily.xlsx")
     else:
         name = "Weekly" if kind == "أسبوعي" else "Monthly"
@@ -9407,14 +9339,9 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
             final, use_container_width=True, hide_index=True,
             height=460
         )
-        first_shift = activity_kind == "يومي" and period == "first"
-        after_break = _snb_after_break_notes(
-            selected if activity_kind in ("يومي", "أسبوعي") else prepared, selected,
-            stats["notes"], stats["collector"]
-        )
-        if first_shift:
-            after_break = after_break[["التاريخ", "المحصل", "ميعاد أول إفادة",
-                                       "ميعاد آخر إفادة", "مدة الدوام"]]
+        show_break = activity_kind == "يومي" and period in ("second", "full")
+        time_notes = _snb_first_last_notes(result, stats["collector"], stats["notes"],
+                                           activity_kind, period)
         wasted_details, wasted_summary = _snb_wasted_time_reports(
             result, stats["collector"], stats["notes"],
             activity_kind=activity_kind
@@ -9433,29 +9360,13 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
             _snb_weekly_activity_trend(result, stats["collector"])
             if activity_kind == "أسبوعي" else (None, None)
         )
-        weekly_first_last = (
-            _snb_weekly_first_last_notes(
-                result, stats["collector"], stats["notes"]
-            )
-            if activity_kind == "أسبوعي" else None
-        )
-        # Compact reports: two cards for core time analysis and three for weekly analytics.
         duty_col, waste_col = st.columns(2, gap="small")
         with duty_col:
-            with st.expander(
-                "أول وآخر إفادة ومدة الدوام" if first_shift else "🕧 أول وآخر إفادة وحالتهما + أول إفادة بعد البريك",
-                expanded=False,
-            ):
-                st.caption(
-                    "بداية ونهاية النشاط لكل محصل في الفترة الأولى." if first_shift else
-                    "صف لكل محصل في كل يوم. في النشاط الأسبوعي تعرض حالة "
-                    "أول إفادة وأول إفادة بعد البريك وآخر إفادة من المكالمات "
-                    "المعتمدة في الأسبوع؛ والدوام من الأولى إلى الأخيرة."
-                )
-                _expander_table(
-                    weekly_first_last if weekly_first_last is not None else after_break,
-                    "weekly_first_last" if weekly_first_last is not None else "after_break",
-                )
+            title = "أول وآخر إفادة وحالتهما"
+            if show_break:
+                title += " وأول إفادة بعد البريك وحالتها"
+            with st.expander(title, expanded=False):
+                _expander_table(time_notes, "snb_collector_time_notes")
         with waste_col:
             with st.expander(
                 f"⏱️ تفاصيل الوقت المهدر وإجماليه ${'الأسبوعي' if activity_kind == 'أسبوعي' else 'اليومي'}",
@@ -9547,12 +9458,12 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             export_final.to_excel(writer, sheet_name="Activity", index=False)
             _snb_export_visible_columns(
-                weekly_first_last if weekly_report else after_break
+                time_notes
             ).to_excel(
                 writer,
                 sheet_name=(
                     "Weekly_First_Last_Notes" if weekly_report
-                    else "First_Last_Notes" if first_shift else "After_Break_Notes"
+                    else "After_Break_Notes" if show_break else "First_Last_Notes"
                 ),
                 index=False,
             )
