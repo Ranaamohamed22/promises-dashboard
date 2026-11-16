@@ -276,13 +276,33 @@ def calculate_neglect_filters(raw_df, bank):
     else:
         final_df = after_due.copy()
 
+    _status_label = (
+        "بعد اختيار غير المعالج فقط"
+        if st.session_state[status_key] == "غير المعالج فقط"
+        else "بعد اختيار كل حالات المعالجة"
+    )
+    _writeoff_label = (
+        "بعد استبعاد فئة write off"
+        if st.session_state[writeoff_key] == "استبعاد write off"
+        else "بدون استبعاد فئة write off"
+    )
+    _due_label = (
+        "بعد استبعاد Follow up Due Date = اليوم"
+        if st.session_state[due_key]
+        else "بدون استبعاد Follow up Due Date = اليوم"
+    )
+    _last_label = (
+        "بعد الاحتفاظ بأكثر من 3 أيام منذ Follow up Last Date"
+        if st.session_state[last_key]
+        else "بدون شرط أكثر من 3 أيام منذ Follow up Last Date"
+    )
     steps = [
         {"الخطوة": "إجمالي الصفوف الأصلية", "العدد": int(len(source))},
         {"الخطوة": "بعد اختيار حالات (Sub State)", "العدد": int(len(after_substate))},
-        {"الخطوة": "بعد حالة المعالجة", "العدد": int(len(after_status))},
-        {"الخطوة": "بعد استبعاد فئة write off", "العدد": int(len(after_writeoff))},
-        {"الخطوة": "بعد استبعاد Follow up Due Date = اليوم", "العدد": int(len(after_due))},
-        {"الخطوة": "بعد أكثر من 3 أيام منذ Follow up Last Date", "العدد": int(len(final_df))},
+        {"الخطوة": _status_label, "العدد": int(len(after_status))},
+        {"الخطوة": _writeoff_label, "العدد": int(len(after_writeoff))},
+        {"الخطوة": _due_label, "العدد": int(len(after_due))},
+        {"الخطوة": _last_label, "العدد": int(len(final_df))},
     ]
     return {
         "source": source, "states": states, "sub_col": sub_col,
@@ -10925,7 +10945,7 @@ else:
                     with st.container(border=True, key="neglect_filter_panel"):
                         st.markdown(
                             "<div class='neglect-filter-title'>معايير فترة الإهمال "
-                            "<span style='float:left;'>▼</span></div>",
+                            "<span style='float:left;'>🔽</span></div>",
                             unsafe_allow_html=True
                         )
 
