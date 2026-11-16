@@ -8916,31 +8916,21 @@ def _snb_waste_collector_reference_table(wasted_details):
 
 
 def _snb_main_state_reference_table(result):
-    """Unique account counts by latest Main State, with a reconciled total."""
-    columns = ["الحالة", "عدد الحسابات"]
+    """Count every filtered Activity row by Main State, without deduplicating debtors."""
+    columns = ["الحالة", "عدد الإفادات"]
     if result is None or result.empty:
         return pd.DataFrame(columns=columns)
     state_col = _snb_find_column(result, "Main State", "Main state")
-    debtor_col = _snb_find_column(result, "Debitor", "Debtor", "رقم العميل", "رقم الهوية")
     if state_col is None:
-        return pd.DataFrame(columns=columns)
-    frame = result.copy()
-    if debtor_col:
-        frame = frame.sort_values("__ejada_parsed_created", kind="stable")
-        ids = frame[debtor_col].fillna("").astype(str).str.strip()
-        missing = pd.Series(
-            ["__missing_account_" + str(i) for i in range(len(frame))],
-            index=frame.index,
-        )
-        ids = ids.where(ids.ne(""), missing)
-        frame = frame.assign(__state_account_id=ids).drop_duplicates(
-            "__state_account_id", keep="last"
-        )
-    counts = frame[state_col].fillna("غير محدد").astype(str).str.strip()
-    counts = counts.replace("", "غير محدد").value_counts()
-    rows = [{"الحالة": state, "عدد الحسابات": int(n)}
+        # Even without a Main State column, reconcile to the Activity row count.
+        states = pd.Series("غير محدد", index=result.index)
+    else:
+        states = result[state_col].fillna("غير محدد").astype(str).str.strip()
+        states = states.replace("", "غير محدد")
+    counts = states.value_counts(dropna=False)
+    rows = [{"الحالة": state, "عدد الإفادات": int(n)}
             for state, n in counts.items()]
-    rows.append({"الحالة": "الإجمالي", "عدد الحسابات": int(counts.sum())})
+    rows.append({"الحالة": "الإجمالي", "عدد الإفادات": int(len(result))})
     return pd.DataFrame(rows, columns=columns)
 
 
