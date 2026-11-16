@@ -9897,11 +9897,11 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
                 }}
                 .st-key-neglect_choice_regular_{selected_bank} button p::after {{
                     border-color:{"#16C34A" if _mode_value == "regular" else "#FFFFFF"};
-                    background:{"#16C34A" if _mode_value == "regular" else "transparent"};
+                    background:{"radial-gradient(circle,#FFFFFF 0 43%,transparent 48%)" if _mode_value == "regular" else "#FFFFFF"};
                 }}
                 .st-key-neglect_choice_followup_{selected_bank} button p::after {{
                     border-color:{"#16C34A" if _mode_value == "followup" else "#FFFFFF"};
-                    background:{"#16C34A" if _mode_value == "followup" else "transparent"};
+                    background:{"radial-gradient(circle,#FFFFFF 0 43%,transparent 48%)" if _mode_value == "followup" else "#FFFFFF"};
                 }}
                 .st-key-neglect_download_header button {{
                     background:#08A52C !important;
@@ -11016,6 +11016,13 @@ else:
                             width:36% !important;
                             min-width:0 !important;
                         }
+                        div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-neglect_filter_panel) {
+                            height:382px !important;
+                            min-height:382px !important;
+                            max-height:382px !important;
+                            overflow:hidden !important;
+                            border-radius:12px !important;
+                        }
                         .st-key-neglect_filter_panel {
                             height:382px !important;
                             min-height:382px !important;
@@ -11106,8 +11113,28 @@ else:
                             white-space:nowrap !important;
                         }
                         .st-key-neglect_filter_panel [data-testid="stRadio"] input {
-                            accent-color:#0AA32F !important;
-                            width:16px !important;height:16px !important;
+                            appearance:none !important;
+                            -webkit-appearance:none !important;
+                            width:17px !important;height:17px !important;
+                            min-width:17px !important;
+                            border:1px solid #AEBCCC !important;
+                            border-radius:4px !important;
+                            background:#FFFFFF !important;
+                            margin:0 0 0 5px !important;
+                            position:relative !important;
+                        }
+                        .st-key-neglect_filter_panel [data-testid="stRadio"] input:checked {
+                            background:#0AA32F !important;
+                            border-color:#0AA32F !important;
+                        }
+                        .st-key-neglect_filter_panel [data-testid="stRadio"] input:checked:after {
+                            content:"✓";
+                            display:block;
+                            color:#FFFFFF;
+                            font-size:12px;
+                            font-weight:900;
+                            line-height:15px;
+                            text-align:center;
                         }
                         .st-key-neglect_filter_panel [data-testid="stCheckbox"] {
                             border:1px solid #DCE4ED !important;
@@ -11178,6 +11205,13 @@ else:
                             min-height:382px !important;
                             margin:0 !important;
                             box-sizing:border-box !important;
+                        }
+                        div[data-testid="stVerticalBlockBorderWrapper"]:has([class*="st-key-promise_diagnostic_"][class*="_neglect"]) {
+                            height:382px !important;
+                            min-height:382px !important;
+                            max-height:382px !important;
+                            overflow:hidden !important;
+                            border-radius:12px !important;
                         }
                         [class*="st-key-promise_diagnostic_"][class*="_neglect"] [data-testid="stExpander"] {
                             width:100% !important;
