@@ -200,7 +200,7 @@ def calculate_neglect_filters(raw_df, bank):
         }
         matched_defaults = [
             state for state in states
-            if re.sub(r"\\s+", " ", state).strip() in preferred_defaults
+            if re.sub(r"\s+", " ", state).strip() in preferred_defaults
         ]
         st.session_state[state_key] = matched_defaults or list(states)
     initial_selected = set(st.session_state.get(state_key, []))
