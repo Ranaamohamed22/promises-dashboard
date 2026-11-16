@@ -8805,44 +8805,15 @@ def _activity_week_choice(stamps, key, monthly=False):
     return valid, starts
 
 
-def _stc_duplicate_review(frame, notes, collector, identity, stamps, eligible, prefix):
-    # Review whole groups before applying the shift, including out-of-period alternatives.
+def _stc_first_call_mask(frame, notes, collector, identity, stamps):
+    """Keep the earliest matching call per customer, collector, note and date."""
     keys = pd.DataFrame({"هوية": frame[identity].fillna("").str.strip(),
                          "محصل": frame[collector].str.strip(),
                          "إفادة": frame[notes].map(_snb_normalize_note),
                          "يوم": stamps.dt.date})
-    repeated = keys.duplicated(keep=False) & keys["هوية"].ne("") & keys["إفادة"].ne("")
-    keep = eligible.copy()
-    approvals = st.session_state.setdefault("stc_duplicates_" + prefix, {})
-    pending = 0
-    for _, rows in keys[repeated].groupby(list(keys), sort=False):
-        ids = stamps.loc[rows.index].sort_values(kind="stable").index.tolist()
-        if not eligible.loc[ids].any():
-            continue
-        key = str(ids[0])
-        chosen = approvals.get(key)
-        with st.expander(f"تكرار · {rows.iloc[0]['محصل']} · {rows.iloc[0]['يوم']} · صف {ids[0]+2}",
-                         expanded=chosen is None):
-            view = frame.loc[ids, [identity, collector, notes]].copy()
-            view["الوقت"] = stamps.loc[ids].dt.strftime("%I:%M %p")
-            view["النطاق"] = eligible.loc[ids].map({True:"داخل الفترة", False:"خارج الفترة المختارة"})
-            view.insert(0, "صف الملف", [i+2 for i in ids])
-            st.dataframe(view, hide_index=True)
-            pick = st.selectbox("التسجيل المعتمد", ids, format_func=lambda i: f"صف {i+2}",
-                                key=f"pick_{prefix}_{key}")
-            if st.button("اعتماد التسجيل", key=f"approve_{prefix}_{key}"):
-                chosen = approvals[key] = pick
-            if chosen is not None:
-                st.caption(f"التسجيل المعتمد: صف {chosen+2}")
-        keep.loc[ids] = False
-        if chosen is None:
-            pending += 1
-        else:
-            keep.loc[chosen] = eligible.loc[chosen]
-    if pending:
-        st.info(f"راجعي مجموعات التكرار المتبقية قبل الحساب: {pending}")
-        return None
-    return keep
+    ordered = keys.loc[stamps.sort_values(kind="stable").index]
+    duplicate = ordered.duplicated() & ordered["هوية"].ne("") & ordered["إفادة"].ne("")
+    return ~duplicate.reindex(frame.index)
 
 
 def _stc_model_choices(frame, notes, collector, identity, stamps, mapping, labels, prefix):
@@ -9090,14 +9061,10 @@ def render_stc_activity_report(model_upload, activity_upload, activity_kind="ت�
     if not eligible.any():
         st.info("مفيش مكالمات في النطاق المختار.")
         return
-    # Separate approval state for each scope so excluded choices are visible for review.
-    scope_key = key + hashlib.sha256(eligible.to_numpy().tobytes()).hexdigest()[:12]
-    keep = _stc_duplicate_review(source, notes, collector, identity, stamps, eligible, scope_key)
-    if keep is None:
-        return
-    frame = source.loc[keep].copy()
+    keep = _stc_first_call_mask(source, notes, collector, identity, stamps)
+    frame = source.loc[eligible & keep].copy()
     if frame.empty:
-        st.info("مفيش مكالمات محتسبة بعد مراجعة التكرار.")
+        st.info("مفيش مكالمات محتسبة في الفترة المختارة.")
         return
     model_key = hashlib.sha256(model_upload.getvalue()).hexdigest()[:12] if model_upload else "saved"
     review_key = key + model_key
