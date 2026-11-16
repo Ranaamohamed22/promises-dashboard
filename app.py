@@ -9871,21 +9871,40 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
                     gap:10px !important;
                     flex-wrap:nowrap !important;
                 }}
-                .st-key-neglect_mode_controls button {{
+                .stApp [class*="st-key-neglect_mode_controls"] button,
+                .stApp [class*="st-key-neglect_choice_regular_"] button,
+                .stApp [class*="st-key-neglect_choice_followup_"] button {{
                     background:transparent !important;
+                    background-color:transparent !important;
                     border:0 !important;
+                    outline:0 !important;
                     box-shadow:none !important;
                     color:#FFFFFF !important;
+                    -webkit-text-fill-color:#FFFFFF !important;
                     padding:3px 5px !important;
-                    min-height:34px !important;
+                    min-height:36px !important;
+                    height:36px !important;
                     width:100% !important;
+                    opacity:1 !important;
                 }}
-                .st-key-neglect_mode_controls button p {{
+                .stApp [class*="st-key-neglect_mode_controls"] button p,
+                .stApp [class*="st-key-neglect_mode_controls"] button span,
+                .stApp [class*="st-key-neglect_choice_regular_"] button p,
+                .stApp [class*="st-key-neglect_choice_regular_"] button span,
+                .stApp [class*="st-key-neglect_choice_followup_"] button p,
+                .stApp [class*="st-key-neglect_choice_followup_"] button span {{
                     color:#FFFFFF !important;
                     -webkit-text-fill-color:#FFFFFF !important;
                     font-size:14px !important;
                     font-weight:900 !important;
                     white-space:nowrap !important;
+                    opacity:1 !important;
+                    visibility:visible !important;
+                }}
+                .stApp [class*="st-key-neglect_choice_regular_"] button:hover,
+                .stApp [class*="st-key-neglect_choice_followup_"] button:hover {{
+                    background:rgba(255,255,255,.10) !important;
+                    background-color:rgba(255,255,255,.10) !important;
                 }}
                 .st-key-neglect_choice_regular_{selected_bank} button p::after,
                 .st-key-neglect_choice_followup_{selected_bank} button p::after {{
@@ -11021,16 +11040,16 @@ else:
                             min-width:0 !important;
                         }
                         div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-neglect_filter_panel) {
-                            height:382px !important;
-                            min-height:382px !important;
-                            max-height:382px !important;
+                            height:430px !important;
+                            min-height:430px !important;
+                            max-height:430px !important;
                             overflow:hidden !important;
                             border-radius:12px !important;
                         }
                         .st-key-neglect_filter_panel {
-                            height:382px !important;
-                            min-height:382px !important;
-                            max-height:382px !important;
+                            height:430px !important;
+                            min-height:430px !important;
+                            max-height:430px !important;
                             overflow:hidden !important;
                             box-sizing:border-box !important;
                             background:#FFFFFF !important;
@@ -11143,10 +11162,10 @@ else:
                         .st-key-neglect_filter_panel [data-testid="stCheckbox"] {
                             border:1px solid #DCE4ED !important;
                             border-radius:7px !important;
-                            padding:3px 7px !important;
-                            margin:1px 0 !important;
+                            padding:7px 10px !important;
+                            margin:3px 0 !important;
                             background:#FFFFFF !important;
-                            min-height:28px !important;
+                            min-height:36px !important;
                             box-sizing:border-box !important;
                         }
                         .st-key-neglect_filter_panel [data-testid="stCheckbox"]:has(input:checked) {
@@ -11163,13 +11182,13 @@ else:
                         .st-key-neglect_filter_panel [data-testid="stCheckbox"] label p {
                             color:#1F4373 !important;
                             font-weight:800 !important;
-                            font-size:11px !important;
-                            line-height:1.15 !important;
-                            white-space:nowrap !important;
+                            font-size:13px !important;
+                            line-height:1.25 !important;
+                            white-space:normal !important;
                         }
                         .st-key-neglect_filter_panel [data-testid="stCheckbox"] input {
                             accent-color:#0AA32F !important;
-                            width:16px !important;height:16px !important;
+                            width:18px !important;height:18px !important;
                         }
                         .st-key-neglect_filter_panel [data-testid="stTextInput"] {
                             margin:0 !important;
@@ -11200,26 +11219,26 @@ else:
                             border-color:#DCE4ED !important;
                         }
                         [class*="st-key-neglect_state_checklist_"] {
-                            max-height:132px !important;
+                            max-height:170px !important;
                         }
                         [class*="st-key-promise_diagnostic_"][class*="_neglect"] {
                             width:100% !important;
                             max-width:100% !important;
-                            height:382px !important;
-                            min-height:382px !important;
+                            height:430px !important;
+                            min-height:430px !important;
                             margin:0 !important;
                             box-sizing:border-box !important;
                         }
                         div[data-testid="stVerticalBlockBorderWrapper"]:has([class*="st-key-promise_diagnostic_"][class*="_neglect"]) {
-                            height:382px !important;
-                            min-height:382px !important;
-                            max-height:382px !important;
+                            height:430px !important;
+                            min-height:430px !important;
+                            max-height:430px !important;
                             overflow:hidden !important;
                             border-radius:12px !important;
                         }
                         [class*="st-key-promise_diagnostic_"][class*="_neglect"] [data-testid="stExpander"] {
                             width:100% !important;
-                            height:382px !important;
+                            height:430px !important;
                             margin:0 !important;
                             border:1px solid #D4DFEA !important;
                             border-radius:12px !important;
@@ -11268,13 +11287,51 @@ else:
                             unsafe_allow_html=True
                         )
 
-                        # Step 1: Sub State
+                        # Step 1: processing status (filter unprocessed records first).
                         number_col, label_col, content_col = st.columns(
                             [0.34, 1.25, 4.4], gap="small",
                             vertical_alignment="center"
                         )
                         with number_col:
                             st.markdown("<div class='neglect-step-number'>1</div>", unsafe_allow_html=True)
+                        with label_col:
+                            st.markdown("<div class='neglect-step-label'>حالة المعالجة:</div>", unsafe_allow_html=True)
+                        with content_col:
+                            st.radio(
+                                "حالة المعالجة",
+                                ["غير المعالج فقط", "الكل"],
+                                key=status_key, horizontal=True,
+                                label_visibility="collapsed"
+                            )
+
+                        st.divider()
+
+                        # Step 2: write-off exclusion.
+                        number_col, label_col, content_col = st.columns(
+                            [0.34, 1.25, 4.4], gap="small",
+                            vertical_alignment="center"
+                        )
+                        with number_col:
+                            st.markdown("<div class='neglect-step-number'>2</div>", unsafe_allow_html=True)
+                        with label_col:
+                            st.markdown("<div class='neglect-step-label'>استبعاد write off:</div>", unsafe_allow_html=True)
+                        with content_col:
+                            st.radio(
+                                "استبعاد write off",
+                                ["استبعاد write off", "عدم الاستبعاد"],
+                                key=writeoff_key, horizontal=True,
+                                label_visibility="collapsed"
+                            )
+
+                        st.divider()
+
+                        # Step 3: Sub State selection.
+                        number_col, label_col, content_col = st.columns(
+                            [0.34, 1.25, 4.4], gap="small",
+                            vertical_alignment="center"
+                        )
+                        with number_col:
+                            st.markdown("<div class='neglect-step-number'>3</div>", unsafe_allow_html=True)
                         with label_col:
                             st.markdown("<div class='neglect-step-label'>اختيار حالات (Sub State):</div>", unsafe_allow_html=True)
                         with content_col:
@@ -11304,7 +11361,6 @@ else:
                                     args=(checkbox_prefix, states, False)
                                 )
 
-                        # Keep the state order and three-column grouping identical to the reference.
                         preferred_state_order = [
                             "رافض السداد", "مسجون", "طلبات", "XPTP",
                             "مستحيل", "العميل متوفي", "جاري البحث", "تم سداد كامل المبلغ",
@@ -11330,7 +11386,7 @@ else:
                             or str(state_search).strip().casefold() in state.casefold()
                         ]
                         with st.container(
-                            height=132, border=False,
+                            height=170, border=False,
                             key=f"neglect_state_checklist_{selected_bank}_{digest}"
                         ):
                             state_columns = st.columns(3, gap="small")
@@ -11346,44 +11402,6 @@ else:
                                                 checkbox_prefix, state
                                             )
                                         )
-
-                        st.divider()
-
-                        # Step 2: processing status
-                        number_col, label_col, content_col = st.columns(
-                            [0.34, 1.25, 4.4], gap="small",
-                            vertical_alignment="center"
-                        )
-                        with number_col:
-                            st.markdown("<div class='neglect-step-number'>2</div>", unsafe_allow_html=True)
-                        with label_col:
-                            st.markdown("<div class='neglect-step-label'>حالة المعالجة:</div>", unsafe_allow_html=True)
-                        with content_col:
-                            st.radio(
-                                "حالة المعالجة",
-                                ["غير المعالج فقط", "الكل"],
-                                key=status_key, horizontal=True,
-                                label_visibility="collapsed"
-                            )
-
-                        st.divider()
-
-                        # Step 3: write-off exclusion
-                        number_col, label_col, content_col = st.columns(
-                            [0.34, 1.25, 4.4], gap="small",
-                            vertical_alignment="center"
-                        )
-                        with number_col:
-                            st.markdown("<div class='neglect-step-number'>3</div>", unsafe_allow_html=True)
-                        with label_col:
-                            st.markdown("<div class='neglect-step-label'>استبعاد write off:</div>", unsafe_allow_html=True)
-                        with content_col:
-                            st.radio(
-                                "استبعاد write off",
-                                ["استبعاد write off", "عدم الاستبعاد"],
-                                key=writeoff_key, horizontal=True,
-                                label_visibility="collapsed"
-                            )
 
                         st.divider()
 
