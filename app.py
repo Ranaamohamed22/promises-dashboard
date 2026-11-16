@@ -8864,6 +8864,86 @@ def _snb_substate_breakdown(result, collector_col):
     return stats[columns].reset_index(drop=True), state_col
 
 
+
+def _snb_calls_under_one_minute(result, collector_col, notes_col):
+    """Positive intervals below 60 seconds for the same collector on the same day."""
+    columns = [
+        "التاريخ", "المحصل", "العميل", "وقت الإفادة",
+        "فرق التوقيت (دقائق)", "الإفادة", "تقييم المكالمات",
+    ]
+    stamp = "__ejada_parsed_created"
+    if result is None or result.empty:
+        return pd.DataFrame(columns=columns)
+    ordered = result.sort_values([collector_col, stamp], kind="stable")
+    keys = ordered[collector_col].fillna("").astype(str).str.strip()
+    days = ordered[stamp].dt.normalize()
+    seconds = ordered.groupby([keys, days], dropna=False)[stamp].diff().dt.total_seconds()
+    selected = ordered.loc[seconds.gt(0) & seconds.lt(60)].copy()
+    debtor_col = _snb_find_column(selected, "Debitor", "Debtor", "رقم العميل", "رقم الهوية")
+    return pd.DataFrame({
+        "التاريخ": selected[stamp].dt.strftime("%Y-%m-%d"),
+        "المحصل": selected[collector_col].fillna("").astype(str),
+        "العميل": selected[debtor_col].fillna("").astype(str) if debtor_col else "",
+        "وقت الإفادة": selected[stamp].dt.strftime("%I:%M:%S %p"),
+        "فرق التوقيت (دقائق)": (seconds.loc[selected.index] / 60).round(2),
+        "الإفادة": selected[notes_col].fillna("").astype(str),
+        "تقييم المكالمات": selected["تقييم المكالمات"].fillna("").astype(str),
+    }).reindex(columns=columns).reset_index(drop=True)
+
+
+def _snb_waste_collector_reference_table(wasted_details):
+    """Five-column collector waste summary, matching the supplied example."""
+    columns = [
+        "المحصل", "إجمالي الوقت المهدر (دق)", "عدد المكالمات المهدرة",
+        "متوسط الوقت المهدر (دق)", "أعلى وقت مهدر (دق)",
+    ]
+    if wasted_details is None or wasted_details.empty:
+        return pd.DataFrame(columns=columns)
+    rows = []
+    for collector, group in wasted_details.groupby("المحصل", sort=True):
+        positive = pd.to_numeric(group["الوقت المهدر (دقائق)"], errors="coerce")
+        positive = positive[positive > 0]
+        rows.append({
+            "المحصل": collector,
+            "إجمالي الوقت المهدر (دق)": round(float(positive.sum()), 2),
+            "عدد المكالمات المهدرة": int(len(positive)),
+            "متوسط الوقت المهدر (دق)": round(float(positive.mean()), 2) if len(positive) else 0.0,
+            "أعلى وقت مهدر (دق)": round(float(positive.max()), 2) if len(positive) else 0.0,
+        })
+    return pd.DataFrame(rows, columns=columns).sort_values(
+        "إجمالي الوقت المهدر (دق)", ascending=False, kind="stable"
+    ).reset_index(drop=True)
+
+
+def _snb_main_state_reference_table(result):
+    """Unique account counts by latest Main State, with a reconciled total."""
+    columns = ["الحالة", "عدد الحسابات"]
+    if result is None or result.empty:
+        return pd.DataFrame(columns=columns)
+    state_col = _snb_find_column(result, "Main State", "Main state")
+    debtor_col = _snb_find_column(result, "Debitor", "Debtor", "رقم العميل", "رقم الهوية")
+    if state_col is None:
+        return pd.DataFrame(columns=columns)
+    frame = result.copy()
+    if debtor_col:
+        frame = frame.sort_values("__ejada_parsed_created", kind="stable")
+        ids = frame[debtor_col].fillna("").astype(str).str.strip()
+        missing = pd.Series(
+            ["__missing_account_" + str(i) for i in range(len(frame))],
+            index=frame.index,
+        )
+        ids = ids.where(ids.ne(""), missing)
+        frame = frame.assign(__state_account_id=ids).drop_duplicates(
+            "__state_account_id", keep="last"
+        )
+    counts = frame[state_col].fillna("غير محدد").astype(str).str.strip()
+    counts = counts.replace("", "غير محدد").value_counts()
+    rows = [{"الحالة": state, "عدد الحسابات": int(n)}
+            for state, n in counts.items()]
+    rows.append({"الحالة": "الإجمالي", "عدد الحسابات": int(counts.sum())})
+    return pd.DataFrame(rows, columns=columns)
+
+
 def _snb_wasted_time_reports(result, collector_col, notes_col, activity_kind="يومي"):
     """Return audited per-call waste and daily or weekly collector totals.
 
