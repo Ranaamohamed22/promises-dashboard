@@ -172,6 +172,121 @@ def _set_neglect_state_checkboxes(prefix, states, checked):
         st.session_state[_neglect_state_checkbox_key(prefix, state)] = bool(checked)
 
 
+def calculate_neglect_filters(raw_df, bank):
+    """Calculate the live neglect result from the same controls shown in the UI."""
+    if raw_df is None:
+        raw_df = pd.DataFrame()
+    source = raw_df.copy()
+    sub_col = _snb_find_column(
+        source, "Sub State", "sub state", "substate",
+        "الحالة الفرعية", "حالة العميل"
+    )
+    states = sorted({
+        str(value).strip()
+        for value in source[sub_col].dropna()
+        if str(value).strip()
+    }) if sub_col else []
+
+    digest = hashlib.sha1(
+        (bank + "|" + str(len(source)) + "|" + "|".join(states)).encode("utf-8")
+    ).hexdigest()[:10]
+    state_key = f"neglect_states_{bank}_{digest}"
+    checkbox_prefix = f"neglect_state_choice_{bank}_{digest}"
+    if state_key not in st.session_state:
+        st.session_state[state_key] = list(states)
+    initial_selected = set(st.session_state.get(state_key, []))
+    for state in states:
+        checkbox_key = _neglect_state_checkbox_key(checkbox_prefix, state)
+        if checkbox_key not in st.session_state:
+            st.session_state[checkbox_key] = state in initial_selected
+
+    status_key = f"neglect_status_mode_{bank}_{digest}"
+    writeoff_key = f"neglect_writeoff_mode_{bank}_{digest}"
+    due_key = f"neglect_exclude_due_today_{bank}_{digest}"
+    last_key = f"neglect_last_date_over_3_{bank}_{digest}"
+    st.session_state.setdefault(status_key, "غير المعالج فقط")
+    st.session_state.setdefault(writeoff_key, "استبعاد write off")
+    st.session_state.setdefault(due_key, True)
+    st.session_state.setdefault(last_key, True)
+
+    selected_states = [
+        state for state in states
+        if st.session_state.get(
+            _neglect_state_checkbox_key(checkbox_prefix, state), False
+        )
+    ]
+    after_substate = (
+        source.loc[
+            source[sub_col].fillna("").astype(str).str.strip().isin(selected_states)
+        ].copy()
+        if sub_col else source.copy()
+    )
+
+    status_col = _snb_find_column(
+        after_substate, "حالة المعالجة - التمويل",
+        "حالة المعالجة", "processing status"
+    )
+    category_col = _snb_find_column(
+        after_substate, "تحديث فئة العميل - التمويل",
+        "تحديث فئة العميل", "customer category update"
+    )
+    due_col = _snb_find_column(
+        after_substate, "Follow up Due Date", "follow up due date"
+    )
+    last_col = _snb_find_column(
+        after_substate, "Follow up Last Date", "follow up last date"
+    )
+
+    if st.session_state[status_key] == "غير المعالج فقط" and status_col:
+        after_status = after_substate.loc[
+            after_substate[status_col].astype(str).str.strip().eq("غير معالج")
+        ].copy()
+    else:
+        after_status = after_substate.copy()
+
+    if st.session_state[writeoff_key] == "استبعاد write off" and category_col:
+        after_writeoff = after_status.loc[
+            after_status[category_col].astype(str).str.strip().str.lower().ne("writeoff")
+        ].copy()
+    else:
+        after_writeoff = after_status.copy()
+
+    today_value = pd.Timestamp(date.today()).normalize()
+    if st.session_state[due_key] and due_col:
+        due_dates = pd.to_datetime(after_writeoff[due_col], errors="coerce").dt.normalize()
+        after_due = after_writeoff.loc[due_dates.ne(today_value)].copy()
+    else:
+        after_due = after_writeoff.copy()
+
+    if st.session_state[last_key] and last_col:
+        last_dates = pd.to_datetime(after_due[last_col], errors="coerce").dt.normalize()
+        elapsed_days = (today_value - last_dates).dt.days
+        final_mask = elapsed_days.gt(3)
+        final_df = after_due.loc[final_mask].copy()
+        final_df["Neglect_Days"] = elapsed_days.loc[final_mask].astype(int)
+    else:
+        final_df = after_due.copy()
+
+    steps = [
+        {"الخطوة": "إجمالي الصفوف الأصلية", "العدد": int(len(source))},
+        {"الخطوة": "بعد اختيار حالات (Sub State)", "العدد": int(len(after_substate))},
+        {"الخطوة": "بعد حالة المعالجة", "العدد": int(len(after_status))},
+        {"الخطوة": "بعد استبعاد فئة write off", "العدد": int(len(after_writeoff))},
+        {"الخطوة": "بعد استبعاد Follow up Due Date = اليوم", "العدد": int(len(after_due))},
+        {"الخطوة": "بعد أكثر من 3 أيام منذ Follow up Last Date", "العدد": int(len(final_df))},
+    ]
+    return {
+        "source": source, "states": states, "sub_col": sub_col,
+        "digest": digest, "state_key": state_key,
+        "checkbox_prefix": checkbox_prefix, "selected_states": selected_states,
+        "status_key": status_key, "writeoff_key": writeoff_key,
+        "due_key": due_key, "last_key": last_key,
+        "after_substate": after_substate, "after_status": after_status,
+        "after_writeoff": after_writeoff, "after_due": after_due,
+        "final_df": final_df, "steps": steps,
+    }
+
+
 def clear_activity_files():
     st.session_state.page_files[st.session_state.selected_bank]['Activity'] = None
     st.session_state.act_uploader_ver[st.session_state.selected_bank] += 1
@@ -9592,6 +9707,26 @@ def render_promise_filter_diagnostics(bank, kind, extra_steps=None):
                     unsafe_allow_html=True
                 )
 
+            if kind == "neglect" and rows:
+                _final_count = int(rows[-1].get("العدد", 0))
+                st.markdown(
+                    f"""
+                    <div style="direction:rtl;display:flex;align-items:center;
+                                justify-content:space-between;gap:12px;
+                                background:#E7F6E9;border:1px solid #B7E0BF;
+                                border-radius:8px;padding:12px 16px;margin-top:10px;">
+                        <span style="color:#1F4373;font-size:14px;font-weight:900;">
+                            إجمالي الحسابات النهائية
+                        </span>
+                        <span style="display:flex;align-items:center;gap:8px;
+                                     color:#169B42;font-size:25px;font-weight:900;">
+                            {_final_count:,} <span style="font-size:18px;">●</span>
+                        </span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
 
 @contextmanager
 def upload_field(title, key):
@@ -9608,8 +9743,8 @@ def uploaded_chip(files, key, clear, args):
         st.button("×", key=key, help="مسح الملف المرفوع", on_click=clear, args=args, width="content")
 
 
-def render_report_upload_bar(page, promise_metrics=None, neglect_metrics=None):
-    """Compact report header: file details and stacked X/+ alongside the title."""
+def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None):
+    """Compact report header; Neglect follows the approved reference layout."""
     titles = {
         'Promises': '🤝 إدارة ومتابعة الوعود (القائمة والمكسورة)',
         'Neglect': 'الإهمال',
@@ -9618,17 +9753,112 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_metrics=None):
     current_files = bank_files.get(page) or []
     uploader_version = st.session_state.report_uploader_versions[selected_bank][page]
 
-    with st.container(key=f"report_upload_bar_{selected_bank}_{page}"):
-        # Keep the neglect workflow selector immediately beside the portfolio uploader.
-        if page == "Neglect":
-            upload_col, mode_col, title_col, _left_balance = st.columns(
-                [1.65, 1.65, 4.0, 2.8], gap='small', vertical_alignment='center'
+    if page == "Neglect":
+        _mode_value = st.session_state.get(f"neglect_mode_{selected_bank}")
+        _download_df = neglect_export_df if neglect_export_df is not None else pd.DataFrame()
+        with st.container(key=f"report_upload_bar_{selected_bank}_{page}"):
+            st.markdown(
+                """
+                <style>
+                .st-key-neglect_mode_controls button {
+                    background: transparent !important;
+                    border: 0 !important;
+                    box-shadow: none !important;
+                    color: #FFFFFF !important;
+                    font-weight: 900 !important;
+                    padding: 5px 8px !important;
+                }
+                .st-key-neglect_mode_controls button p {
+                    color: #FFFFFF !important;
+                    font-size: 15px !important;
+                    font-weight: 900 !important;
+                }
+                .st-key-neglect_upload_header [data-testid="stFileUploaderDropzone"] {
+                    background: #FFFFFF !important;
+                    border: 1px solid #B8C8DA !important;
+                    border-radius: 8px !important;
+                }
+                .st-key-neglect_download_header button {
+                    background: #08A52C !important;
+                    border: 1px solid #08A52C !important;
+                    color: #FFFFFF !important;
+                    font-weight: 900 !important;
+                    min-height: 42px !important;
+                }
+                .st-key-neglect_download_header button p {
+                    color: #FFFFFF !important;
+                    font-weight: 900 !important;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True
             )
-        else:
-            upload_col, title_col, _left_balance = st.columns(
-                [1.7, 3.9, 4.4], gap='small', vertical_alignment='top'
+            download_col, mode_col, divider_col, upload_col = st.columns(
+                [1.65, 2.05, 0.08, 1.7], gap="small",
+                vertical_alignment="center"
             )
+            with download_col:
+                with st.container(key="neglect_download_header"):
+                    _xlsx_bytes = (
+                        build_neglect_report_xlsx(_download_df).getvalue()
+                        if not _download_df.empty else b""
+                    )
+                    st.download_button(
+                        "📥 تحميل تقرير الإهمال",
+                        data=_xlsx_bytes,
+                        file_name=f"{selected_bank}_Neglect_Report.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"dl_neglect_report_header_{selected_bank}",
+                        use_container_width=True,
+                        disabled=_download_df.empty
+                    )
+            with mode_col:
+                with st.container(key="neglect_mode_controls"):
+                    regular_col, followup_col = st.columns(2, gap="small")
+                    with regular_col:
+                        st.button(
+                            "🟢 إهمال" if _mode_value == "regular" else "⚪ إهمال",
+                            key=f"neglect_choice_regular_{selected_bank}",
+                            type="secondary", use_container_width=True,
+                            on_click=choose_neglect_mode, args=("regular",)
+                        )
+                    with followup_col:
+                        st.button(
+                            "🟢 متابعة إهمال" if _mode_value == "followup" else "⚪ متابعة إهمال",
+                            key=f"neglect_choice_followup_{selected_bank}",
+                            type="secondary", use_container_width=True,
+                            on_click=choose_neglect_mode, args=("followup",)
+                        )
+            with divider_col:
+                st.markdown(
+                    "<div style='height:42px;border-left:2px solid #A9BCD1;"
+                    "margin:auto;width:1px;'></div>",
+                    unsafe_allow_html=True
+                )
+            with upload_col:
+                field_title = "رفع ملف المحفظة" if current_files else "رفع ملف المحفظة"
+                with st.container(key="neglect_upload_header"):
+                    with upload_field(field_title, f"report_{selected_bank}_{page}"):
+                        widget_key = f"report_uploader_{selected_bank}_{page}_{uploader_version}"
+                        if current_files:
+                            uploaded_chip(
+                                current_files,
+                                f"small_clear_report_{selected_bank}_{page}",
+                                clear_report_page_file, (selected_bank, page)
+                            )
+                        else:
+                            st.file_uploader(
+                                f"رفع ملف {titles[page]}", type=['xlsx', 'csv'],
+                                accept_multiple_files=True, label_visibility='collapsed',
+                                key=widget_key, on_change=save_uploaded_files,
+                                args=('page_files', selected_bank, page, widget_key)
+                            )
+        return
 
+    with st.container(key=f"report_upload_bar_{selected_bank}_{page}"):
+        upload_col, title_col, _left_balance = st.columns(
+            [1.7, 3.9, 4.4], gap='small', vertical_alignment='top'
+        )
         with upload_col:
             field_title = "رفع ملف الوعود" if page == "Promises" else "رفع ملف المحفظة"
             if not current_files:
@@ -9644,26 +9874,6 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_metrics=None):
                         accept_multiple_files=True, label_visibility='collapsed',
                         key=widget_key, on_change=save_uploaded_files,
                         args=('page_files', selected_bank, page, widget_key)
-                    )
-
-        if page == "Neglect":
-            _neglect_mode_value = st.session_state.get(f"neglect_mode_{selected_bank}")
-            with mode_col:
-                with st.container(
-                    horizontal=True, vertical_alignment="center",
-                    key=f"neglect_mode_choices_{selected_bank}"
-                ):
-                    st.button(
-                        "🟢 إهمال" if _neglect_mode_value == "regular" else "⚪ إهمال",
-                        key=f"neglect_choice_regular_{selected_bank}",
-                        type="secondary", width="content",
-                        on_click=choose_neglect_mode, args=("regular",)
-                    )
-                    st.button(
-                        "🟢 متابعة إهمال" if _neglect_mode_value == "followup" else "⚪ متابعة إهمال",
-                        key=f"neglect_choice_followup_{selected_bank}",
-                        type="secondary", width="content",
-                        on_click=choose_neglect_mode, args=("followup",)
                     )
 
         with title_col:
@@ -9688,23 +9898,7 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_metrics=None):
                     """,
                     unsafe_allow_html=True
                 )
-            elif page == "Neglect" and neglect_metrics is not None:
-                _n_total_rows, _n_neglect_accounts = neglect_metrics
-                st.markdown(
-                    f"""
-                    <div style="display:flex;gap:10px;align-items:stretch;justify-content:flex-start;direction:rtl;flex-wrap:wrap;padding-top:2px;">
-                        <div style="background:#FFFFFF;border:1px solid #D5DFEA;border-right:5px solid #1F4373;border-radius:10px;padding:9px 16px;min-width:155px;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,.10);">
-                            <div style="font-size:13px;font-weight:800;color:#586F8C;">إجمالي صفوف الملف</div>
-                            <div style="font-size:24px;line-height:1.2;font-weight:900;color:#1F4373;">{int(_n_total_rows):,}</div>
-                        </div>
-                        <div style="background:#FFFFFF;border:1px solid #D5DFEA;border-right:5px solid #29A64A;border-radius:10px;padding:9px 16px;min-width:170px;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,.10);">
-                            <div style="font-size:13px;font-weight:800;color:#586F8C;">عدد حسابات الإهمال</div>
-                            <div style="font-size:24px;line-height:1.2;font-weight:900;color:#29A64A;">{int(_n_neglect_accounts):,}</div>
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+
 
 # دالة معالجة بيانات أي صفحة
 
@@ -10226,7 +10420,7 @@ if curr_page == 'Neglect' and bank_files.get('Neglect'):
 
 if curr_page in ('Promises', 'Neglect'):
     _promise_metrics = None
-    _neglect_metrics = None
+    _neglect_export_df = pd.DataFrame()
     if curr_page == 'Promises' and _promise_header_result is not None:
         _promise_metrics = (
             _promise_header_result[5],
@@ -10234,13 +10428,18 @@ if curr_page in ('Promises', 'Neglect'):
             _promise_header_result[8],
         )
     if curr_page == 'Neglect' and _neglect_header_result is not None:
-        _neglect_metrics = (
-            _neglect_header_result[5],
-            _neglect_header_result[9],
+        _raw_for_header = (
+            st.session_state.get("neglect_source_df", {}).get(selected_bank)
         )
+        if _raw_for_header is None:
+            _raw_for_header = _neglect_header_result[2]
+        _header_filter_result = calculate_neglect_filters(
+            _raw_for_header, selected_bank
+        )
+        _neglect_export_df = _header_filter_result["final_df"]
     render_report_upload_bar(
         curr_page, promise_metrics=_promise_metrics,
-        neglect_metrics=_neglect_metrics
+        neglect_export_df=_neglect_export_df
     )
 
 # Activity is intentionally a blank design canvas until the new report is specified.
@@ -10625,7 +10824,7 @@ else:
                 "فلترة الإهمال العادي. هنحدد قواعد المتابعة وخطواتها بشكل منفصل."
             )
         elif _neglect_mode != "regular":
-            st.info("اختاري أولًا «إهمال» أو «متابعة إهمال» من الاختيار الموجود بجوار رفع الملف.")
+            st.info("اختاري «إهمال» أو «متابعة إهمال» من أعلى الصفحة.")
         else:
             raw_neglect_source = (
                 st.session_state.get("neglect_source_df", {}).get(selected_bank)
@@ -10633,263 +10832,241 @@ else:
             if raw_neglect_source is None or raw_neglect_source.empty:
                 raw_neglect_source = neglect_df.copy()
 
-            sub_col = _snb_find_column(
-                raw_neglect_source, "Sub State", "sub state", "substate",
-                "الحالة الفرعية", "حالة العميل"
-            )
+            _filter = calculate_neglect_filters(raw_neglect_source, selected_bank)
+            states = _filter["states"]
+            digest = _filter["digest"]
+            checkbox_prefix = _filter["checkbox_prefix"]
+            status_key = _filter["status_key"]
+            writeoff_key = _filter["writeoff_key"]
+            due_key = _filter["due_key"]
+            last_key = _filter["last_key"]
+            final_neglect_df = _filter["final_df"]
+
             with st.container(key=f"neglect_diagnostic_row_{selected_bank}"):
-                # In RTL layout the diagnostics are on the left and the selector is on the right.
                 data_col, diag_col = st.columns(
                     [2.15, 1.0], gap="small", vertical_alignment="top"
                 )
+
+                # Right-hand filter panel: match the supplied approved mockup.
                 with data_col:
                     st.markdown(
-                        f"""
+                        """
                         <style>
-                        .st-key-neglect_states_outer_{selected_bank} {{
-                            width: 97% !important;
-                            max-width: 97% !important;
-                            margin-left: auto !important;
-                            margin-right: auto !important;
-                        }}
-                        .st-key-neglect_states_outer_{selected_bank} [data-testid="stExpander"] {{
-                            border: 1px solid #D5DFEA !important;
-                            border-radius: 12px !important;
-                            overflow: hidden !important;
-                        }}
-                        .st-key-neglect_states_outer_{selected_bank} [data-testid="stExpander"] details > summary {{
-                            background: #1F4373 !important;
-                            color: #FFFFFF !important;
-                            border-radius: 10px !important;
-                            min-height: 54px !important;
-                            font-weight: 900 !important;
-                        }}
-                        .st-key-neglect_states_outer_{selected_bank} [data-testid="stExpander"] details > summary p {{
-                            color: #FFFFFF !important;
-                            font-weight: 900 !important;
-                        }}
-                        .st-key-neglect_states_outer_{selected_bank} [data-testid="stCheckbox"] {{
-                            border: 1px solid #DCE4ED !important;
-                            border-radius: 9px !important;
-                            padding: 7px 10px !important;
-                            margin: 3px 0 !important;
-                            background: #FFFFFF !important;
-                        }}
-                        .st-key-neglect_states_outer_{selected_bank} [data-testid="stCheckbox"]:has(input:checked) {{
-                            background: #EAF8ED !important;
-                            border-color: #8BCF9B !important;
-                        }}
+                        .st-key-neglect_filter_panel {
+                            background:#FFFFFF !important;
+                            border:1px solid #B8C9DC !important;
+                            border-radius:13px !important;
+                            padding:8px 9px !important;
+                        }
+                        .st-key-neglect_filter_panel .neglect-filter-title {
+                            direction:rtl;background:#082B62;color:#FFFFFF;
+                            border-radius:8px;padding:9px 13px;
+                            font-size:15px;font-weight:900;text-align:right;
+                            margin-bottom:8px;
+                        }
+                        .st-key-neglect_filter_panel .neglect-step-number {
+                            width:25px;height:25px;border-radius:50%;
+                            display:flex;align-items:center;justify-content:center;
+                            background:#20A63D;color:#FFFFFF;font-weight:900;
+                            font-size:14px;margin:auto;
+                        }
+                        .st-key-neglect_filter_panel .neglect-step-label {
+                            direction:rtl;text-align:right;background:#E9F7E9;
+                            color:#1F4373;border-radius:7px;padding:8px 9px;
+                            font-size:13px;font-weight:900;white-space:normal;
+                        }
+                        .st-key-neglect_filter_panel [data-testid="stRadio"] > div {
+                            display:flex;flex-direction:row;gap:8px;flex-wrap:wrap;
+                        }
+                        .st-key-neglect_filter_panel [data-testid="stRadio"] label {
+                            border:1px solid #D7E0EA;border-radius:8px;
+                            background:#FFFFFF;padding:6px 12px;
+                            margin:0;min-height:34px;
+                        }
+                        .st-key-neglect_filter_panel [data-testid="stRadio"] label:has(input:checked) {
+                            background:#E6F6E8;border-color:#8BCF9B;
+                        }
+                        .st-key-neglect_filter_panel [data-testid="stRadio"] label p {
+                            color:#1F4373;font-weight:900;font-size:12px;
+                        }
+                        .st-key-neglect_filter_panel [data-testid="stCheckbox"] {
+                            border:1px solid #DCE4ED;border-radius:8px;
+                            padding:5px 9px;margin:2px 0;background:#FFFFFF;
+                        }
+                        .st-key-neglect_filter_panel [data-testid="stCheckbox"]:has(input:checked) {
+                            background:#E6F6E8;border-color:#8BCF9B;
+                        }
+                        .st-key-neglect_filter_panel [data-testid="stCheckbox"] label p {
+                            color:#1F4373;font-weight:800;font-size:12px;
+                        }
+                        .st-key-neglect_filter_panel [data-testid="stTextInput"] input {
+                            text-align:right;border-radius:8px;
+                        }
+                        .st-key-neglect_filter_panel [data-testid="stButton"] button {
+                            min-height:34px;border-radius:8px;font-size:12px;
+                            font-weight:900;
+                        }
+                        .st-key-neglect_filter_panel hr {
+                            margin:7px 0 !important;border-color:#DCE4ED !important;
+                        }
                         </style>
                         """,
                         unsafe_allow_html=True
                     )
-                    with st.container(key=f"neglect_states_outer_{selected_bank}"):
-                        with st.expander(
-                            "اختيار الحالات (Sub State)",
-                            expanded=True
-                        ):
-                            if sub_col:
-                                states = sorted({
-                                    str(value).strip()
-                                    for value in raw_neglect_source[sub_col].dropna()
-                                    if str(value).strip()
-                                })
-                                key_digest = hashlib.sha1(
-                                    (
-                                        selected_bank + "|" + str(len(raw_neglect_source))
-                                        + "|" + "|".join(states)
-                                    ).encode("utf-8")
-                                ).hexdigest()[:10]
-                                state_key = f"neglect_states_{selected_bank}_{key_digest}"
-                                checkbox_prefix = f"neglect_state_choice_{selected_bank}_{key_digest}"
-
-                                if state_key not in st.session_state:
-                                    st.session_state[state_key] = list(states)
-                                initial_selected = set(st.session_state.get(state_key, []))
-                                for state in states:
-                                    checkbox_key = _neglect_state_checkbox_key(
-                                        checkbox_prefix, state
-                                    )
-                                    if checkbox_key not in st.session_state:
-                                        st.session_state[checkbox_key] = state in initial_selected
-
-                                search_col, selected_col = st.columns(
-                                    [2.3, 1.0], gap="small",
-                                    vertical_alignment="center"
-                                )
-                                with search_col:
-                                    state_search = st.text_input(
-                                        "ابحثي باسم الحالة",
-                                        placeholder="اكتبي اسم الحالة للبحث...",
-                                        key=f"neglect_state_search_{selected_bank}_{key_digest}",
-                                        label_visibility="collapsed"
-                                    )
-                                with selected_col:
-                                    _currently_selected = sum(
-                                        bool(st.session_state.get(
-                                            _neglect_state_checkbox_key(checkbox_prefix, state),
-                                            False
-                                        ))
-                                        for state in states
-                                    )
-                                    st.markdown(
-                                        f"<div style='direction:rtl;text-align:center;"
-                                        f"font-weight:900;color:#1F4373;padding:8px 2px;'>"
-                                        f"المحدد: {_currently_selected} حالة</div>",
-                                        unsafe_allow_html=True
-                                    )
-
-                                _select_all_col, _clear_all_col, _space_col = st.columns(
-                                    [1.0, 1.0, 1.6], gap="small"
-                                )
-                                with _select_all_col:
-                                    st.button(
-                                        "تحديد الكل",
-                                        key=f"neglect_select_all_{selected_bank}_{key_digest}",
-                                        type="primary",
-                                        use_container_width=True,
-                                        on_click=_set_neglect_state_checkboxes,
-                                        args=(checkbox_prefix, states, True)
-                                    )
-                                with _clear_all_col:
-                                    st.button(
-                                        "إلغاء التحديد",
-                                        key=f"neglect_clear_all_{selected_bank}_{key_digest}",
-                                        use_container_width=True,
-                                        on_click=_set_neglect_state_checkboxes,
-                                        args=(checkbox_prefix, states, False)
-                                    )
-
-                                visible_states = [
-                                    state for state in states
-                                    if not str(state_search).strip()
-                                    or str(state_search).strip().casefold() in state.casefold()
-                                ]
-                                with st.container(
-                                    height=350,
-                                    border=True,
-                                    key=f"neglect_state_checklist_{selected_bank}_{key_digest}"
-                                ):
-                                    _right_states, _left_states = st.columns(2, gap="small")
-                                    for index, state in enumerate(visible_states):
-                                        target_col = _right_states if index % 2 == 0 else _left_states
-                                        with target_col:
-                                            st.checkbox(
-                                                state,
-                                                key=_neglect_state_checkbox_key(
-                                                    checkbox_prefix, state
-                                                )
-                                            )
-
-                                selected_sub_states = [
-                                    state for state in states
-                                    if st.session_state.get(
-                                        _neglect_state_checkbox_key(checkbox_prefix, state),
-                                        False
-                                    )
-                                ]
-                                st.session_state[state_key] = selected_sub_states
-                            else:
-                                states = []
-                                selected_sub_states = []
-                                st.info("عمود Sub State غير موجود في ملف المحفظة.")
-
-                        # Apply all rules in the requested order to the raw source:
-                        # Sub State -> unprocessed -> not writeoff -> Due Date != today -> Last Date > 3 days.
-                        today_neglect = pd.Timestamp(date.today()).normalize()
-                        after_substate = (
-                            raw_neglect_source.loc[
-                                raw_neglect_source[sub_col].fillna("").astype(str).str.strip()
-                                .isin(selected_sub_states)
-                            ].copy()
-                            if sub_col else raw_neglect_source.copy()
-                        )
-
-                        status_col = _snb_find_column(
-                            after_substate, "حالة المعالجة - التمويل",
-                            "حالة المعالجة", "processing status"
-                        )
-                        category_col = _snb_find_column(
-                            after_substate, "تحديث فئة العميل - التمويل",
-                            "تحديث فئة العميل", "customer category update"
-                        )
-                        due_col = _snb_find_column(
-                            after_substate, "Follow up Due Date", "follow up due date"
-                        )
-                        last_col = _snb_find_column(
-                            after_substate, "Follow up Last Date", "follow up last date"
-                        )
-
-                        after_unprocessed = (
-                            after_substate.loc[
-                                after_substate[status_col].astype(str).str.strip().eq("غير معالج")
-                            ].copy()
-                            if status_col else after_substate.copy()
-                        )
-                        after_writeoff = (
-                            after_unprocessed.loc[
-                                after_unprocessed[category_col].astype(str).str.strip().str.lower().ne("writeoff")
-                            ].copy()
-                            if category_col else after_unprocessed.copy()
-                        )
-
-                        if due_col:
-                            _due_dates = pd.to_datetime(
-                                after_writeoff[due_col], errors="coerce"
-                            ).dt.normalize()
-                            after_due_date = after_writeoff.loc[
-                                _due_dates.ne(today_neglect)
-                            ].copy()
-                        else:
-                            after_due_date = after_writeoff.copy()
-
-                        if last_col:
-                            _last_dates = pd.to_datetime(
-                                after_due_date[last_col], errors="coerce"
-                            ).dt.normalize()
-                            _neglect_days = (today_neglect - _last_dates).dt.days
-                            final_mask = _neglect_days.gt(3)
-                            final_neglect_df = after_due_date.loc[final_mask].copy()
-                            final_neglect_df["Neglect_Days"] = _neglect_days.loc[final_mask].astype(int)
-                        else:
-                            final_neglect_df = after_due_date.copy()
-
-                        _neglect_diagnostic_steps = [
-                            {"الخطوة": "إجمالي الصفوف الأصلية", "العدد": int(len(raw_neglect_source))},
-                            {"الخطوة": "بعد اختيار حالات Sub State", "العدد": int(len(after_substate))},
-                            {"الخطوة": "بعد حالة المعالجة = غير معالج", "العدد": int(len(after_unprocessed))},
-                            {"الخطوة": "بعد استبعاد فئة Write off", "العدد": int(len(after_writeoff))},
-                            {"الخطوة": "بعد استبعاد Follow up Due Date = اليوم", "العدد": int(len(after_due_date))},
-                            {"الخطوة": "بعد أكثر من 3 أيام منذ Follow up Last Date", "العدد": int(len(final_neglect_df))},
-                        ]
-
+                    with st.container(border=True, key="neglect_filter_panel"):
                         st.markdown(
-                            f"<div style='direction:rtl;text-align:right;font-weight:900;"
-                            f"color:{label_color};margin-top:10px;'>"
-                            f"إجمالي حسابات الإهمال بعد الفلترة: "
-                            f"<span style='color:{snb_green};font-size:20px;'>"
-                            f"{len(final_neglect_df):,}</span></div>",
+                            "<div class='neglect-filter-title'>معايير فترة الإهمال "
+                            "<span style='float:left;'>▼</span></div>",
                             unsafe_allow_html=True
                         )
 
-                        if not final_neglect_df.empty:
-                            _neglect_download = build_neglect_report_xlsx(
-                                final_neglect_df
-                            ).getvalue()
-                            st.download_button(
-                                "📥 تحميل شيت الإهمال Excel",
-                                data=_neglect_download,
-                                file_name=f"{selected_bank}_Neglect_Report.xlsx",
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                key=f"dl_neglect_report_{selected_bank}",
-                                use_container_width=False
+                        # Step 1: Sub State
+                        number_col, label_col, content_col = st.columns(
+                            [0.34, 1.25, 4.4], gap="small",
+                            vertical_alignment="center"
+                        )
+                        with number_col:
+                            st.markdown("<div class='neglect-step-number'>1</div>", unsafe_allow_html=True)
+                        with label_col:
+                            st.markdown("<div class='neglect-step-label'>اختيار حالات (Sub State):</div>", unsafe_allow_html=True)
+                        with content_col:
+                            search_col, selected_col = st.columns(
+                                [2.4, 1.0], gap="small",
+                                vertical_alignment="center"
                             )
-                        else:
-                            st.info("لا توجد حسابات ضمن الحالات المحددة لتحميلها.")
+                            with search_col:
+                                state_search = st.text_input(
+                                    "بحث الحالات",
+                                    placeholder="ابحثي باسم الحالة...",
+                                    key=f"neglect_state_search_{selected_bank}_{digest}",
+                                    label_visibility="collapsed"
+                                )
+                            with selected_col:
+                                _selected_now = len(_filter["selected_states"])
+                                st.markdown(
+                                    f"<div style='text-align:center;direction:rtl;"
+                                    f"font-weight:900;color:#1F4373;'>"
+                                    f"المحدد: {_selected_now} حالة</div>",
+                                    unsafe_allow_html=True
+                                )
 
+                            select_col, clear_col, spacer_col = st.columns(
+                                [0.8, 0.9, 2.0], gap="small"
+                            )
+                            with select_col:
+                                st.button(
+                                    "تحديد الكل", key=f"neglect_select_all_{selected_bank}_{digest}",
+                                    type="primary", use_container_width=True,
+                                    on_click=_set_neglect_state_checkboxes,
+                                    args=(checkbox_prefix, states, True)
+                                )
+                            with clear_col:
+                                st.button(
+                                    "إلغاء التحديد", key=f"neglect_clear_all_{selected_bank}_{digest}",
+                                    use_container_width=True,
+                                    on_click=_set_neglect_state_checkboxes,
+                                    args=(checkbox_prefix, states, False)
+                                )
+
+                        visible_states = [
+                            state for state in states
+                            if not str(state_search).strip()
+                            or str(state_search).strip().casefold() in state.casefold()
+                        ]
+                        with st.container(
+                            height=205, border=False,
+                            key=f"neglect_state_checklist_{selected_bank}_{digest}"
+                        ):
+                            state_columns = st.columns(3, gap="small")
+                            for index, state in enumerate(visible_states):
+                                with state_columns[index % 3]:
+                                    st.checkbox(
+                                        state,
+                                        key=_neglect_state_checkbox_key(
+                                            checkbox_prefix, state
+                                        )
+                                    )
+
+                        st.divider()
+
+                        # Step 2: processing status
+                        number_col, label_col, content_col = st.columns(
+                            [0.34, 1.25, 4.4], gap="small",
+                            vertical_alignment="center"
+                        )
+                        with number_col:
+                            st.markdown("<div class='neglect-step-number'>2</div>", unsafe_allow_html=True)
+                        with label_col:
+                            st.markdown("<div class='neglect-step-label'>حالة المعالجة:</div>", unsafe_allow_html=True)
+                        with content_col:
+                            st.radio(
+                                "حالة المعالجة",
+                                ["غير المعالج فقط", "الكل"],
+                                key=status_key, horizontal=True,
+                                label_visibility="collapsed"
+                            )
+
+                        st.divider()
+
+                        # Step 3: write-off exclusion
+                        number_col, label_col, content_col = st.columns(
+                            [0.34, 1.25, 4.4], gap="small",
+                            vertical_alignment="center"
+                        )
+                        with number_col:
+                            st.markdown("<div class='neglect-step-number'>3</div>", unsafe_allow_html=True)
+                        with label_col:
+                            st.markdown("<div class='neglect-step-label'>استبعاد write off:</div>", unsafe_allow_html=True)
+                        with content_col:
+                            st.radio(
+                                "استبعاد write off",
+                                ["استبعاد write off", "عدم الاستبعاد"],
+                                key=writeoff_key, horizontal=True,
+                                label_visibility="collapsed"
+                            )
+
+                        st.divider()
+
+                        # Step 4: Follow up Due Date
+                        number_col, label_col, content_col = st.columns(
+                            [0.34, 1.25, 4.4], gap="small",
+                            vertical_alignment="center"
+                        )
+                        with number_col:
+                            st.markdown("<div class='neglect-step-number'>4</div>", unsafe_allow_html=True)
+                        with label_col:
+                            st.markdown("<div class='neglect-step-label'>Follow up Due Date:</div>", unsafe_allow_html=True)
+                        with content_col:
+                            st.checkbox(
+                                "استبعاد السجلات التي يكون فيها Follow up Due Date = اليوم",
+                                key=due_key
+                            )
+
+                        st.divider()
+
+                        # Step 5: Follow up Last Date
+                        number_col, label_col, content_col = st.columns(
+                            [0.34, 1.25, 4.4], gap="small",
+                            vertical_alignment="center"
+                        )
+                        with number_col:
+                            st.markdown("<div class='neglect-step-number'>5</div>", unsafe_allow_html=True)
+                        with label_col:
+                            st.markdown("<div class='neglect-step-label'>Follow up Last Date:</div>", unsafe_allow_html=True)
+                        with content_col:
+                            st.checkbox(
+                                "الاحتفاظ بالحسابات التي مر عليها أكثر من 3 أيام",
+                                key=last_key
+                            )
+
+                # Left-hand diagnostics and final KPI.
                 with diag_col:
                     render_promise_filter_diagnostics(
-                        selected_bank,
-                        "neglect",
-                        extra_steps=_neglect_diagnostic_steps
+                        selected_bank, "neglect",
+                        extra_steps=_filter["steps"]
                     )
+
+            if not final_neglect_df.empty:
+                st.session_state["neglect_export_df"] = final_neglect_df.copy()
+            else:
+                st.session_state["neglect_export_df"] = pd.DataFrame()
