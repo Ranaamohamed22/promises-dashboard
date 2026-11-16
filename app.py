@@ -213,10 +213,10 @@ def calculate_neglect_filters(raw_df, bank):
     writeoff_key = f"neglect_writeoff_mode_{bank}_{digest}"
     due_key = f"neglect_exclude_due_today_{bank}_{digest}"
     last_key = f"neglect_last_date_over_3_{bank}_{digest}"
-    st.session_state.setdefault(status_key, "غير المعالج فقط")
-    st.session_state.setdefault(writeoff_key, "استبعاد write off")
-    st.session_state.setdefault(due_key, True)
-    st.session_state.setdefault(last_key, True)
+    st.session_state[status_key] = "غير المعالج فقط"
+    st.session_state[writeoff_key] = "استبعاد write off"
+    st.session_state[due_key] = True
+    st.session_state[last_key] = True
 
     status_col = _snb_find_column(
         source, "حالة المعالجة - التمويل",
@@ -11287,51 +11287,13 @@ else:
                             unsafe_allow_html=True
                         )
 
-                        # Step 1: processing status (filter unprocessed records first).
+                        # The only visible control in this panel is Sub State selection.
                         number_col, label_col, content_col = st.columns(
                             [0.34, 1.25, 4.4], gap="small",
                             vertical_alignment="center"
                         )
                         with number_col:
                             st.markdown("<div class='neglect-step-number'>1</div>", unsafe_allow_html=True)
-                        with label_col:
-                            st.markdown("<div class='neglect-step-label'>حالة المعالجة:</div>", unsafe_allow_html=True)
-                        with content_col:
-                            st.radio(
-                                "حالة المعالجة",
-                                ["غير المعالج فقط", "الكل"],
-                                key=status_key, horizontal=True,
-                                label_visibility="collapsed"
-                            )
-
-                        st.divider()
-
-                        # Step 2: write-off exclusion.
-                        number_col, label_col, content_col = st.columns(
-                            [0.34, 1.25, 4.4], gap="small",
-                            vertical_alignment="center"
-                        )
-                        with number_col:
-                            st.markdown("<div class='neglect-step-number'>2</div>", unsafe_allow_html=True)
-                        with label_col:
-                            st.markdown("<div class='neglect-step-label'>استبعاد write off:</div>", unsafe_allow_html=True)
-                        with content_col:
-                            st.radio(
-                                "استبعاد write off",
-                                ["استبعاد write off", "عدم الاستبعاد"],
-                                key=writeoff_key, horizontal=True,
-                                label_visibility="collapsed"
-                            )
-
-                        st.divider()
-
-                        # Step 3: Sub State selection.
-                        number_col, label_col, content_col = st.columns(
-                            [0.34, 1.25, 4.4], gap="small",
-                            vertical_alignment="center"
-                        )
-                        with number_col:
-                            st.markdown("<div class='neglect-step-number'>3</div>", unsafe_allow_html=True)
                         with label_col:
                             st.markdown("<div class='neglect-step-label'>اختيار حالات (Sub State):</div>", unsafe_allow_html=True)
                         with content_col:
@@ -11386,7 +11348,7 @@ else:
                             or str(state_search).strip().casefold() in state.casefold()
                         ]
                         with st.container(
-                            height=170, border=False,
+                            height=245, border=False,
                             key=f"neglect_state_checklist_{selected_bank}_{digest}"
                         ):
                             state_columns = st.columns(3, gap="small")
@@ -11402,40 +11364,6 @@ else:
                                                 checkbox_prefix, state
                                             )
                                         )
-
-                        st.divider()
-
-                        # Step 4: Follow up Due Date
-                        number_col, label_col, content_col = st.columns(
-                            [0.34, 1.25, 4.4], gap="small",
-                            vertical_alignment="center"
-                        )
-                        with number_col:
-                            st.markdown("<div class='neglect-step-number'>4</div>", unsafe_allow_html=True)
-                        with label_col:
-                            st.markdown("<div class='neglect-step-label'>Follow up Due Date:</div>", unsafe_allow_html=True)
-                        with content_col:
-                            st.checkbox(
-                                "استبعاد السجلات التي يكون فيها Follow up Due Date = اليوم",
-                                key=due_key
-                            )
-
-                        st.divider()
-
-                        # Step 5: Follow up Last Date
-                        number_col, label_col, content_col = st.columns(
-                            [0.34, 1.25, 4.4], gap="small",
-                            vertical_alignment="center"
-                        )
-                        with number_col:
-                            st.markdown("<div class='neglect-step-number'>5</div>", unsafe_allow_html=True)
-                        with label_col:
-                            st.markdown("<div class='neglect-step-label'>Follow up Last Date:</div>", unsafe_allow_html=True)
-                        with content_col:
-                            st.checkbox(
-                                "الاحتفاظ بالحسابات التي مر عليها أكثر من 3 أيام",
-                                key=last_key
-                            )
 
                 # Left-hand diagnostics and final KPI.
                 with diag_col:
