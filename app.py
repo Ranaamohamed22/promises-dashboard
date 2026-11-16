@@ -7896,7 +7896,7 @@ def _ejada_stc_activity_kpi_counts(uploaded):
         df, "Notes", "Note", "الإفادة", "ملاحظات", "Feedback"
     )
     collector_col = _snb_find_column(
-        df, "Collector", "Collecter", "المحصل", "Agent"
+        df, "Created by", "Collector", "Collecter", "المحصل", "Agent"
     )
     if all(c is not None for c in (id_col, notes_col, collector_col)):
         df = df.drop_duplicates(
@@ -8752,13 +8752,13 @@ def _stc_prepare_activity_data(uploaded):
     if notes_col is None:
         raise ValueError("تقرير نشاط STC لازم يحتوي عمود Notes / الإفادة.")
     collector = _snb_find_column(
-        frame, "Collector", "Collecter", "المحصل", "Agent"
+        frame, "Created by", "Collector", "Collecter", "المحصل", "Agent"
     )
-    identity = _snb_find_column(frame, "رقم هوية العميل", "رقم الهوية", "هوية العميل",
+    identity = _snb_find_column(frame, "Debitor", "رقم هوية العميل", "رقم الهوية", "هوية العميل",
                                 "National ID", "National ID Number", "Identity Number",
-                                "ID Number", "ID Numer", "ID", "Debitor", "Debtor")
+                                "ID Number", "ID Numer", "ID", "Debtor")
     if collector is None or identity is None:
-        raise ValueError("ملف النشاط محتاج عمود المحصل وعمود رقم هوية العميل.")
+        raise ValueError("ملف نشاط STC محتاج Created by لاسم المحصل وDebitor لرقم هوية العميل.")
     date_col = _snb_find_column(
         frame, "Created on", "Created On", "CreatedOn",
         "التاريخ", "Date"
