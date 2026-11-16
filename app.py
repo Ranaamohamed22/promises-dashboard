@@ -10608,7 +10608,7 @@ else:
                 "فلترة الإهمال العادي. هنحدد قواعد المتابعة وخطواتها بشكل منفصل."
             )
         elif _neglect_mode != "regular":
-            st.info("اختاري أولًا «إهمال» أو «متابعة إهمال» من الاختيار الموجود أعلى الصفحة.")
+            st.info("اختاري أولًا «إهمال» أو «متابعة إهمال» من الاختيار الموجود بجوار رفع الملف.")
         else:
             # The uploaded portfolio determines every available Sub State option.
             sub_col = _snb_find_column(
@@ -10616,7 +10616,7 @@ else:
                 "الحالة الفرعية", "حالة العميل"
             )
             with st.container(key=f"neglect_diagnostic_row_{selected_bank}"):
-                # In RTL layout the first column is on the right: put states right and diagnostics left.
+                # In RTL layout the first column is on the right: states right, diagnostics left.
                 data_col, diag_col = st.columns(
                     [2.15, 1.0], gap="small", vertical_alignment="top"
                 )
@@ -10639,22 +10639,22 @@ else:
                     )
                     with st.container(key=f"neglect_states_outer_{selected_bank}"):
                         if sub_col:
-                        states = st.session_state.get(
-                            "neglect_substate_options", {}
-                        ).get(selected_bank) or sorted({
-                            str(value).strip()
-                            for value in neglect_df[sub_col].dropna()
-                            if str(value).strip()
-                        })
-                        key_digest = hashlib.sha1(
-                            (
-                                selected_bank + "|" + str(len(neglect_df))
-                                + "|" + "|".join(states)
-                            ).encode("utf-8")
-                        ).hexdigest()[:10]
-                        state_key = f"neglect_states_{selected_bank}_{key_digest}"
-                        if state_key not in st.session_state:
-                            st.session_state[state_key] = list(states)
+                            states = st.session_state.get(
+                                "neglect_substate_options", {}
+                            ).get(selected_bank) or sorted({
+                                str(value).strip()
+                                for value in neglect_df[sub_col].dropna()
+                                if str(value).strip()
+                            })
+                            key_digest = hashlib.sha1(
+                                (
+                                    selected_bank + "|" + str(len(neglect_df))
+                                    + "|" + "|".join(states)
+                                ).encode("utf-8")
+                            ).hexdigest()[:10]
+                            state_key = f"neglect_states_{selected_bank}_{key_digest}"
+                            if state_key not in st.session_state:
+                                st.session_state[state_key] = list(states)
 
                             with st.expander(
                                 "اختيار الحالات (Sub State)",
@@ -10681,7 +10681,7 @@ else:
                                         on_click=_set_neglect_state_selection,
                                         args=(state_key, [])
                                     )
-                                selected_sub_states = st.multiselect(
+                                st.multiselect(
                                     "ابحثي واختاري حالة أو أكثر:",
                                     options=states,
                                     key=state_key,
@@ -10689,48 +10689,48 @@ else:
                                 )
 
                             selected_sub_states = st.session_state.get(state_key, [])
-                        final_neglect_df = neglect_df.loc[
-                            neglect_df[sub_col].fillna("").astype(str).str.strip()
-                            .isin(selected_sub_states)
-                        ].copy()
-                        st.caption(
-                            f"الحالات المتاحة: {len(states):,} | "
-                            f"الحالات المحددة: {len(selected_sub_states):,}"
-                        )
-                        _neglect_selection_step = {
-                            "الخطوة": "بعد اختيار الحالات (Sub State)",
-                            "العدد": int(len(final_neglect_df))
-                        }
-                    else:
-                        final_neglect_df = neglect_df.copy()
-                        st.info("عمود Sub State غير موجود في بيانات الإهمال المرفوعة.")
-                        _neglect_selection_step = {
-                            "الخطوة": "اختيار الحالات (Sub State) - العمود غير متاح",
-                            "العدد": int(len(final_neglect_df))
-                        }
+                            final_neglect_df = neglect_df.loc[
+                                neglect_df[sub_col].fillna("").astype(str).str.strip()
+                                .isin(selected_sub_states)
+                            ].copy()
+                            st.caption(
+                                f"الحالات المتاحة: {len(states):,} | "
+                                f"الحالات المحددة: {len(selected_sub_states):,}"
+                            )
+                            _neglect_selection_step = {
+                                "الخطوة": "بعد اختيار الحالات (Sub State)",
+                                "العدد": int(len(final_neglect_df))
+                            }
+                        else:
+                            final_neglect_df = neglect_df.copy()
+                            st.info("عمود Sub State غير موجود في بيانات الإهمال المرفوعة.")
+                            _neglect_selection_step = {
+                                "الخطوة": "اختيار الحالات (Sub State) - العمود غير متاح",
+                                "العدد": int(len(final_neglect_df))
+                            }
 
-                    st.markdown(
-                        f"<p style='text-align:right;direction:rtl;color:{label_color};"
-                        f"font-weight:900;'>عدد حسابات الإهمال: "
-                        f"<b style='color:{snb_green};font-size:19px;'>"
-                        f"{len(final_neglect_df):,}</b></p>",
-                        unsafe_allow_html=True
-                    )
-
-                    if not final_neglect_df.empty:
-                        _neglect_download = build_neglect_report_xlsx(
-                            final_neglect_df
-                        ).getvalue()
-                        st.download_button(
-                            "📥 تحميل شيت الإهمال Excel",
-                            data=_neglect_download,
-                            file_name=f"{selected_bank}_Neglect_Report.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            key=f"dl_neglect_report_{selected_bank}",
-                            use_container_width=False
+                        st.markdown(
+                            f"<p style='text-align:right;direction:rtl;color:{label_color};"
+                            f"font-weight:900;'>عدد حسابات الإهمال: "
+                            f"<b style='color:{snb_green};font-size:19px;'>"
+                            f"{len(final_neglect_df):,}</b></p>",
+                            unsafe_allow_html=True
                         )
-                    else:
-                        st.info("لا توجد حسابات ضمن الحالات المحددة لتحميلها.")
+
+                        if not final_neglect_df.empty:
+                            _neglect_download = build_neglect_report_xlsx(
+                                final_neglect_df
+                            ).getvalue()
+                            st.download_button(
+                                "📥 تحميل شيت الإهمال Excel",
+                                data=_neglect_download,
+                                file_name=f"{selected_bank}_Neglect_Report.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key=f"dl_neglect_report_{selected_bank}",
+                                use_container_width=False
+                            )
+                        else:
+                            st.info("لا توجد حسابات ضمن الحالات المحددة لتحميلها.")
 
                 with diag_col:
                     render_promise_filter_diagnostics(
