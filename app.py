@@ -188,7 +188,7 @@ def calculate_neglect_filters(raw_df, bank):
     }) if sub_col else []
 
     digest = hashlib.sha1(
-        (bank + "|" + str(len(source)) + "|" + "|".join(states)).encode("utf-8")
+        (bank + "|neglect_mockup_v2|" + str(len(source)) + "|" + "|".join(states)).encode("utf-8")
     ).hexdigest()[:10]
     state_key = f"neglect_states_{bank}_{digest}"
     checkbox_prefix = f"neglect_state_choice_{bank}_{digest}"
