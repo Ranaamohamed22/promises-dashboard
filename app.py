@@ -9590,14 +9590,29 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                                       format_func=names.get, key="snb_activity_daily_shift")
                 shift_notice.markdown(f'<div class="ejada-shift-notice">رنا إحنا في {names[period]}</div>',
                                       unsafe_allow_html=True)
+                # Always retain the final hour of either shift.
                 remove_extra, remove_last = True, False
                 if period != "first":
                     remove_extra = st.checkbox(
                         "استبعاد الساعة الزيادة بعد نهاية الفترة (4–5 عصرًا)",
                         value=True, key="snb_activity_exclude_after_shift")
-                    remove_last = st.checkbox(
-                        "حذف آخر ساعة من الفترة (3–4 عصرًا)",
-                        value=False, key="snb_activity_exclude_last_hour")
+            # Warn about late notes in the uploaded daily file, without blocking
+            # processing or changing the shift boundaries.
+            if period in ("first", "second"):
+                stamps = prepared["__ejada_parsed_created"].dropna()
+                if not stamps.empty:
+                    report_day = stamps.max().normalize()
+                    cutoff_hour = 12 if period == "first" else 14
+                    cutoff = report_day + pd.Timedelta(hours=cutoff_hour)
+                    late_count = int(((stamps.dt.normalize() == report_day) &
+                                      (stamps >= cutoff)).sum())
+                    if late_count:
+                        cutoff_label = "12 ظهرًا" if period == "first" else "2 ظهرًا"
+                        st.warning(
+                            f"تنبيه: يوجد {late_count:,} إفادة في الملف عند أو بعد "
+                            f"الساعة {cutoff_label} في {names[period]}. "
+                            "التقرير سيستمر بشكل طبيعي، ولن يتم حذف الساعة الأخيرة."
+                        )
             selected, excluded_after_shift = _filter_snb_activity_period(
                 prepared, activity_kind, period, remove_extra, remove_last)
         else:
@@ -9625,8 +9640,6 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
             scope = activity_kind
             if activity_kind == "يومي":
                 scope += f" | {names[period]}"
-                if remove_last:
-                    scope += " | بعد حذف آخر ساعة"
                 if not remove_extra:
                     scope += " | يشمل الساعة الإضافية"
             dates = selected["__ejada_parsed_created"].dropna()
