@@ -8754,8 +8754,7 @@ def _stc_duplicate_mask(frame, collector, identity, stamps):
 def _stc_model_choices(frame, notes, collector, identity, stamps, mapping, labels, prefix):
     keys = frame[notes].map(_snb_normalize_note)
     manual = st.session_state.setdefault("stc_ratings_" + prefix, {})
-    needs = (~keys.map(mapping).isin([0, 1]) |
-             keys.str.contains(r"(?<!\w)(?:تم|معالج)(?!\w)|/", regex=True))
+    needs = ~keys.map(mapping).isin([0, 1])
     pending = frame.index[needs & ~frame.index.isin(manual)]
     if len(pending):
         names = {0: "غير ناجحة", 1: "ناجحة"}
@@ -8855,11 +8854,30 @@ def _stc_metrics(frame, collector, stamps, ratings):
     overlap = (now.clip(upper=end) - prev.clip(lower=start)).dt.total_seconds().clip(lower=0)
     duration = ((now-prev).dt.total_seconds()-overlap).fillna(0)/60
     result["التاريخ"] = now.dt.date
-    result["الوقت"] = now.dt.strftime("%I:%M %p")
+    result["الوقت"] = now.dt.strftime("%I:%M:%S %p")
     result["تقييم المكالمات"] = ratings.map({1:"ناجحة", 0:"غير ناجحة"})
     result["مدة المكالمة بالدقائق"] = duration
     result["الوقت المهدر بالدقائق"] = (duration-7).clip(lower=0)
     return result
+
+
+def _stc_daily_note_times(result, collector, notes, stamps):
+    ordered = result.loc[stamps.loc[result.index].sort_values(kind="stable").index]
+    groups = ordered.groupby(collector, sort=False)
+    first = groups.head(1).set_index(collector)
+    last = groups.tail(1).set_index(collector)
+    times = stamps.loc[ordered.index]
+    after = ordered.loc[times.dt.hour * 60 + times.dt.minute >= 14 * 60 + 45]
+    post = after.drop_duplicates(collector).set_index(collector)
+    return pd.DataFrame({
+        "ميعاد أول إفادة": first["الوقت"],
+        "حالة أول إفادة": first["تقييم المكالمات"],
+        "أول إفادة بعد البريك": post[notes],
+        "ميعاد أول إفادة بعد البريك": post["الوقت"],
+        "حالة أول إفادة بعد البريك": post["تقييم المكالمات"],
+        "ميعاد آخر إفادة": last["الوقت"],
+        "حالة آخر إفادة": last["تقييم المكالمات"],
+    }, index=first.index).fillna("").reset_index()
 
 
 def _format_duty_span(span):
@@ -9028,12 +9046,7 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
     if kind == "يومي":
         sheets = {"المكالمات": result, "ملخص المحصلين": summary}
         if not first:
-            afternoon = stamps.loc[result.index] - day.loc[result.index] >= pd.Timedelta(hours=14, minutes=45)
-            after = result.loc[afternoon].drop_duplicates(collector)
-            sheets["أول إفادة بعد البريك"] = after[
-                [collector, notes, "الوقت", "تقييم المكالمات"]
-            ].rename(columns={notes: "أول إفادة بعد البريك",
-                              "تقييم المكالمات": "حالة أول إفادة بعد البريك"})
+            sheets["أول إفادة بعد البريك"] = _stc_daily_note_times(result, collector, notes, stamps)
             with st.expander("أول إفادة بعد البريك وحالتها"):
                 st.dataframe(sheets["أول إفادة بعد البريك"], hide_index=True)
         _stc_download(sheets, "تحميل تقرير النشاط اليومي", "STC_Daily.xlsx")
