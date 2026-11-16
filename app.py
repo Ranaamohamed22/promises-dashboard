@@ -8805,15 +8805,11 @@ def _activity_week_choice(stamps, key, monthly=False):
     return valid, starts
 
 
-def _stc_first_call_mask(frame, notes, collector, identity, stamps):
-    """Keep the earliest matching call per customer, collector, note and date."""
-    keys = pd.DataFrame({"هوية": frame[identity].fillna("").str.strip(),
-                         "محصل": frame[collector].str.strip(),
-                         "إفادة": frame[notes].map(_snb_normalize_note),
-                         "يوم": stamps.dt.date})
-    ordered = keys.loc[stamps.sort_values(kind="stable").index]
-    duplicate = ordered.duplicated() & ordered["هوية"].ne("") & ordered["إفادة"].ne("")
-    return ~duplicate.reindex(frame.index)
+def _stc_duplicate_mask(frame, collector, identity, stamps):
+    keys = pd.DataFrame({"collector": frame[collector].str.strip(),
+                         "identity": frame[identity].fillna("").str.strip(),
+                         "created": stamps})
+    return keys["identity"].ne("") & keys.duplicated(keep="first")
 
 
 def _stc_model_choices(frame, notes, collector, identity, stamps, mapping, labels, prefix):
@@ -8986,6 +8982,30 @@ def _stc_dashboard(summary, collector, scope):
 
 def render_stc_activity_report(model_upload, activity_upload, activity_kind="تلقائي",
                                error_slot=None, shift_selector=None):
+    if activity_upload is not None:
+        try:
+            source, notes, collector, identity, stamps = _stc_prepare_activity_data(activity_upload)
+        except Exception as exc:
+            st.error(f"تعذر تجهيز ملف STC: {exc}")
+            return
+        digest = hashlib.sha256(activity_upload.getvalue()).hexdigest()[:20]
+        version = st.session_state.activity_upload_versions["STC"]["activity"]
+        key = f"stc_{digest}_{version}"
+        duplicates = _stc_duplicate_mask(source, collector, identity, stamps)
+        count = int(duplicates.sum())
+        if count:
+            choice = st.radio(
+                f"فيه {count:,} صف متكرر حسب Created by وDebitor وCreated on (التاريخ والوقت).",
+                ["تأكيد حذف التكرارات والاحتفاظ بأول صف", "الاحتفاظ بكل الصفوف"],
+                index=None, horizontal=True, key="duplicate_choice_" + key,
+                help="الاختيار بيطبّق على التقرير فقط. ملفك الأصلي بيفضل زي ما هو."
+            )
+            if choice is None:
+                return
+            if choice == "تأكيد حذف التكرارات والاحتفاظ بأول صف":
+                source = source.loc[~duplicates]
+                stamps = stamps.loc[source.index]
+                key += "_deduplicated"
     try:
         model = _stc_parse_activity_model(model_upload)
         saved, labels, _ = _stc_load_saved_activity_model()
@@ -9005,14 +9025,6 @@ def render_stc_activity_report(model_upload, activity_upload, activity_kind="ت�
     if not mapping:
         st.info("ارفعي موديل STC بعمود Notes وعمود التقييم (١ أو ٠).")
         return
-    try:
-        source, notes, collector, identity, stamps = _stc_prepare_activity_data(activity_upload)
-    except Exception as exc:
-        st.error(f"تعذر تجهيز ملف STC: {exc}")
-        return
-    digest = hashlib.sha256(activity_upload.getvalue()).hexdigest()[:20]
-    version = st.session_state.activity_upload_versions["STC"]["activity"]
-    key = f"stc_{digest}_{version}"
     kind = _activity_period(stamps)[0] if activity_kind == "تلقائي" else activity_kind
     day = stamps.dt.normalize()
     first = False
@@ -9061,11 +9073,7 @@ def render_stc_activity_report(model_upload, activity_upload, activity_kind="ت�
     if not eligible.any():
         st.info("مفيش مكالمات في النطاق المختار.")
         return
-    keep = _stc_first_call_mask(source, notes, collector, identity, stamps)
-    frame = source.loc[eligible & keep].copy()
-    if frame.empty:
-        st.info("مفيش مكالمات محتسبة في الفترة المختارة.")
-        return
+    frame = source.loc[eligible].copy()
     model_key = hashlib.sha256(model_upload.getvalue()).hexdigest()[:12] if model_upload else "saved"
     review_key = key + model_key
     ratings = _stc_model_choices(frame, notes, collector, identity, stamps, mapping, labels, review_key)
