@@ -7307,6 +7307,23 @@ def _render_bank_activity_model_manager(bank):
 
     st.metric("الإفادات المحفوظة في الموديل الدائم", len(saved))
     if bank == "SNB":
+        coverage = st.session_state.get("ejada_snb_model_coverage")
+        if coverage:
+            matched, total = coverage["matched"], coverage["total"]
+            percent = 100 * matched / total if total else 0
+            st.caption(
+                f"آخر تقرير نشاط تم تحليله — نسبة الإفادات المطابقة تمامًا "
+                f"لموديل النشاط: {percent:.1f}% ({matched:,} من {total:,}). "
+                "عمود «نسبة تطابق التقييم» يقيس تشابه نص الإفادة بأقرب نص "
+                "في الموديل، ولا يقيس صحة التقييم اليدوي."
+            )
+        else:
+            st.caption(
+                "نسبة الإفادات المطابقة تمامًا لموديل النشاط ستظهر هنا "
+                "بعد تحليل تقرير نشاط SNB. عمود «نسبة تطابق التقييم» "
+                "يقيس تشابه نص الإفادة بأقرب نص في الموديل، "
+                "ولا يقيس صحة التقييم اليدوي."
+            )
         st.caption(
             f"الموديل الأساسي المشفّر: {len(base)} إفادة. "
             "الجدول يعرض الإضافات المحفوظة فقط؛ التعديل لا يمس ملف الموديل الأساسي."
@@ -7371,6 +7388,8 @@ def _render_bank_activity_model_manager(bank):
     except (RuntimeError, ValueError) as exc:
         st.error(f"تعذّر حفظ التعديل: {exc}")
         return
+    if bank == "SNB":
+        st.session_state.pop("ejada_snb_model_coverage", None)
     st.session_state[f"ejada_model_saved_{bank}"] = "تم حفظ الإفادة في موديل " + bank
     st.rerun()
 
@@ -9633,15 +9652,10 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
             selected[stats["notes"]].map(_snb_normalize_note)
             .isin(model_mapping).sum()
         )
-        model_coverage = (
-            100 * model_matched / len(selected) if len(selected) else 0
-        )
-        st.caption(
-            f"نسبة الإفادات المطابقة تمامًا لموديل النشاط: "
-            f"{model_coverage:.1f}% ({model_matched:,} من {len(selected):,}). "
-            "عمود «نسبة تطابق التقييم» يقيس تشابه نص الإفادة بأقرب نص "
-            "في الموديل، ولا يقيس صحة التقييم اليدوي."
-        )
+        # Display model coverage only in the independent model-management page.
+        st.session_state["ejada_snb_model_coverage"] = {
+            "matched": model_matched, "total": len(selected),
+        }
         st.caption(
             "Notes = الإفادة. 0 = غير ناجحة، 1 = ناجحة. "
             "مده المكالمه محسوبة بالدقائق بين مكالمتين متتاليتين "
