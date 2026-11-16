@@ -8764,11 +8764,12 @@ def _stc_model_choices(frame, notes, collector, identity, stamps, mapping, label
         rows = []
         for i in pending:
             percent, near = suggestions[keys[i]]
+            proposed = names.get(mapping.get(near))
             rows.append({"صف الملف": i+2, "المحصل": frame.at[i, collector],
                          "رقم الهوية": frame.at[i, identity], "وقت المكالمة": stamps[i],
                          "الإفادة": frame.at[i, notes], "أقرب إفادة": labels.get(near, near),
-                         "نسبة التشابه": percent, "التقييم المقترح": names.get(mapping.get(near), ""),
-                         "تقييم المكالمة": None})
+                         "نسبة التشابه": percent, "التقييم المقترح": proposed,
+                         "تقييم المكالمة": proposed})
         with st.form("stc_call_form_" + prefix):
             data = pd.DataFrame(rows)
             edited = st.data_editor(data, hide_index=True, disabled=list(data.columns[:-1]),
@@ -8776,11 +8777,14 @@ def _stc_model_choices(frame, notes, collector, identity, stamps, mapping, label
                                         options=list(names.values()))},
                                     key=f"stc_ed_{prefix}_{hash(tuple(pending))}")
             if st.form_submit_button("اعتماد تقييم المكالمات"):
-                for row_id, rating in zip(edited["صف الملف"], edited["تقييم المكالمة"]):
+                ratings = edited["تقييم المكالمة"].where(
+                    edited["تقييم المكالمة"].isin(names.values()), edited["التقييم المقترح"]
+                )
+                for row_id, rating in zip(edited["صف الملف"], ratings):
                     if rating in names.values():
                         manual[int(row_id)-2] = int(rating == "ناجحة")
                 st.rerun()
-        st.info("اعتمدي تقييم كل مكالمة قبل تنزيل التقرير.")
+        st.info("اضغطي اعتماد لاستخدام التقييم المقترح، أو عدّلي تقييم أي مكالمة قبل الاعتماد. أي صف من غير اقتراح محتاج تقييم منك.")
         return None
     return pd.Series([manual[i] if i in manual else mapping[keys[i]] for i in frame.index],
                      index=frame.index, dtype=int)
