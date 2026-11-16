@@ -173,10 +173,11 @@ def _set_neglect_state_checkboxes(prefix, states, checked):
 
 
 def calculate_neglect_filters(raw_df, bank):
-    """Calculate the live neglect result from the same controls shown in the UI."""
+    """Apply neglect filters in the exact requested order and return live diagnostics."""
     if raw_df is None:
         raw_df = pd.DataFrame()
     source = raw_df.copy()
+
     sub_col = _snb_find_column(
         source, "Sub State", "sub state", "substate",
         "الحالة الفرعية", "حالة العميل"
@@ -188,12 +189,11 @@ def calculate_neglect_filters(raw_df, bank):
     }) if sub_col else []
 
     digest = hashlib.sha1(
-        (bank + "|neglect_mockup_v2|" + str(len(source)) + "|" + "|".join(states)).encode("utf-8")
+        (bank + "|neglect_mockup_v3|" + str(len(source)) + "|" + "|".join(states)).encode("utf-8")
     ).hexdigest()[:10]
     state_key = f"neglect_states_{bank}_{digest}"
     checkbox_prefix = f"neglect_state_choice_{bank}_{digest}"
     if state_key not in st.session_state:
-        # Match the approved mockup's initial green selections when these states exist.
         preferred_defaults = {
             "رافض السداد", "مسجون", "مستحيل",
             "الجوال مغلق", "تم سداد كامل المبلغ"
@@ -218,41 +218,30 @@ def calculate_neglect_filters(raw_df, bank):
     st.session_state.setdefault(due_key, True)
     st.session_state.setdefault(last_key, True)
 
-    selected_states = [
-        state for state in states
-        if st.session_state.get(
-            _neglect_state_checkbox_key(checkbox_prefix, state), False
-        )
-    ]
-    after_substate = (
-        source.loc[
-            source[sub_col].fillna("").astype(str).str.strip().isin(selected_states)
-        ].copy()
-        if sub_col else source.copy()
-    )
-
     status_col = _snb_find_column(
-        after_substate, "حالة المعالجة - التمويل",
+        source, "حالة المعالجة - التمويل",
         "حالة المعالجة", "processing status"
     )
     category_col = _snb_find_column(
-        after_substate, "تحديث فئة العميل - التمويل",
+        source, "تحديث فئة العميل - التمويل",
         "تحديث فئة العميل", "customer category update"
     )
     due_col = _snb_find_column(
-        after_substate, "Follow up Due Date", "follow up due date"
+        source, "Follow up Due Date", "follow up due date"
     )
     last_col = _snb_find_column(
-        after_substate, "Follow up Last Date", "follow up last date"
+        source, "Follow up Last Date", "follow up last date"
     )
 
+    # Step 1: keep unprocessed records only.
     if st.session_state[status_key] == "غير المعالج فقط" and status_col:
-        after_status = after_substate.loc[
-            after_substate[status_col].astype(str).str.strip().eq("غير معالج")
+        after_status = source.loc[
+            source[status_col].astype(str).str.strip().eq("غير معالج")
         ].copy()
     else:
-        after_status = after_substate.copy()
+        after_status = source.copy()
 
+    # Step 2: exclude write-off.
     if st.session_state[writeoff_key] == "استبعاد write off" and category_col:
         after_writeoff = after_status.loc[
             after_status[category_col].astype(str).str.strip().str.lower().ne("writeoff")
@@ -260,13 +249,29 @@ def calculate_neglect_filters(raw_df, bank):
     else:
         after_writeoff = after_status.copy()
 
+    # Step 3: apply selected Sub State values.
+    selected_states = [
+        state for state in states
+        if st.session_state.get(
+            _neglect_state_checkbox_key(checkbox_prefix, state), False
+        )
+    ]
+    after_substate = (
+        after_writeoff.loc[
+            after_writeoff[sub_col].fillna("").astype(str).str.strip().isin(selected_states)
+        ].copy()
+        if sub_col else after_writeoff.copy()
+    )
+
+    # Step 4: exclude records whose Follow up Due Date is today.
     today_value = pd.Timestamp(date.today()).normalize()
     if st.session_state[due_key] and due_col:
-        due_dates = pd.to_datetime(after_writeoff[due_col], errors="coerce").dt.normalize()
-        after_due = after_writeoff.loc[due_dates.ne(today_value)].copy()
+        due_dates = pd.to_datetime(after_substate[due_col], errors="coerce").dt.normalize()
+        after_due = after_substate.loc[due_dates.ne(today_value)].copy()
     else:
-        after_due = after_writeoff.copy()
+        after_due = after_substate.copy()
 
+    # Step 5: keep records with more than 3 days since Follow up Last Date.
     if st.session_state[last_key] and last_col:
         last_dates = pd.to_datetime(after_due[last_col], errors="coerce").dt.normalize()
         elapsed_days = (today_value - last_dates).dt.days
@@ -277,7 +282,7 @@ def calculate_neglect_filters(raw_df, bank):
         final_df = after_due.copy()
 
     _status_label = (
-        "بعد استبعاد غير المعالج"
+        "بعد اختيار غير المعالج فقط"
         if st.session_state[status_key] == "غير المعالج فقط"
         else "بعد اختيار كل حالات المعالجة"
     )
@@ -298,9 +303,9 @@ def calculate_neglect_filters(raw_df, bank):
     )
     steps = [
         {"الخطوة": "إجمالي الصفوف الأصلية", "العدد": int(len(source))},
-        {"الخطوة": "بعد اختيار حالات (Sub State)", "العدد": int(len(after_substate))},
         {"الخطوة": _status_label, "العدد": int(len(after_status))},
         {"الخطوة": _writeoff_label, "العدد": int(len(after_writeoff))},
+        {"الخطوة": "بعد اختيار حالات (Sub State)", "العدد": int(len(after_substate))},
         {"الخطوة": _due_label, "العدد": int(len(after_due))},
         {"الخطوة": _last_label, "العدد": int(len(final_df))},
     ]
@@ -310,11 +315,10 @@ def calculate_neglect_filters(raw_df, bank):
         "checkbox_prefix": checkbox_prefix, "selected_states": selected_states,
         "status_key": status_key, "writeoff_key": writeoff_key,
         "due_key": due_key, "last_key": last_key,
-        "after_substate": after_substate, "after_status": after_status,
-        "after_writeoff": after_writeoff, "after_due": after_due,
+        "after_status": after_status, "after_writeoff": after_writeoff,
+        "after_substate": after_substate, "after_due": after_due,
         "final_df": final_df, "steps": steps,
     }
-
 
 def clear_activity_files():
     st.session_state.page_files[st.session_state.selected_bank]['Activity'] = None
