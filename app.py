@@ -162,6 +162,16 @@ def _set_neglect_state_selection(state_key, values):
     st.session_state[state_key] = list(values)
 
 
+def _neglect_state_checkbox_key(prefix, state):
+    digest = hashlib.sha1(str(state).encode("utf-8")).hexdigest()[:12]
+    return f"{prefix}_{digest}"
+
+
+def _set_neglect_state_checkboxes(prefix, states, checked):
+    for state in states:
+        st.session_state[_neglect_state_checkbox_key(prefix, state)] = bool(checked)
+
+
 def clear_activity_files():
     st.session_state.page_files[st.session_state.selected_bank]['Activity'] = None
     st.session_state.act_uploader_ver[st.session_state.selected_bank] += 1
@@ -9549,8 +9559,13 @@ def render_promise_filter_diagnostics(bank, kind, extra_steps=None):
                 "الأرقام للتشخيص فقط، ولا تغيّر نتيجة التقرير.</div>",
                 unsafe_allow_html=True
             )
-            rows = list(payload.get('steps') or [])
-            rows.extend(extra_steps or [])
+            rows = (
+                list(extra_steps)
+                if kind == "neglect" and extra_steps is not None
+                else list(payload.get('steps') or [])
+            )
+            if kind != "neglect":
+                rows.extend(extra_steps or [])
             class_rows = payload.get('classification_counts') or []
 
             if rows and class_rows:
@@ -9788,6 +9803,8 @@ def process_page_data(uploaded_files=None, bank="SNB", activity_files=None, prom
 
     df_all = pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
     df_promises = pd.concat(promises_dfs, ignore_index=True) if promises_dfs else pd.DataFrame()
+    # Retain the raw portfolio for the interactive, sequential neglect diagnostics.
+    st.session_state.setdefault("neglect_source_df", {})[bank] = df_promises.copy()
     # Keep ALL Sub State values from the uploaded bank portfolio available for
     # Neglect selection, even if no row with that value survives the date filters.
     raw_sub_col = find_col_in(
@@ -10610,13 +10627,18 @@ else:
         elif _neglect_mode != "regular":
             st.info("اختاري أولًا «إهمال» أو «متابعة إهمال» من الاختيار الموجود بجوار رفع الملف.")
         else:
-            # The uploaded portfolio determines every available Sub State option.
+            raw_neglect_source = (
+                st.session_state.get("neglect_source_df", {}).get(selected_bank)
+            )
+            if raw_neglect_source is None or raw_neglect_source.empty:
+                raw_neglect_source = neglect_df.copy()
+
             sub_col = _snb_find_column(
-                neglect_df, "Sub State", "sub state", "substate",
+                raw_neglect_source, "Sub State", "sub state", "substate",
                 "الحالة الفرعية", "حالة العميل"
             )
             with st.container(key=f"neglect_diagnostic_row_{selected_bank}"):
-                # In RTL layout the first column is on the right: states right, diagnostics left.
+                # In RTL layout the diagnostics are on the left and the selector is on the right.
                 data_col, diag_col = st.columns(
                     [2.15, 1.0], gap="small", vertical_alignment="top"
                 )
@@ -10631,89 +10653,222 @@ else:
                             margin-right: auto !important;
                         }}
                         .st-key-neglect_states_outer_{selected_bank} [data-testid="stExpander"] {{
+                            border: 1px solid #D5DFEA !important;
                             border-radius: 12px !important;
+                            overflow: hidden !important;
+                        }}
+                        .st-key-neglect_states_outer_{selected_bank} [data-testid="stExpander"] details > summary {{
+                            background: #1F4373 !important;
+                            color: #FFFFFF !important;
+                            border-radius: 10px !important;
+                            min-height: 54px !important;
+                            font-weight: 900 !important;
+                        }}
+                        .st-key-neglect_states_outer_{selected_bank} [data-testid="stExpander"] details > summary p {{
+                            color: #FFFFFF !important;
+                            font-weight: 900 !important;
+                        }}
+                        .st-key-neglect_states_outer_{selected_bank} [data-testid="stCheckbox"] {{
+                            border: 1px solid #DCE4ED !important;
+                            border-radius: 9px !important;
+                            padding: 7px 10px !important;
+                            margin: 3px 0 !important;
+                            background: #FFFFFF !important;
+                        }}
+                        .st-key-neglect_states_outer_{selected_bank} [data-testid="stCheckbox"]:has(input:checked) {{
+                            background: #EAF8ED !important;
+                            border-color: #8BCF9B !important;
                         }}
                         </style>
                         """,
                         unsafe_allow_html=True
                     )
                     with st.container(key=f"neglect_states_outer_{selected_bank}"):
-                        if sub_col:
-                            states = st.session_state.get(
-                                "neglect_substate_options", {}
-                            ).get(selected_bank) or sorted({
-                                str(value).strip()
-                                for value in neglect_df[sub_col].dropna()
-                                if str(value).strip()
-                            })
-                            key_digest = hashlib.sha1(
-                                (
-                                    selected_bank + "|" + str(len(neglect_df))
-                                    + "|" + "|".join(states)
-                                ).encode("utf-8")
-                            ).hexdigest()[:10]
-                            state_key = f"neglect_states_{selected_bank}_{key_digest}"
-                            if state_key not in st.session_state:
-                                st.session_state[state_key] = list(states)
+                        with st.expander(
+                            "اختيار الحالات (Sub State)",
+                            expanded=True
+                        ):
+                            if sub_col:
+                                states = sorted({
+                                    str(value).strip()
+                                    for value in raw_neglect_source[sub_col].dropna()
+                                    if str(value).strip()
+                                })
+                                key_digest = hashlib.sha1(
+                                    (
+                                        selected_bank + "|" + str(len(raw_neglect_source))
+                                        + "|" + "|".join(states)
+                                    ).encode("utf-8")
+                                ).hexdigest()[:10]
+                                state_key = f"neglect_states_{selected_bank}_{key_digest}"
+                                checkbox_prefix = f"neglect_state_choice_{selected_bank}_{key_digest}"
 
-                            with st.expander(
-                                "اختيار الحالات (Sub State)",
-                                expanded=False
-                            ):
-                                st.caption(
-                                    "اكتبي اسم الحالة للبحث، واختاري الحالات المطلوبة. "
-                                    "يمكنك تحديد الكل أو إلغاء التحديد."
+                                if state_key not in st.session_state:
+                                    st.session_state[state_key] = list(states)
+                                initial_selected = set(st.session_state.get(state_key, []))
+                                for state in states:
+                                    checkbox_key = _neglect_state_checkbox_key(
+                                        checkbox_prefix, state
+                                    )
+                                    if checkbox_key not in st.session_state:
+                                        st.session_state[checkbox_key] = state in initial_selected
+
+                                search_col, selected_col = st.columns(
+                                    [2.3, 1.0], gap="small",
+                                    vertical_alignment="center"
                                 )
-                                _select_all_col, _clear_all_col = st.columns(2, gap="small")
+                                with search_col:
+                                    state_search = st.text_input(
+                                        "ابحثي باسم الحالة",
+                                        placeholder="اكتبي اسم الحالة للبحث...",
+                                        key=f"neglect_state_search_{selected_bank}_{key_digest}",
+                                        label_visibility="collapsed"
+                                    )
+                                with selected_col:
+                                    _currently_selected = sum(
+                                        bool(st.session_state.get(
+                                            _neglect_state_checkbox_key(checkbox_prefix, state),
+                                            False
+                                        ))
+                                        for state in states
+                                    )
+                                    st.markdown(
+                                        f"<div style='direction:rtl;text-align:center;"
+                                        f"font-weight:900;color:#1F4373;padding:8px 2px;'>"
+                                        f"المحدد: {_currently_selected} حالة</div>",
+                                        unsafe_allow_html=True
+                                    )
+
+                                _select_all_col, _clear_all_col, _space_col = st.columns(
+                                    [1.0, 1.0, 1.6], gap="small"
+                                )
                                 with _select_all_col:
                                     st.button(
-                                        "تحديد كل الحالات",
+                                        "تحديد الكل",
                                         key=f"neglect_select_all_{selected_bank}_{key_digest}",
+                                        type="primary",
                                         use_container_width=True,
-                                        on_click=_set_neglect_state_selection,
-                                        args=(state_key, states)
+                                        on_click=_set_neglect_state_checkboxes,
+                                        args=(checkbox_prefix, states, True)
                                     )
                                 with _clear_all_col:
                                     st.button(
                                         "إلغاء التحديد",
                                         key=f"neglect_clear_all_{selected_bank}_{key_digest}",
                                         use_container_width=True,
-                                        on_click=_set_neglect_state_selection,
-                                        args=(state_key, [])
+                                        on_click=_set_neglect_state_checkboxes,
+                                        args=(checkbox_prefix, states, False)
                                     )
-                                st.multiselect(
-                                    "ابحثي واختاري حالة أو أكثر:",
-                                    options=states,
-                                    key=state_key,
-                                    help="اكتبي جزءًا من اسم الحالة لتصفية القائمة."
-                                )
 
-                            selected_sub_states = st.session_state.get(state_key, [])
-                            final_neglect_df = neglect_df.loc[
-                                neglect_df[sub_col].fillna("").astype(str).str.strip()
+                                visible_states = [
+                                    state for state in states
+                                    if not str(state_search).strip()
+                                    or str(state_search).strip().casefold() in state.casefold()
+                                ]
+                                with st.container(
+                                    height=350,
+                                    border=True,
+                                    key=f"neglect_state_checklist_{selected_bank}_{key_digest}"
+                                ):
+                                    _right_states, _left_states = st.columns(2, gap="small")
+                                    for index, state in enumerate(visible_states):
+                                        target_col = _right_states if index % 2 == 0 else _left_states
+                                        with target_col:
+                                            st.checkbox(
+                                                state,
+                                                key=_neglect_state_checkbox_key(
+                                                    checkbox_prefix, state
+                                                )
+                                            )
+
+                                selected_sub_states = [
+                                    state for state in states
+                                    if st.session_state.get(
+                                        _neglect_state_checkbox_key(checkbox_prefix, state),
+                                        False
+                                    )
+                                ]
+                                st.session_state[state_key] = selected_sub_states
+                            else:
+                                states = []
+                                selected_sub_states = []
+                                st.info("عمود Sub State غير موجود في ملف المحفظة.")
+
+                        # Apply all rules in the requested order to the raw source:
+                        # Sub State -> unprocessed -> not writeoff -> Due Date != today -> Last Date > 3 days.
+                        today_neglect = pd.Timestamp(date.today()).normalize()
+                        after_substate = (
+                            raw_neglect_source.loc[
+                                raw_neglect_source[sub_col].fillna("").astype(str).str.strip()
                                 .isin(selected_sub_states)
                             ].copy()
-                            st.caption(
-                                f"الحالات المتاحة: {len(states):,} | "
-                                f"الحالات المحددة: {len(selected_sub_states):,}"
-                            )
-                            _neglect_selection_step = {
-                                "الخطوة": "بعد اختيار الحالات (Sub State)",
-                                "العدد": int(len(final_neglect_df))
-                            }
+                            if sub_col else raw_neglect_source.copy()
+                        )
+
+                        status_col = _snb_find_column(
+                            after_substate, "حالة المعالجة - التمويل",
+                            "حالة المعالجة", "processing status"
+                        )
+                        category_col = _snb_find_column(
+                            after_substate, "تحديث فئة العميل - التمويل",
+                            "تحديث فئة العميل", "customer category update"
+                        )
+                        due_col = _snb_find_column(
+                            after_substate, "Follow up Due Date", "follow up due date"
+                        )
+                        last_col = _snb_find_column(
+                            after_substate, "Follow up Last Date", "follow up last date"
+                        )
+
+                        after_unprocessed = (
+                            after_substate.loc[
+                                after_substate[status_col].astype(str).str.strip().eq("غير معالج")
+                            ].copy()
+                            if status_col else after_substate.copy()
+                        )
+                        after_writeoff = (
+                            after_unprocessed.loc[
+                                after_unprocessed[category_col].astype(str).str.strip().str.lower().ne("writeoff")
+                            ].copy()
+                            if category_col else after_unprocessed.copy()
+                        )
+
+                        if due_col:
+                            _due_dates = pd.to_datetime(
+                                after_writeoff[due_col], errors="coerce"
+                            ).dt.normalize()
+                            after_due_date = after_writeoff.loc[
+                                _due_dates.ne(today_neglect)
+                            ].copy()
                         else:
-                            final_neglect_df = neglect_df.copy()
-                            st.info("عمود Sub State غير موجود في بيانات الإهمال المرفوعة.")
-                            _neglect_selection_step = {
-                                "الخطوة": "اختيار الحالات (Sub State) - العمود غير متاح",
-                                "العدد": int(len(final_neglect_df))
-                            }
+                            after_due_date = after_writeoff.copy()
+
+                        if last_col:
+                            _last_dates = pd.to_datetime(
+                                after_due_date[last_col], errors="coerce"
+                            ).dt.normalize()
+                            _neglect_days = (today_neglect - _last_dates).dt.days
+                            final_mask = _neglect_days.gt(3)
+                            final_neglect_df = after_due_date.loc[final_mask].copy()
+                            final_neglect_df["Neglect_Days"] = _neglect_days.loc[final_mask].astype(int)
+                        else:
+                            final_neglect_df = after_due_date.copy()
+
+                        _neglect_diagnostic_steps = [
+                            {"الخطوة": "إجمالي الصفوف الأصلية", "العدد": int(len(raw_neglect_source))},
+                            {"الخطوة": "بعد اختيار حالات Sub State", "العدد": int(len(after_substate))},
+                            {"الخطوة": "بعد حالة المعالجة = غير معالج", "العدد": int(len(after_unprocessed))},
+                            {"الخطوة": "بعد استبعاد فئة Write off", "العدد": int(len(after_writeoff))},
+                            {"الخطوة": "بعد استبعاد Follow up Due Date = اليوم", "العدد": int(len(after_due_date))},
+                            {"الخطوة": "بعد أكثر من 3 أيام منذ Follow up Last Date", "العدد": int(len(final_neglect_df))},
+                        ]
 
                         st.markdown(
-                            f"<p style='text-align:right;direction:rtl;color:{label_color};"
-                            f"font-weight:900;'>عدد حسابات الإهمال: "
-                            f"<b style='color:{snb_green};font-size:19px;'>"
-                            f"{len(final_neglect_df):,}</b></p>",
+                            f"<div style='direction:rtl;text-align:right;font-weight:900;"
+                            f"color:{label_color};margin-top:10px;'>"
+                            f"إجمالي حسابات الإهمال بعد الفلترة: "
+                            f"<span style='color:{snb_green};font-size:20px;'>"
+                            f"{len(final_neglect_df):,}</span></div>",
                             unsafe_allow_html=True
                         )
 
@@ -10736,5 +10891,5 @@ else:
                     render_promise_filter_diagnostics(
                         selected_bank,
                         "neglect",
-                        extra_steps=[_neglect_selection_step]
+                        extra_steps=_neglect_diagnostic_steps
                     )
