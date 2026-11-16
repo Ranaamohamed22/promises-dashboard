@@ -7016,82 +7016,15 @@ def _stc_save_activity_model(additions, allow_overwrite=False):
     return len(current)
 
 
-def _stc_render_model_setup(uploaded, model_info, saved_ratings):
-    """Allow one-time secure import, including manual resolution of model conflicts."""
+def _stc_render_saved_model(saved_ratings):
     with st.expander("صيغة ملف موديل STC"):
         st.caption("اكتبي نص الإفادة في Notes والتقييم في التقييم: 1 للمكالمة الناجحة و0 لغير الناجحة.")
         _stc_download({"موديل STC": pd.DataFrame(columns=["Notes", "التقييم"])},
                       "تحميل قالب موديل STC", "STC_Activity_Model_Template.xlsx")
-    if uploaded is None:
-        if saved_ratings:
-            st.success(
-                f"موديل STC المستقل محفوظ ومتاح للاستخدام: "
-                f"{len(saved_ratings):,} إفادة."
-            )
-        else:
-            st.info(
-                "ارفعي موديل STC بصيغة Excel من خانة موديل النشاط، "
-                "ثم احفظيه مشفّرًا ليُستخدم بدون إعادة الرفع."
-            )
-        return
-    st.markdown("#### 🏦 إعداد موديل نشاط STC المستقل")
-    conflicts = model_info["conflicts"]
-    st.caption(
-        f"صفوف المصدر: {model_info['rows']:,} | "
-        f"إفادات معتمدة بلا تعارض: {len(model_info['ratings']):,} | "
-        f"إفادات متعارضة: {len(conflicts):,} | "
-        f"صفوف غير صالحة: {model_info['invalid']:,}"
-    )
     if saved_ratings:
-        st.caption(
-            f"الموديل المحفوظ مسبقًا يحتوي على {len(saved_ratings):,} إفادة "
-            "ومستقل عن موديل SNB."
-        )
-    with st.expander("🔐 حفظ أو تحديث موديل STC على GitHub", expanded=True):
-        st.caption(
-            "يُحفظ الملف مشفّرًا في data/stc_activity_model.enc، "
-            "ولا يتم تعديل موديل SNB أو نشر نصوص الإفادات في app.py."
-        )
-        if not _snb_secret("MODEL_ENCRYPTION_KEY"):
-            st.warning("لازم إعداد MODEL_ENCRYPTION_KEY في Streamlit Secrets.")
-        if not _snb_secret("GITHUB_TOKEN"):
-            st.warning("لازم إعداد GITHUB_TOKEN في Streamlit Secrets.")
-        with st.form("stc_model_import_form"):
-            if conflicts:
-                st.info("الإفادات ذات التقييمات المتعارضة هتفضل للمراجعة لكل مكالمة.")
-            overwrite = st.checkbox(
-                "أوافق على استبدال تقييم STC القديم عند اختلافه",
-                value=False,
-            )
-            password = st.text_input(
-                "كلمة مرور إدارة الموديل", type="password"
-            )
-            submit = st.form_submit_button("💾 حفظ موديل STC المستقل")
-        if submit:
-            configured = _snb_model_git_settings()
-            if not configured["admin_password"] or not hmac.compare_digest(
-                password.encode(), configured["admin_password"].encode()
-            ):
-                st.error("كلمة مرور إدارة الموديل غير صحيحة أو غير مُعدّة.")
-                return
-            additions = [
-                (model_info["labels"][key], value)
-                for key, value in model_info["ratings"].items()
-            ]
-            additions.extend(
-                (model_info["labels"][key], -1) for key in conflicts
-            )
-            try:
-                total = _stc_save_activity_model(
-                    additions, allow_overwrite=overwrite
-                )
-            except (RuntimeError, ValueError) as exc:
-                st.error(f"تعذر حفظ موديل STC: {exc}")
-                return
-            st.session_state["stc_model_last_save_notice"] = (
-                f"تم حفظ {total:,} إفادة في موديل STC المستقل بنجاح."
-            )
-            st.rerun()
+        st.success(f"موديل STC المستقل محفوظ ومتاح للاستخدام: {len(saved_ratings):,} إفادة.")
+    else:
+        st.warning("تعذر العثور على موديل STC المحفوظ. راجعي إعدادات الموديل.")
 
 
 def _snb_model_evaluations(uploaded_model):
@@ -8980,7 +8913,7 @@ def _stc_dashboard(summary, collector, scope):
                        file_name="STC_Activity_Dashboard.html", mime="text/html", key="activity_html_STC")
 
 
-def render_stc_activity_report(model_upload, activity_upload, activity_kind="تلقائي",
+def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
                                error_slot=None, shift_selector=None):
     if activity_upload is not None:
         try:
@@ -9007,23 +8940,15 @@ def render_stc_activity_report(model_upload, activity_upload, activity_kind="ت�
                 stamps = stamps.loc[source.index]
                 key += "_deduplicated"
     try:
-        model = _stc_parse_activity_model(model_upload)
-        saved, labels, _ = _stc_load_saved_activity_model()
+        mapping, labels, _ = _stc_load_saved_activity_model()
     except (RuntimeError, ValueError, OSError) as exc:
         st.error(f"تعذر تحميل موديل STC: {exc}")
         return
     notice = st.session_state.pop("stc_model_last_save_notice", None)
     if notice:
         st.success(notice)
-    _stc_render_model_setup(model_upload, model, saved)
-    mapping = {**model["ratings"], **saved}
-    # An uploaded conflict remains manual even if a previous import rated the note.
-    mapping.update(dict.fromkeys(model["conflicts"], -1))
-    labels = {**model["labels"], **labels}
-    if activity_upload is None:
-        return
-    if not mapping:
-        st.info("ارفعي موديل STC بعمود Notes وعمود التقييم (١ أو ٠).")
+    _stc_render_saved_model(mapping)
+    if activity_upload is None or not mapping:
         return
     kind = _activity_period(stamps)[0] if activity_kind == "تلقائي" else activity_kind
     day = stamps.dt.normalize()
@@ -9074,8 +8999,7 @@ def render_stc_activity_report(model_upload, activity_upload, activity_kind="ت�
         st.info("مفيش مكالمات في النطاق المختار.")
         return
     frame = source.loc[eligible].copy()
-    model_key = hashlib.sha256(model_upload.getvalue()).hexdigest()[:12] if model_upload else "saved"
-    review_key = key + model_key
+    review_key = key + "saved"
     ratings = _stc_model_choices(frame, notes, collector, identity, stamps, mapping, labels, review_key)
     if ratings is None:
         return
@@ -10145,11 +10069,9 @@ if curr_page == 'Overview':
     with _overview_upload_header:
         overview_versions = st.session_state.overview_uploader_versions[selected_bank]
         fields = [('Activity', '📈 تقرير النشاط', ['xlsx', 'csv'])]
-        if selected_bank == 'STC':
-            fields.append(('ActivityModel', '🧩 موديل النشاط', ['xlsx']))
         fields.append(('Promises', 'ارفعي المحفظة', ['xlsx', 'csv']))
         upload_cols = st.columns([1] * len(fields) + [2.7], gap='small')
-        card_names = {'Activity': 'activity', 'ActivityModel': 'model', 'Promises': 'promises'}
+        card_names = {'Activity': 'activity', 'Promises': 'promises'}
         for col, (kind, title, extensions) in zip(upload_cols, fields):
             with col, upload_field(title, f"overview_{card_names[kind]}"):
                 key = f"overview_file_{selected_bank}_{kind}_{overview_versions[kind]}"
@@ -10159,7 +10081,7 @@ if curr_page == 'Overview':
                                   clear_overview_upload, (selected_bank, kind))
                 else:
                     st.file_uploader(
-                        title, type=extensions, accept_multiple_files=kind != 'ActivityModel',
+                        title, type=extensions, accept_multiple_files=True,
                         label_visibility='collapsed', key=key, on_change=save_uploaded_files,
                         args=('overview_uploads', selected_bank, kind, key)
                     )
@@ -10283,34 +10205,11 @@ if page_uploaded is None:
                     args=(selected_bank,),
                 )
 
-        # Legacy fallback: no encrypted model configured, allow a model upload
-        # below the main header without moving the centred title.
-        if selected_bank == "STC":
-            model_col, _model_space = st.columns([1.8, 7.8], gap="small")
-            with model_col:
-                with upload_field("رفع موديل النشاط", "activity_model"):
-                    model_key = (
-                        f"activity_model_file_{selected_bank}_"
-                        f"{st.session_state.activity_upload_versions[selected_bank]['model']}"
-                    )
-                    saved = st.session_state.activity_page_uploads[selected_bank]["model"]
-                    if saved:
-                        uploaded_chip(saved, f"clear_activity_{selected_bank}_model",
-                                      clear_activity_page_upload, (selected_bank, "model"))
-                    else:
-                        st.file_uploader(
-                            "خانة رفع موديل النشاط", type=["xlsx"],
-                            accept_multiple_files=False,
-                            label_visibility="collapsed", key=model_key,
-                            on_change=save_activity_page_upload,
-                            args=(selected_bank, "model", model_key)
-                        )
-
         # STC has its OWN model, review and encrypted file — never SNB.
         if selected_bank == "STC":
             _stc_uploaded = st.session_state.activity_page_uploads["STC"]
             render_stc_activity_report(
-                _stc_uploaded.get("model"), _stc_uploaded.get("activity"),
+                _stc_uploaded.get("activity"),
                 activity_kind=activity_kind, shift_selector=shift_selector,
                 error_slot=activity_error_slot,
             )
@@ -10318,7 +10217,6 @@ if page_uploaded is None:
             selected_bank == "SNB"
             and _ejada_activity_dashboard_is_open("SNB")
             and not _snb_secret_model_ready
-            and st.session_state.activity_page_uploads["SNB"]["model"] is None
         ):
             # No baseline model available yet: count coverage, but never guess.
             _waiting = st.session_state.activity_page_uploads["SNB"]["activity"]
@@ -10342,13 +10240,13 @@ if page_uploaded is None:
         if selected_bank == 'SNB':
             _uploaded = st.session_state.activity_page_uploads['SNB']
             if (
-                (_snb_secret_model_ready or _uploaded['model'] is not None)
+                _snb_secret_model_ready
                 and _uploaded['activity'] is not None
             ):
                 st.session_state.snb_activity_screen = 'report'
             if st.session_state.get('snb_activity_screen') == 'report':
                 render_snb_activity_report(
-                    _uploaded['model'], _uploaded['activity'],
+                    None, _uploaded['activity'],
                     activity_kind=activity_kind,
                     error_slot=activity_error_slot, shift_selector=shift_selector, shift_notice=shift_notice
                 )
