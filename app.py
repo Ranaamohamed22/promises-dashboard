@@ -277,7 +277,7 @@ def calculate_neglect_filters(raw_df, bank):
         final_df = after_due.copy()
 
     _status_label = (
-        "بعد اختيار غير المعالج فقط"
+        "بعد استبعاد غير المعالج"
         if st.session_state[status_key] == "غير المعالج فقط"
         else "بعد اختيار كل حالات المعالجة"
     )
@@ -292,7 +292,7 @@ def calculate_neglect_filters(raw_df, bank):
         else "بدون استبعاد Follow up Due Date = اليوم"
     )
     _last_label = (
-        "بعد الاحتفاظ بأكثر من 3 أيام منذ Follow up Last Date"
+        "بعد أكثر من 3 أيام منذ Follow up Last Date"
         if st.session_state[last_key]
         else "بدون شرط أكثر من 3 أيام منذ Follow up Last Date"
     )
@@ -9692,7 +9692,7 @@ def render_promise_filter_diagnostics(bank, kind, extra_steps=None):
         "active": "القائمة", "broken": "المكسورة", "neglect": "الإهمال"
     }.get(kind, kind)
     heading = (
-        f"🔎 تشخيص فلترة الإهمال {bank}" if kind == "neglect"
+        f"🔎 تشخيص فترة الإهمال {bank}" if kind == "neglect"
         else f"🔎 تشخيص فلترة الوعود {kind_label} {bank}"
     )
     with st.container(key=f'promise_diagnostic_{bank}_{kind}'):
@@ -9745,11 +9745,11 @@ def render_promise_filter_diagnostics(bank, kind, extra_steps=None):
                                 background:#E7F6E9;border:1px solid #B7E0BF;
                                 border-radius:8px;padding:12px 16px;margin-top:10px;">
                         <span style="color:#1F4373;font-size:14px;font-weight:900;">
-                            إجمالي الحسابات النهائية
+                            إجمالي حسابات الإهمال
                         </span>
                         <span style="display:flex;align-items:center;gap:8px;
                                      color:#169B42;font-size:25px;font-weight:900;">
-                            {_final_count:,} <span style="font-size:18px;">●</span>
+                            {_final_count:,} <span style="font-size:18px;">✓</span>
                         </span>
                     </div>
                     """,
@@ -9787,43 +9787,152 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
         _download_df = neglect_export_df if neglect_export_df is not None else pd.DataFrame()
         with st.container(key=f"report_upload_bar_{selected_bank}_{page}"):
             st.markdown(
-                """
+                f"""
                 <style>
-                .st-key-neglect_mode_controls button {
-                    background: transparent !important;
-                    border: 0 !important;
-                    box-shadow: none !important;
-                    color: #FFFFFF !important;
-                    font-weight: 900 !important;
-                    padding: 5px 8px !important;
-                }
-                .st-key-neglect_mode_controls button p {
-                    color: #FFFFFF !important;
-                    font-size: 15px !important;
-                    font-weight: 900 !important;
-                }
-                .st-key-neglect_upload_header [data-testid="stFileUploaderDropzone"] {
-                    background: #FFFFFF !important;
-                    border: 1px solid #B8C8DA !important;
-                    border-radius: 8px !important;
-                }
-                .st-key-neglect_download_header button {
-                    background: #08A52C !important;
-                    border: 1px solid #08A52C !important;
-                    color: #FFFFFF !important;
-                    font-weight: 900 !important;
-                    min-height: 42px !important;
-                }
-                .st-key-neglect_download_header button p {
-                    color: #FFFFFF !important;
-                    font-weight: 900 !important;
-                }
+                .stApp .st-key-report_upload_bar_{selected_bank}_Neglect {{
+                    direction:rtl !important;
+                    background:linear-gradient(100deg,#0A2B4A 0%,#06284A 55%,#031F40 100%) !important;
+                    border:1px solid #163D60 !important;
+                    border-radius:9px 9px 0 0 !important;
+                    min-height:70px !important;
+                    box-sizing:border-box !important;
+                    padding:5px 16px 4px !important;
+                    margin:0 !important;
+                    color:#FFFFFF !important;
+                }}
+                .st-key-report_upload_bar_{selected_bank}_Neglect [data-testid="stHorizontalBlock"] {{
+                    direction:rtl !important;
+                    flex-wrap:nowrap !important;
+                    align-items:center !important;
+                    gap:8px !important;
+                    min-height:58px !important;
+                }}
+                .st-key-report_upload_bar_{selected_bank}_Neglect [data-testid="stColumn"] {{
+                    min-width:0 !important;
+                    align-self:center !important;
+                }}
+                .st-key-report_upload_bar_{selected_bank}_Neglect .upload-field-label {{
+                    color:#FFFFFF !important;
+                    font-size:11px !important;
+                    line-height:14px !important;
+                    font-weight:900 !important;
+                    text-align:center !important;
+                    margin:0 0 2px !important;
+                }}
+                .st-key-report_upload_bar_{selected_bank}_Neglect [class*="st-key-upload_field_"] {{
+                    width:100% !important;
+                    max-width:100% !important;
+                    gap:0 !important;
+                    margin:0 !important;
+                }}
+                .st-key-report_upload_bar_{selected_bank}_Neglect [class*="st-key-upload_box_"] {{
+                    background:#FFFFFF !important;
+                    border:0 !important;
+                    border-radius:8px !important;
+                    padding:2px !important;
+                    height:36px !important;
+                    min-height:36px !important;
+                    overflow:hidden !important;
+                }}
+                .st-key-report_upload_bar_{selected_bank}_Neglect div[class*="st-key-uploaded_chip_"] {{
+                    background:#FFFFFF !important;
+                    border:0 !important;
+                    min-height:31px !important;
+                    height:31px !important;
+                    padding:2px 4px !important;
+                    gap:4px !important;
+                }}
+                .st-key-report_upload_bar_{selected_bank}_Neglect .uploaded-filename {{
+                    color:#5E6D7E !important;
+                    font-size:11px !important;
+                    line-height:24px !important;
+                    text-align:center !important;
+                }}
+                .st-key-report_upload_bar_{selected_bank}_Neglect div[class*="st-key-small_clear_report_"] button {{
+                    width:17px !important;
+                    min-width:17px !important;
+                    height:17px !important;
+                    min-height:17px !important;
+                    border-radius:5px !important;
+                    font-size:13px !important;
+                }}
+                .st-key-report_upload_bar_{selected_bank}_Neglect div[class*="st-key-small_clear_report_"] button p {{
+                    font-size:13px !important;
+                    line-height:1 !important;
+                }}
+                .st-key-neglect_mode_controls {{
+                    width:100% !important;
+                }}
+                .st-key-neglect_mode_controls [data-testid="stHorizontalBlock"] {{
+                    gap:10px !important;
+                    flex-wrap:nowrap !important;
+                }}
+                .st-key-neglect_mode_controls button {{
+                    background:transparent !important;
+                    border:0 !important;
+                    box-shadow:none !important;
+                    color:#FFFFFF !important;
+                    padding:3px 5px !important;
+                    min-height:34px !important;
+                    width:100% !important;
+                }}
+                .st-key-neglect_mode_controls button p {{
+                    color:#FFFFFF !important;
+                    -webkit-text-fill-color:#FFFFFF !important;
+                    font-size:14px !important;
+                    font-weight:900 !important;
+                    white-space:nowrap !important;
+                }}
+                .st-key-neglect_choice_regular_{selected_bank} button p::after,
+                .st-key-neglect_choice_followup_{selected_bank} button p::after {{
+                    content:"";
+                    display:inline-block;
+                    width:17px;height:17px;
+                    border:2px solid #FFFFFF;
+                    border-radius:50%;
+                    vertical-align:-4px;
+                    margin-right:9px;
+                    box-sizing:border-box;
+                    background:transparent;
+                }}
+                .st-key-neglect_choice_regular_{selected_bank} button p::after {{
+                    border-color:{"#16C34A" if _mode_value == "regular" else "#FFFFFF"};
+                    background:{"#16C34A" if _mode_value == "regular" else "transparent"};
+                }}
+                .st-key-neglect_choice_followup_{selected_bank} button p::after {{
+                    border-color:{"#16C34A" if _mode_value == "followup" else "#FFFFFF"};
+                    background:{"#16C34A" if _mode_value == "followup" else "transparent"};
+                }}
+                .st-key-neglect_download_header button {{
+                    background:#08A52C !important;
+                    border:1px solid #08A52C !important;
+                    color:#FFFFFF !important;
+                    border-radius:8px !important;
+                    font-weight:900 !important;
+                    min-height:45px !important;
+                    height:45px !important;
+                    padding:4px 10px !important;
+                    box-shadow:none !important;
+                }}
+                .st-key-neglect_download_header button p {{
+                    color:#FFFFFF !important;
+                    -webkit-text-fill-color:#FFFFFF !important;
+                    font-size:14px !important;
+                    font-weight:900 !important;
+                    white-space:nowrap !important;
+                }}
+                .st-key-neglect_header_divider {{
+                    height:42px !important;
+                    border-left:2px solid #A9BCD1 !important;
+                    width:2px !important;
+                    margin:auto !important;
+                }}
                 </style>
                 """,
                 unsafe_allow_html=True
             )
-            download_col, mode_col, divider_col, upload_col = st.columns(
-                [1.65, 2.05, 0.08, 1.7], gap="small",
+            download_col, spacer_col, mode_col, divider_col, upload_col = st.columns(
+                [1.65, 2.0, 2.05, 0.08, 1.7], gap="small",
                 vertical_alignment="center"
             )
             with download_col:
@@ -9833,7 +9942,7 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
                         if not _download_df.empty else b""
                     )
                     st.download_button(
-                        "📥 تحميل تقرير الإهمال",
+                        "▤ تحميل تقرير الإهمال",
                         data=_xlsx_bytes,
                         file_name=f"{selected_bank}_Neglect_Report.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -9841,33 +9950,33 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
                         use_container_width=True,
                         disabled=_download_df.empty or _mode_value != "regular"
                     )
+            with spacer_col:
+                st.empty()
             with mode_col:
                 with st.container(key="neglect_mode_controls"):
                     regular_col, followup_col = st.columns(2, gap="small")
                     with regular_col:
                         st.button(
-                            "🟢 إهمال" if _mode_value == "regular" else "⚪ إهمال",
+                            "إهمال",
                             key=f"neglect_choice_regular_{selected_bank}",
                             type="secondary", use_container_width=True,
                             on_click=choose_neglect_mode, args=("regular",)
                         )
                     with followup_col:
                         st.button(
-                            "🟢 متابعة إهمال" if _mode_value == "followup" else "⚪ متابعة إهمال",
+                            "متابعة إهمال",
                             key=f"neglect_choice_followup_{selected_bank}",
                             type="secondary", use_container_width=True,
                             on_click=choose_neglect_mode, args=("followup",)
                         )
             with divider_col:
                 st.markdown(
-                    "<div style='height:42px;border-left:2px solid #A9BCD1;"
-                    "margin:auto;width:1px;'></div>",
+                    "<div class='st-key-neglect_header_divider'></div>",
                     unsafe_allow_html=True
                 )
             with upload_col:
-                field_title = "رفع ملف المحفظة" if current_files else "رفع ملف المحفظة"
                 with st.container(key="neglect_upload_header"):
-                    with upload_field(field_title, f"report_{selected_bank}_{page}"):
+                    with upload_field("رفع ملف المحفظة", f"report_{selected_bank}_{page}"):
                         widget_key = f"report_uploader_{selected_bank}_{page}_{uploader_version}"
                         if current_files:
                             uploaded_chip(
@@ -10873,7 +10982,7 @@ else:
 
             with st.container(key=f"neglect_diagnostic_row_{selected_bank}"):
                 data_col, diag_col = st.columns(
-                    [2.15, 1.0], gap="small", vertical_alignment="top"
+                    [1.8, 1.0], gap="small", vertical_alignment="top"
                 )
 
                 # Right-hand filter panel: match the supplied approved mockup.
@@ -10881,17 +10990,69 @@ else:
                     st.markdown(
                         """
                         <style>
+                        .stApp .block-container {
+                            padding-left:4px !important;
+                            padding-right:4px !important;
+                            padding-top:0 !important;
+                        }
+                        [class*="st-key-neglect_diagnostic_row_"] {
+                            width:100% !important;
+                            max-width:100% !important;
+                            margin:0 !important;
+                        }
+                        [class*="st-key-neglect_diagnostic_row_"] > [data-testid="stHorizontalBlock"] {
+                            direction:rtl !important;
+                            flex-wrap:nowrap !important;
+                            align-items:stretch !important;
+                            gap:5px !important;
+                        }
+                        [class*="st-key-neglect_diagnostic_row_"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(1) {
+                            flex:1.8 1 0 !important;
+                            width:64% !important;
+                            min-width:0 !important;
+                        }
+                        [class*="st-key-neglect_diagnostic_row_"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(2) {
+                            flex:1 1 0 !important;
+                            width:36% !important;
+                            min-width:0 !important;
+                        }
                         .st-key-neglect_filter_panel {
+                            height:382px !important;
+                            min-height:382px !important;
+                            max-height:382px !important;
+                            overflow:hidden !important;
+                            box-sizing:border-box !important;
                             background:#FFFFFF !important;
-                            border:1px solid #B8C9DC !important;
-                            border-radius:13px !important;
-                            padding:8px 9px !important;
+                            border:1px solid #D4DFEA !important;
+                            border-radius:12px !important;
+                            padding:7px 9px !important;
+                            gap:2px !important;
+                        }
+                        .st-key-neglect_filter_panel > [data-testid="stVerticalBlock"] {
+                            gap:3px !important;
                         }
                         .st-key-neglect_filter_panel .neglect-filter-title {
-                            direction:rtl;background:#082B62;color:#FFFFFF;
-                            border-radius:8px;padding:9px 13px;
-                            font-size:15px;font-weight:900;text-align:right;
-                            margin-bottom:8px;
+                            position:relative;
+                            direction:rtl;
+                            background:#082B62;
+                            color:#FFFFFF;
+                            border-radius:7px;
+                            padding:3px 13px 3px 28px;
+                            min-height:28px;
+                            box-sizing:border-box;
+                            line-height:21px;
+                            font-size:13px;
+                            font-weight:900;
+                            text-align:right;
+                            margin:0 0 4px;
+                        }
+                        .st-key-neglect_filter_panel .neglect-filter-title:after {
+                            content:"";
+                            position:absolute;
+                            right:10px;top:8px;
+                            width:11px;height:11px;
+                            background:#FFFFFF;
+                            clip-path:polygon(0 0,100% 0,62% 52%,62% 100%,38% 100%,38% 52%);
                         }
                         .st-key-neglect_filter_panel .neglect-step-number {
                             width:25px;height:25px;border-radius:50%;
@@ -10901,42 +11062,163 @@ else:
                         }
                         .st-key-neglect_filter_panel .neglect-step-label {
                             direction:rtl;text-align:right;background:#E9F7E9;
-                            color:#1F4373;border-radius:7px;padding:8px 9px;
-                            font-size:13px;font-weight:900;white-space:normal;
+                            color:#1F4373;border-radius:7px;padding:6px 8px;
+                            min-height:30px;box-sizing:border-box;
+                            display:flex;align-items:center;
+                            font-size:12px;font-weight:900;white-space:normal;
+                            line-height:1.25;
                         }
-                        .st-key-neglect_filter_panel [data-testid="stRadio"] > div {
-                            display:flex;flex-direction:row;gap:8px;flex-wrap:wrap;
+                        .st-key-neglect_filter_panel [data-testid="stHorizontalBlock"] {
+                            gap:6px !important;
+                            align-items:center !important;
+                        }
+                        .st-key-neglect_filter_panel [data-testid="stRadio"] {
+                            margin:0 !important;
+                        }
+                        .st-key-neglect_filter_panel [data-testid="stRadio"] > div,
+                        .st-key-neglect_filter_panel [role="radiogroup"] {
+                            display:flex !important;
+                            flex-direction:row !important;
+                            gap:7px !important;
+                            flex-wrap:nowrap !important;
+                            align-items:center !important;
                         }
                         .st-key-neglect_filter_panel [data-testid="stRadio"] label {
-                            border:1px solid #D7E0EA;border-radius:8px;
-                            background:#FFFFFF;padding:6px 12px;
-                            margin:0;min-height:34px;
+                            border:1px solid #D7E0EA !important;
+                            border-radius:8px !important;
+                            background:#FFFFFF !important;
+                            padding:4px 9px !important;
+                            margin:0 !important;
+                            min-height:30px !important;
+                            display:flex !important;
+                            align-items:center !important;
+                            flex-direction:row-reverse !important;
+                            gap:6px !important;
                         }
                         .st-key-neglect_filter_panel [data-testid="stRadio"] label:has(input:checked) {
-                            background:#E6F6E8;border-color:#8BCF9B;
+                            background:#E6F6E8 !important;
+                            border-color:#8BCF9B !important;
                         }
                         .st-key-neglect_filter_panel [data-testid="stRadio"] label p {
-                            color:#1F4373;font-weight:900;font-size:12px;
+                            color:#1F4373 !important;
+                            font-weight:900 !important;
+                            font-size:11px !important;
+                            white-space:nowrap !important;
+                        }
+                        .st-key-neglect_filter_panel [data-testid="stRadio"] input {
+                            accent-color:#0AA32F !important;
+                            width:16px !important;height:16px !important;
                         }
                         .st-key-neglect_filter_panel [data-testid="stCheckbox"] {
-                            border:1px solid #DCE4ED;border-radius:8px;
-                            padding:5px 9px;margin:2px 0;background:#FFFFFF;
+                            border:1px solid #DCE4ED !important;
+                            border-radius:7px !important;
+                            padding:3px 7px !important;
+                            margin:1px 0 !important;
+                            background:#FFFFFF !important;
+                            min-height:28px !important;
+                            box-sizing:border-box !important;
                         }
                         .st-key-neglect_filter_panel [data-testid="stCheckbox"]:has(input:checked) {
-                            background:#E6F6E8;border-color:#8BCF9B;
+                            background:#E6F6E8 !important;
+                            border-color:#8BCF9B !important;
+                        }
+                        .st-key-neglect_filter_panel [data-testid="stCheckbox"] label {
+                            display:flex !important;
+                            flex-direction:row-reverse !important;
+                            align-items:center !important;
+                            justify-content:space-between !important;
+                            gap:5px !important;
                         }
                         .st-key-neglect_filter_panel [data-testid="stCheckbox"] label p {
-                            color:#1F4373;font-weight:800;font-size:12px;
+                            color:#1F4373 !important;
+                            font-weight:800 !important;
+                            font-size:11px !important;
+                            line-height:1.15 !important;
+                            white-space:nowrap !important;
+                        }
+                        .st-key-neglect_filter_panel [data-testid="stCheckbox"] input {
+                            accent-color:#0AA32F !important;
+                            width:16px !important;height:16px !important;
+                        }
+                        .st-key-neglect_filter_panel [data-testid="stTextInput"] {
+                            margin:0 !important;
                         }
                         .st-key-neglect_filter_panel [data-testid="stTextInput"] input {
-                            text-align:right;border-radius:8px;
+                            height:30px !important;
+                            min-height:30px !important;
+                            text-align:right !important;
+                            border-radius:7px !important;
+                            font-size:11px !important;
+                            padding:3px 8px !important;
                         }
                         .st-key-neglect_filter_panel [data-testid="stButton"] button {
-                            min-height:34px;border-radius:8px;font-size:12px;
-                            font-weight:900;
+                            min-height:30px !important;
+                            height:30px !important;
+                            border-radius:7px !important;
+                            padding:3px 7px !important;
+                            font-size:11px !important;
+                            font-weight:900 !important;
+                            white-space:nowrap !important;
+                        }
+                        .st-key-neglect_filter_panel [data-testid="stButton"] button p {
+                            font-size:11px !important;
+                            font-weight:900 !important;
                         }
                         .st-key-neglect_filter_panel hr {
-                            margin:7px 0 !important;border-color:#DCE4ED !important;
+                            margin:3px 0 !important;
+                            border-color:#DCE4ED !important;
+                        }
+                        [class*="st-key-neglect_state_checklist_"] {
+                            max-height:132px !important;
+                        }
+                        [class*="st-key-promise_diagnostic_"][class*="_neglect"] {
+                            width:100% !important;
+                            max-width:100% !important;
+                            height:382px !important;
+                            min-height:382px !important;
+                            margin:0 !important;
+                            box-sizing:border-box !important;
+                        }
+                        [class*="st-key-promise_diagnostic_"][class*="_neglect"] [data-testid="stExpander"] {
+                            width:100% !important;
+                            height:382px !important;
+                            margin:0 !important;
+                            border:1px solid #D4DFEA !important;
+                            border-radius:12px !important;
+                            overflow:hidden !important;
+                            background:#FFFFFF !important;
+                        }
+                        [class*="st-key-promise_diagnostic_"][class*="_neglect"] [data-testid="stExpander"] summary {
+                            min-height:43px !important;
+                            background:#FFFFFF !important;
+                            border-bottom:1px solid #DCE4ED !important;
+                        }
+                        [class*="st-key-promise_diagnostic_"][class*="_neglect"] [data-testid="stExpanderDetails"] {
+                            padding:5px 8px !important;
+                        }
+                        [class*="st-key-promise_diagnostic_"][class*="_neglect"] table.ejada-diagnostic-table {
+                            width:100% !important;
+                            max-width:100% !important;
+                            table-layout:fixed !important;
+                            margin:0 !important;
+                        }
+                        [class*="st-key-promise_diagnostic_"][class*="_neglect"] table.ejada-diagnostic-table th,
+                        [class*="st-key-promise_diagnostic_"][class*="_neglect"] table.ejada-diagnostic-table td {
+                            padding:6px 7px !important;
+                            height:32px !important;
+                            line-height:1.15 !important;
+                            font-size:12px !important;
+                        }
+                        [class*="st-key-promise_diagnostic_"][class*="_neglect"] table.ejada-diagnostic-table th:last-child,
+                        [class*="st-key-promise_diagnostic_"][class*="_neglect"] table.ejada-diagnostic-table td:last-child {
+                            width:80px !important;
+                            min-width:80px !important;
+                            max-width:80px !important;
+                            text-align:center !important;
+                        }
+                        [class*="st-key-promise_diagnostic_"][class*="_neglect"] .stMarkdown p {
+                            font-size:10px !important;
+                            line-height:1.2 !important;
                         }
                         </style>
                         """,
@@ -10944,8 +11226,7 @@ else:
                     )
                     with st.container(border=True, key="neglect_filter_panel"):
                         st.markdown(
-                            "<div class='neglect-filter-title'>معايير فترة الإهمال "
-                            "<span style='float:left;'>🔽</span></div>",
+                            "<div class='neglect-filter-title'>معايير فترة الإهمال</div>",
                             unsafe_allow_html=True
                         )
 
@@ -10959,8 +11240,8 @@ else:
                         with label_col:
                             st.markdown("<div class='neglect-step-label'>اختيار حالات (Sub State):</div>", unsafe_allow_html=True)
                         with content_col:
-                            search_col, selected_col = st.columns(
-                                [2.4, 1.0], gap="small",
+                            search_col, select_col, clear_col = st.columns(
+                                [2.4, 0.9, 0.9], gap="small",
                                 vertical_alignment="center"
                             )
                             with search_col:
@@ -10970,18 +11251,6 @@ else:
                                     key=f"neglect_state_search_{selected_bank}_{digest}",
                                     label_visibility="collapsed"
                                 )
-                            with selected_col:
-                                _selected_now = len(_filter["selected_states"])
-                                st.markdown(
-                                    f"<div style='text-align:center;direction:rtl;"
-                                    f"font-weight:900;color:#1F4373;'>"
-                                    f"المحدد: {_selected_now} حالة</div>",
-                                    unsafe_allow_html=True
-                                )
-
-                            select_col, clear_col, spacer_col = st.columns(
-                                [0.8, 0.9, 2.0], gap="small"
-                            )
                             with select_col:
                                 st.button(
                                     "تحديد الكل", key=f"neglect_select_all_{selected_bank}_{digest}",
@@ -10997,24 +11266,48 @@ else:
                                     args=(checkbox_prefix, states, False)
                                 )
 
+                        # Keep the state order and three-column grouping identical to the reference.
+                        preferred_state_order = [
+                            "رافض السداد", "مسجون", "طلبات", "XPTP",
+                            "مستحيل", "العميل متوفي", "جاري البحث", "تم سداد كامل المبلغ",
+                            "left message", "الجوال مغلق", "الرقم غير صحيح", "لا يجيب"
+                        ]
+                        _normalized_state_lookup = {
+                            re.sub(r"\s+", " ", state).strip().casefold(): state
+                            for state in states
+                        }
+                        ordered_states = []
+                        for preferred_state in preferred_state_order:
+                            _matched = _normalized_state_lookup.get(
+                                re.sub(r"\s+", " ", preferred_state).strip().casefold()
+                            )
+                            if _matched is not None and _matched not in ordered_states:
+                                ordered_states.append(_matched)
+                        ordered_states.extend(
+                            state for state in states if state not in ordered_states
+                        )
                         visible_states = [
-                            state for state in states
+                            state for state in ordered_states
                             if not str(state_search).strip()
                             or str(state_search).strip().casefold() in state.casefold()
                         ]
                         with st.container(
-                            height=205, border=False,
+                            height=132, border=False,
                             key=f"neglect_state_checklist_{selected_bank}_{digest}"
                         ):
                             state_columns = st.columns(3, gap="small")
-                            for index, state in enumerate(visible_states):
-                                with state_columns[index % 3]:
-                                    st.checkbox(
-                                        state,
-                                        key=_neglect_state_checkbox_key(
-                                            checkbox_prefix, state
+                            group_size = max(1, (len(visible_states) + 2) // 3)
+                            for column_index, state_column in enumerate(state_columns):
+                                start_index = column_index * group_size
+                                end_index = start_index + group_size
+                                with state_column:
+                                    for state in visible_states[start_index:end_index]:
+                                        st.checkbox(
+                                            state,
+                                            key=_neglect_state_checkbox_key(
+                                                checkbox_prefix, state
+                                            )
                                         )
-                                    )
 
                         st.divider()
 
