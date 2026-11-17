@@ -10217,13 +10217,13 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
                 .stApp [class*="st-key-neglect_mode_controls"] button,
                 .stApp [class*="st-key-neglect_choice_regular_"] button,
                 .stApp [class*="st-key-neglect_choice_followup_"] button {{
-                    background:transparent !important;
-                    background-color:transparent !important;
-                    border:0 !important;
+                    background:#FFFFFF !important;
+                    background-color:#1F4373 !important;
+                    border:1px solid #C8D7E6 !important;
                     outline:0 !important;
                     box-shadow:none !important;
-                    color:#FFFFFF !important;
-                    -webkit-text-fill-color:#FFFFFF !important;
+                    color:#1F4373 !important;
+                    -webkit-text-fill-color:#1F4373 !important;
                     padding:3px 5px !important;
                     min-height:36px !important;
                     height:36px !important;
@@ -10236,8 +10236,8 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
                 .stApp [class*="st-key-neglect_choice_regular_"] button span,
                 .stApp [class*="st-key-neglect_choice_followup_"] button p,
                 .stApp [class*="st-key-neglect_choice_followup_"] button span {{
-                    color:#FFFFFF !important;
-                    -webkit-text-fill-color:#FFFFFF !important;
+                    color:#1F4373 !important;
+                    -webkit-text-fill-color:#1F4373 !important;
                     font-size:14px !important;
                     font-weight:900 !important;
                     white-space:nowrap !important;
@@ -10246,8 +10246,8 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
                 }}
                 .stApp [class*="st-key-neglect_choice_regular_"] button:hover,
                 .stApp [class*="st-key-neglect_choice_followup_"] button:hover {{
-                    background:rgba(255,255,255,.10) !important;
-                    background-color:rgba(255,255,255,.10) !important;
+                    background:#EAF2FC !important;
+                    background-color:#EAF2FC !important;
                 }}
                 .st-key-neglect_choice_regular_{selected_bank} button p::after,
                 .st-key-neglect_choice_followup_{selected_bank} button p::after {{
