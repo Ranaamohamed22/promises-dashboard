@@ -1,5 +1,6 @@
 """Independent SNB performance report: portfolio treatment and daily payments."""
 from datetime import datetime
+from hashlib import sha256
 from io import BytesIO
 from zoneinfo import ZoneInfo
 
@@ -106,14 +107,10 @@ def _export_excel(df, sheet_name, highlight_payment_treated=False):
     return output.getvalue()
 
 
-def build_snb_performance(portfolio_file, payments_file):
-    """Preserve source row order within each output group and in daily payments."""
-    portfolio = pd.read_excel(
-        BytesIO(portfolio_file.getvalue()), dtype=object
-    )
-    payments = pd.read_excel(
-        BytesIO(payments_file.getvalue()), dtype=object
-    )
+def build_snb_performance(portfolio_bytes, payments_bytes):
+    """Build solely from the latest uploaded byte snapshots; never read old files."""
+    portfolio = pd.read_excel(BytesIO(portfolio_bytes), dtype=object)
+    payments = pd.read_excel(BytesIO(payments_bytes), dtype=object)
     for name, frame, required in (
         ("المحفظة", portfolio, PORTFOLIO_REQUIRED),
         ("السدادات", payments, PAYMENTS_REQUIRED),
@@ -139,10 +136,9 @@ def build_snb_performance(portfolio_file, payments_file):
     original_mask = status.isin(("معالج", "المعالج"))
     untreated_mask = status.isin(("غير معالج", "غير المعالج"))
 
-    # Original processed accounts are included unconditionally, regardless of
-    # their treatment-amount cells. Some untreated rows contain text such as
-    # "Writeoff": never treat these as zero (that would falsely mark them paid).
-    # Leave them out of the payment-treated group and show an explicit warning.
+    # Original processed accounts are included regardless of their amount cells.
+    # Untreated rows with missing/non-numeric amounts cannot be safely compared:
+    # never treat them as zero, and report their actual values from this upload.
     untreated_amount_text = (
         portfolio.loc[untreated_mask, "مبلغ المعالجة"]
         .astype("string").str.strip()
@@ -156,6 +152,13 @@ def build_snb_performance(portfolio_file, payments_file):
     invalid_treatment_rows = [
         int(idx) + 2
         for idx in untreated_amount_numeric.index[invalid_treatment_mask]
+    ]
+    invalid_treatment_values = [
+        str(value) if pd.notna(value) else "(فارغ)"
+        for value in portfolio.loc[
+            untreated_amount_numeric.index[invalid_treatment_mask],
+            "مبلغ المعالجة",
+        ].head(5)
     ]
     treatment_amount = pd.Series(float("nan"), index=portfolio.index)
     treatment_amount.loc[untreated_mask] = untreated_amount_numeric.astype(float)
@@ -190,6 +193,7 @@ def build_snb_performance(portfolio_file, payments_file):
         "daily_total": daily_total,
         "daily_count": len(daily_payments),
         "invalid_treatment_rows": invalid_treatment_rows,
+        "invalid_treatment_values": invalid_treatment_values,
         "processed_bytes": _export_excel(
             processed, "المعالج", highlight_payment_treated=True
         ),
@@ -217,8 +221,19 @@ def render_snb_performance_page():
     if portfolio_file is None or payments_file is None:
         st.info("ارفعي ملف المحفظة وملف السدادات معًا لتشغيل تقرير الأداء.")
         return
+    # Snapshot the *currently selected* uploader content on every Streamlit
+    # rerun. This path uses no old sample files, filesystem reads or data cache.
+    portfolio_bytes = portfolio_file.getvalue()
+    payments_bytes = payments_file.getvalue()
+    portfolio_version = sha256(portfolio_bytes).hexdigest()[:10]
+    payments_version = sha256(payments_bytes).hexdigest()[:10]
+    st.caption(
+        f"الملفات المستخدمة الآن: المحفظة «{portfolio_file.name}» "
+        f"(نسخة {portfolio_version}) | السدادات «{payments_file.name}» "
+        f"(نسخة {payments_version})"
+    )
     try:
-        result = build_snb_performance(portfolio_file, payments_file)
+        result = build_snb_performance(portfolio_bytes, payments_bytes)
     except Exception as exc:
         st.error(f"تعذر تجهيز تقرير الأداء: {exc}")
         return
@@ -230,8 +245,9 @@ def render_snb_performance_page():
         st.warning(
             f"تم تجاهل {len(invalid_rows)} صف من الحسابات غير المعالجة "
             f"عند مقارنة مبلغ المعالجة بالسدادات، لأن مبلغ المعالجة "
-            f"غير رقمي أو فارغ (مثل Writeoff). "
-            f"أرقام الصفوف في ملف المحفظة: {row_preview}{suffix}. "
+            f"غير رقمي أو فارغ. "
+            f"أرقام الصفوف في ملف المحفظة الحالي: {row_preview}{suffix}. "
+            f"أمثلة للقيم الفعلية: {', '.join(result['invalid_treatment_values'])}. "
             "لم يتم تغيير البيانات الأصلية أو استبعاد أي حساب معالج أصلاً."
         )
 
