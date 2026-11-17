@@ -139,13 +139,26 @@ def build_snb_performance(portfolio_file, payments_file):
     original_mask = status.isin(("معالج", "المعالج"))
     untreated_mask = status.isin(("غير معالج", "غير المعالج"))
 
-    # Original processed accounts are included unconditionally: their treatment
-    # amounts must never be parsed or validated. Only untreated accounts need
-    # a numeric threshold for comparison with their aggregated payments.
-    treatment_amount = pd.Series(0.0, index=portfolio.index, dtype=float)
-    treatment_amount.loc[untreated_mask] = _amounts(
-        portfolio.loc[untreated_mask, "مبلغ المعالجة"], "مبلغ المعالجة"
+    # Original processed accounts are included unconditionally, regardless of
+    # their treatment-amount cells. Some untreated rows contain text such as
+    # "Writeoff": never treat these as zero (that would falsely mark them paid).
+    # Leave them out of the payment-treated group and show an explicit warning.
+    untreated_amount_text = (
+        portfolio.loc[untreated_mask, "مبلغ المعالجة"]
+        .astype("string").str.strip()
+        .str.replace(",", "", regex=False)
+        .str.replace("٬", "", regex=False)
     )
+    untreated_amount_numeric = pd.to_numeric(
+        untreated_amount_text, errors="coerce"
+    )
+    invalid_treatment_mask = untreated_amount_numeric.isna()
+    invalid_treatment_rows = [
+        int(idx) + 2
+        for idx in untreated_amount_numeric.index[invalid_treatment_mask]
+    ]
+    treatment_amount = pd.Series(float("nan"), index=portfolio.index)
+    treatment_amount.loc[untreated_mask] = untreated_amount_numeric.astype(float)
     totals = (
         pd.DataFrame({"account": payment_keys, "amount": paid})
         .query("account != ''")
@@ -176,6 +189,7 @@ def build_snb_performance(portfolio_file, payments_file):
         "processed_count": len(processed),
         "daily_total": daily_total,
         "daily_count": len(daily_payments),
+        "invalid_treatment_rows": invalid_treatment_rows,
         "processed_bytes": _export_excel(
             processed, "المعالج", highlight_payment_treated=True
         ),
@@ -208,6 +222,18 @@ def render_snb_performance_page():
     except Exception as exc:
         st.error(f"تعذر تجهيز تقرير الأداء: {exc}")
         return
+
+    if result["invalid_treatment_rows"]:
+        invalid_rows = result["invalid_treatment_rows"]
+        row_preview = "، ".join(map(str, invalid_rows[:15]))
+        suffix = "، ..." if len(invalid_rows) > 15 else ""
+        st.warning(
+            f"تم تجاهل {len(invalid_rows)} صف من الحسابات غير المعالجة "
+            f"عند مقارنة مبلغ المعالجة بالسدادات، لأن مبلغ المعالجة "
+            f"غير رقمي أو فارغ (مثل Writeoff). "
+            f"أرقام الصفوف في ملف المحفظة: {row_preview}{suffix}. "
+            "لم يتم تغيير البيانات الأصلية أو استبعاد أي حساب معالج أصلاً."
+        )
 
     cols = st.columns(4, gap="small")
     cols[0].metric("المعالج الأصلي", f"{result['original_count']:,}")
