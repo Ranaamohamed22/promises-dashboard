@@ -146,9 +146,7 @@ def build_snb_performance(portfolio_bytes, payments_bytes):
     paid = _amounts(payments["Payment"], "Payment")
     status = (
         portfolio[status_column].astype("string").fillna("")
-        .str.replace("\\u200f", "", regex=False)
-        .str.replace("\\u200e", "", regex=False)
-        .str.replace("\\u200b", "", regex=False)
+        .str.replace(r"[\u200f\u200e\u200b]", "", regex=True)
         .str.strip()
     )
     original_mask = status.isin(("معالج", "المعالج"))
