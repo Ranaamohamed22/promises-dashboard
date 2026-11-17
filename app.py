@@ -8065,7 +8065,7 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload, model_mapping,
 def _snb_add_evaluation(frame, notes_col, mapping, manual, similarity, row_decisions=None):
     """Place call evaluation and percentage match in adjacent columns after Notes."""
     output = frame.copy()
-    for name in ("تقييم المكالمات", "نسبة تطابق التقييم"):
+    for name in ("تقييم المكالمات", "التقيم", "نسبة تطابق التقييم"):
         if name in output.columns:
             output = output.drop(columns=[name])
     keys = output[notes_col].map(_snb_normalize_note)
@@ -8078,8 +8078,11 @@ def _snb_add_evaluation(frame, notes_col, mapping, manual, similarity, row_decis
     labels = values.map({1: "ناجحة", 0: "غير ناجحة"}).fillna("غير مصنفة")
     index = output.columns.get_loc(notes_col) + 1
     output.insert(index, "تقييم المكالمات", labels)
+    # Numeric call rating beside the readable call evaluation: 1/0.
+    # Leave unclassified rows blank rather than inventing a rating.
+    output.insert(index + 1, "التقيم", values.map({1: 1, 0: 0}).astype("Int64"))
     output.insert(
-        index + 1, "نسبة تطابق التقييم",
+        index + 2, "نسبة تطابق التقييم",
         keys.map(lambda key: f"{similarity.get(key, (0, ''))[0]}%")
     )
     return output
@@ -9317,7 +9320,13 @@ def _stc_metrics(frame, collector, stamps, ratings):
     duration = ((now-prev).dt.total_seconds()-overlap).fillna(0)/60
     result["التاريخ"] = now.dt.date
     result["الوقت"] = now.dt.strftime("%I:%M:%S %p")
-    result["تقييم المكالمات"] = ratings.map({1:"ناجحة", 0:"غير ناجحة"})
+    # Keep both the readable label and numeric rating side by side.
+    for column in ("تقييم المكالمات", "التقيم"):
+        if column in result.columns:
+            result = result.drop(columns=[column])
+    result["تقييم المكالمات"] = ratings.loc[result.index].map({1:"ناجحة", 0:"غير ناجحة"})
+    rating_position = result.columns.get_loc("تقييم المكالمات") + 1
+    result.insert(rating_position, "التقيم", ratings.loc[result.index].astype("Int64"))
     result["مدة المكالمة بالدقائق"] = duration
     result["الوقت المهدر بالدقائق"] = (duration-7).clip(lower=0)
     return result
