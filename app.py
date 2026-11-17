@@ -9531,6 +9531,25 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
         if kind == "يومي" else result
     )
     st.dataframe(display_result, hide_index=True)
+    # WhatsApp-related notes: only the rows already included in this report.
+    # "واتس" also matches "واتساب" and longer phrases containing it.
+    whatsapp_mask = (
+        display_result[notes].fillna("").astype(str)
+        .str.contains("واتس", case=False, regex=False, na=False)
+    )
+    whatsapp_notes = display_result.loc[whatsapp_mask].copy()
+    if not whatsapp_notes.empty:
+        st.markdown("### إفادات واتس — STC")
+        st.caption(
+            f"تم العثور على {len(whatsapp_notes):,} إفادة تحتوي على كلمة «واتس» "
+            "في نطاق النشاط المختار."
+        )
+        st.dataframe(whatsapp_notes, hide_index=True, use_container_width=True)
+        _stc_download(
+            {"إفادات واتس": whatsapp_notes},
+            "تحميل إفادات واتس Excel",
+            "STC_WhatsApp_Notes.xlsx",
+        )
     if duty_stamps is not None:
         with st.expander("مدة الدوام لكل محصل"):
             st.dataframe(summary[[collector, "مدة الدوام"]], hide_index=True)
@@ -9538,6 +9557,8 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
                 st.dataframe(daily[["التاريخ", collector, "مدة الدوام"]], hide_index=True)
     if kind == "يومي":
         sheets = {"المكالمات": display_result, "ملخص المحصلين": summary}
+        if not whatsapp_notes.empty:
+            sheets["إفادات واتس"] = whatsapp_notes
         if not first:
             sheets["أول إفادة بعد البريك"] = _stc_daily_note_times(result, collector, notes, stamps)
             with st.expander("أول إفادة بعد البريك وحالتها"):
