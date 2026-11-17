@@ -202,6 +202,15 @@ def build_snb_performance(portfolio_bytes, payments_bytes):
 
 
 def render_snb_performance_page():
+    # Resetting the uploader generation forces Streamlit to discard the
+    # previously selected files, even if the replacement has the same name.
+    if "snb_perf_upload_generation" not in st.session_state:
+        st.session_state["snb_perf_upload_generation"] = 0
+    if st.button("🔄 مسح الملفين ورفع ملفات جديدة", key="snb_perf_reset_uploads"):
+        st.session_state["snb_perf_upload_generation"] += 1
+        st.rerun()
+    generation = st.session_state["snb_perf_upload_generation"]
+
     # Match the Activity page: keep the two upload controls in the top row,
     # rather than pushing them down with a full-width title and caption.
     portfolio_col, payments_col, heading_col = st.columns(
@@ -209,11 +218,11 @@ def render_snb_performance_page():
     )
     with portfolio_col:
         portfolio_file = st.file_uploader(
-            "رفع ملف المحفظة", type=["xlsx"], key="snb_perf_portfolio"
+            "رفع ملف المحفظة", type=["xlsx"], key=f"snb_perf_portfolio_{generation}"
         )
     with payments_col:
         payments_file = st.file_uploader(
-            "رفع ملف السدادات", type=["xlsx"], key="snb_perf_payments"
+            "رفع ملف السدادات", type=["xlsx"], key=f"snb_perf_payments_{generation}"
         )
     with heading_col:
         st.markdown("**📊 تقرير الأداء — SNB**")
