@@ -247,24 +247,12 @@ def render_snb_performance_page():
         st.error(f"تعذر تجهيز تقرير الأداء: {exc}")
         return
 
-    if result["invalid_treatment_rows"]:
-        invalid_rows = result["invalid_treatment_rows"]
-        row_preview = "، ".join(map(str, invalid_rows[:15]))
-        suffix = "، ..." if len(invalid_rows) > 15 else ""
-        st.warning(
-            f"تم تجاهل {len(invalid_rows)} صف من الحسابات غير المعالجة "
-            f"عند مقارنة مبلغ المعالجة بالسدادات، لأن مبلغ المعالجة "
-            f"غير رقمي أو فارغ. "
-            f"أرقام الصفوف في ملف المحفظة الحالي: {row_preview}{suffix}. "
-            f"أمثلة للقيم الفعلية: {', '.join(result['invalid_treatment_values'])}. "
-            "لم يتم تغيير البيانات الأصلية أو استبعاد أي حساب معالج أصلاً."
-        )
-
-    cols = st.columns(4, gap="small")
-    cols[0].metric("المعالج الأصلي", f"{result['original_count']:,}")
-    cols[1].metric("المعالج بالسداد", f"{result['payment_count']:,}")
-    cols[2].metric("إجمالي المعالج", f"{result['processed_count']:,}")
-    cols[3].metric("إجمالي سدادات اليوم", f"{result['daily_total']:,.2f}")
+    # Show exactly the three requested count KPIs. Non-numeric thresholds
+    # remain excluded from comparisons without an on-page warning banner.
+    cols = st.columns(3, gap="small")
+    cols[0].metric("عدد المعالج من المحفظة", f"{result['original_count']:,}")
+    cols[1].metric("عدد المعالج من السداد", f"{result['payment_count']:,}")
+    cols[2].metric("عدد سدادات اليوم", f"{result['daily_count']:,}")
     today_text = result["today"].strftime("%d/%m/%Y")
     today_filename = result["today"].isoformat()
     download_a, download_b = st.columns(2, gap="medium")
