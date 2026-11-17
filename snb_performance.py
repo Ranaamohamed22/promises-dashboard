@@ -11,8 +11,10 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 
-PORTFOLIO_REQUIRED = (
-    "Account Number", "حالة المعالجة - التمويل", "مبلغ المعالجة"
+PORTFOLIO_REQUIRED = ("Account Number", "مبلغ المعالجة")
+PORTFOLIO_STATUS_COLUMNS = (
+    "Claim/حالة المعالجة - التمويل",
+    "حالة المعالجة - التمويل",
 )
 PAYMENTS_REQUIRED = (
     "Customer Account Number", "Payment", "Date of Creation"
@@ -126,12 +128,28 @@ def build_snb_performance(portfolio_bytes, payments_bytes):
             "ارفعي المحفظة الأصلية قبل إنشاء التقرير."
         )
 
+    # Prefer the Claim-prefixed portfolio status column used by the source
+    # export. The unprefixed field may exist as well but represent a different
+    # status; using it silently can produce a misleading zero processed count.
+    status_column = next(
+        (col for col in PORTFOLIO_STATUS_COLUMNS if col in portfolio.columns),
+        None,
+    )
+    if status_column is None:
+        raise ValueError(
+            "ملف المحفظة ناقص منه عمود حالة المعالجة: "
+            + " أو ".join(PORTFOLIO_STATUS_COLUMNS)
+        )
+
     account_keys = portfolio["Account Number"].map(_account_key)
     payment_keys = payments["Customer Account Number"].map(_account_key)
     paid = _amounts(payments["Payment"], "Payment")
     status = (
-        portfolio["حالة المعالجة - التمويل"]
-        .astype("string").fillna("").str.strip()
+        portfolio[status_column].astype("string").fillna("")
+        .str.replace("\\u200f", "", regex=False)
+        .str.replace("\\u200e", "", regex=False)
+        .str.replace("\\u200b", "", regex=False)
+        .str.strip()
     )
     original_mask = status.isin(("معالج", "المعالج"))
     untreated_mask = status.isin(("غير معالج", "غير المعالج"))
@@ -187,6 +205,8 @@ def build_snb_performance(portfolio_bytes, payments_bytes):
     daily_total = float(paid.loc[today_mask].sum())
     return {
         "today": today,
+        "status_column": status_column,
+        "status_values": status.value_counts().head(5).to_dict(),
         "original_count": len(original_rows),
         "payment_count": len(payment_rows),
         "processed_count": len(processed),
@@ -246,6 +266,17 @@ def render_snb_performance_page():
     except Exception as exc:
         st.error(f"تعذر تجهيز تقرير الأداء: {exc}")
         return
+
+    st.caption(f"عمود حالة المعالجة المستخدم من المحفظة الحالية: {result['status_column']}")
+    if result["original_count"] == 0:
+        examples = "، ".join(
+            f"{value or '(فارغ)'} ({count})"
+            for value, count in result["status_values"].items()
+        )
+        st.info(
+            "لم يتم العثور على صفوف بحالة «معالج» أو «المعالج» "
+            f"في العمود المحدد. القيم الموجودة فعلًا: {examples}"
+        )
 
     # Explicit high-contrast cards: global app styling can make Streamlit's
     # default st.metric text hard to see on the dark SNB background.
