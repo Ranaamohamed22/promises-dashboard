@@ -22,6 +22,7 @@ from openpyxl import Workbook, load_workbook
 from copy import copy
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+from snb_performance import render_snb_performance_page
 
 # ==========================================
 # إعدادات الصفحة الأساسية
@@ -2182,12 +2183,14 @@ with st.container(key="brand_header"):
 
 # Keep report navigation in the SAME row as SNB/STC, aligned to the top right.
 def _render_ejada_main_navigation():
-    pages = (
+    pages = [
         ("Overview", "نظرة عامة", "top_overview_btn"),
         ("Promises", "الوعود القائمة والمكسورة", "nav_prom_btn"),
         ("Neglect", "الإهمال", "nav_neg_btn"),
         ("Activity", "النشاط", "nav_act_btn"),
-    )
+    ]
+    if st.session_state.selected_bank == "SNB":
+        pages.append(("Performance", "تقرير الأداء", "nav_perf_btn"))
     with st.container(key="report_pills", horizontal=True, width="content", gap=None):
         for page, label, key in pages:
             if page == "Neglect":
@@ -10970,7 +10973,7 @@ if curr_page in ('Promises', 'Neglect'):
 
 # Activity is intentionally a blank design canvas until the new report is specified.
 # Keep other pages and their upload state completely unchanged.
-page_uploaded = None if curr_page in ('Activity', 'ModelManagement') else bank_files[curr_page]
+page_uploaded = None if curr_page in ('Activity', 'ModelManagement', 'Performance') else bank_files[curr_page]
 
 if page_uploaded is None:
     if curr_page == 'Home':
@@ -11019,6 +11022,8 @@ if page_uploaded is None:
         if notice:
             st.success(notice)
         _render_bank_activity_model_manager(selected_bank)
+    elif curr_page == 'Performance' and selected_bank == 'SNB':
+        render_snb_performance_page()
     elif curr_page == 'Activity':
         # Put file uploader, title and compact activity-type selector on ONE row.
         activity_error_slot = st.empty()
