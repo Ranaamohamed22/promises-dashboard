@@ -177,12 +177,11 @@ def build_snb_performance(portfolio_file, payments_file):
 
 
 def render_snb_performance_page():
-    st.markdown("## 📊 تقرير الأداء — البنك الأهلي السعودي SNB")
-    st.caption(
-        "ارفعي المحفظة والسدادات معًا. لا يتم دمج أي ملفات قديمة، "
-        "ويتم تحديث النتائج تلقائيًا عند استبدال أي ملف."
+    # Match the Activity page: keep the two upload controls in the top row,
+    # rather than pushing them down with a full-width title and caption.
+    portfolio_col, payments_col, heading_col = st.columns(
+        [1.2, 1.2, 1.0], gap="small", vertical_alignment="center"
     )
-    portfolio_col, payments_col = st.columns(2, gap="medium")
     with portfolio_col:
         portfolio_file = st.file_uploader(
             "رفع ملف المحفظة", type=["xlsx"], key="snb_perf_portfolio"
@@ -191,6 +190,9 @@ def render_snb_performance_page():
         payments_file = st.file_uploader(
             "رفع ملف السدادات", type=["xlsx"], key="snb_perf_payments"
         )
+    with heading_col:
+        st.markdown("**📊 تقرير الأداء — SNB**")
+        st.caption("ارفعي المحفظة والسدادات معًا لتحديث التقرير تلقائيًا.")
     if portfolio_file is None or payments_file is None:
         st.info("ارفعي ملف المحفظة وملف السدادات معًا لتشغيل تقرير الأداء.")
         return
