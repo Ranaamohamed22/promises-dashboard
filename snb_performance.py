@@ -13,7 +13,6 @@ from openpyxl.utils import get_column_letter
 
 PORTFOLIO_REQUIRED = ("Account Number", "مبلغ المعالجة")
 PORTFOLIO_STATUS_COLUMNS = (
-    "Claim/حالة المعالجة - التمويل",
     "حالة المعالجة - التمويل",
 )
 PAYMENTS_REQUIRED = (
@@ -128,9 +127,8 @@ def build_snb_performance(portfolio_bytes, payments_bytes):
             "ارفعي المحفظة الأصلية قبل إنشاء التقرير."
         )
 
-    # Prefer the Claim-prefixed portfolio status column used by the source
-    # export. The unprefixed field may exist as well but represent a different
-    # status; using it silently can produce a misleading zero processed count.
+    # The portfolio processing status is the unprefixed column. Do not use
+    # Claim/حالة المعالجة - التمويل (a different field in payment exports).
     status_column = next(
         (col for col in PORTFOLIO_STATUS_COLUMNS if col in portfolio.columns),
         None,
