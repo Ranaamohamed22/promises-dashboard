@@ -9332,6 +9332,24 @@ def _stc_metrics(frame, collector, stamps, ratings):
     return result
 
 
+def _stc_order_activity_columns(result, collector, identity, notes, stamps):
+    """Display STC daily/first-shift calls in the requested Excel column order."""
+    output = result.copy()
+    created_col = _snb_find_column(output, "Created on", "Created On", "CreatedOn")
+    if created_col is None:
+        output["Created on"] = stamps.loc[output.index].dt.strftime("%Y-%m-%d %H:%M:%S")
+    elif created_col != "Created on" and "Created on" not in output.columns:
+        output = output.rename(columns={created_col: "Created on"})
+    preferred = [
+        collector, identity, notes, "تقييم المكالمات", "التقيم",
+        "Created on", "التاريخ", "الوقت",
+        "مدة المكالمة بالدقائق", "الوقت المهدر بالدقائق",
+    ]
+    first_columns = list(dict.fromkeys(col for col in preferred if col in output.columns))
+    remaining = [col for col in output.columns if col not in first_columns]
+    return output.loc[:, first_columns + remaining]
+
+
 def _stc_daily_note_times(result, collector, notes, stamps):
     ordered = result.loc[stamps.loc[result.index].sort_values(kind="stable").index]
     groups = ordered.groupby(collector, sort=False)
@@ -9508,14 +9526,18 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
     summary = _stc_summary(result, [collector], duty_stamps)
     daily = _stc_summary(result, ["التاريخ", collector], duty_stamps)
     _stc_dashboard(summary, collector, scope)
-    st.dataframe(result, hide_index=True)
+    display_result = (
+        _stc_order_activity_columns(result, collector, identity, notes, stamps)
+        if kind == "يومي" else result
+    )
+    st.dataframe(display_result, hide_index=True)
     if duty_stamps is not None:
         with st.expander("مدة الدوام لكل محصل"):
             st.dataframe(summary[[collector, "مدة الدوام"]], hide_index=True)
             if kind != "يومي":
                 st.dataframe(daily[["التاريخ", collector, "مدة الدوام"]], hide_index=True)
     if kind == "يومي":
-        sheets = {"المكالمات": result, "ملخص المحصلين": summary}
+        sheets = {"المكالمات": display_result, "ملخص المحصلين": summary}
         if not first:
             sheets["أول إفادة بعد البريك"] = _stc_daily_note_times(result, collector, notes, stamps)
             with st.expander("أول إفادة بعد البريك وحالتها"):
