@@ -132,19 +132,26 @@ def build_snb_performance(portfolio_file, payments_file):
     account_keys = portfolio["Account Number"].map(_account_key)
     payment_keys = payments["Customer Account Number"].map(_account_key)
     paid = _amounts(payments["Payment"], "Payment")
-    treatment_amount = _amounts(portfolio["مبلغ المعالجة"], "مبلغ المعالجة")
-    totals = (
-        pd.DataFrame({"account": payment_keys, "amount": paid})
-        .query("account != ''")
-        .groupby("account", sort=False)["amount"].sum()
-    )
-    collected_by_account = account_keys.map(totals).fillna(0)
     status = (
         portfolio["حالة المعالجة - التمويل"]
         .astype("string").fillna("").str.strip()
     )
     original_mask = status.isin(("معالج", "المعالج"))
     untreated_mask = status.isin(("غير معالج", "غير المعالج"))
+
+    # Original processed accounts are included unconditionally: their treatment
+    # amounts must never be parsed or validated. Only untreated accounts need
+    # a numeric threshold for comparison with their aggregated payments.
+    treatment_amount = pd.Series(0.0, index=portfolio.index, dtype=float)
+    treatment_amount.loc[untreated_mask] = _amounts(
+        portfolio.loc[untreated_mask, "مبلغ المعالجة"], "مبلغ المعالجة"
+    )
+    totals = (
+        pd.DataFrame({"account": payment_keys, "amount": paid})
+        .query("account != ''")
+        .groupby("account", sort=False)["amount"].sum()
+    )
+    collected_by_account = account_keys.map(totals).fillna(0)
     paid_mask = (
         untreated_mask
         & collected_by_account.gt(0)
