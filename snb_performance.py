@@ -247,12 +247,30 @@ def render_snb_performance_page():
         st.error(f"تعذر تجهيز تقرير الأداء: {exc}")
         return
 
-    # Show exactly the three requested count KPIs. Non-numeric thresholds
-    # remain excluded from comparisons without an on-page warning banner.
-    cols = st.columns(3, gap="small")
-    cols[0].metric("عدد المعالج من المحفظة", f"{result['original_count']:,}")
-    cols[1].metric("عدد المعالج من السداد", f"{result['payment_count']:,}")
-    cols[2].metric("عدد سدادات اليوم", f"{result['daily_count']:,}")
+    # Explicit high-contrast cards: global app styling can make Streamlit's
+    # default st.metric text hard to see on the dark SNB background.
+    kpi_items = (
+        ("عدد المعالج من المحفظة", result["original_count"]),
+        ("عدد المعالج من السداد", result["payment_count"]),
+        ("عدد سدادات اليوم", result["daily_count"]),
+    )
+    kpi_cards = "".join(
+        '<div style="background:#FFFFFF;border:2px solid #C9D8E7;'
+        'border-radius:14px;padding:20px 14px;text-align:center;'
+        'min-height:115px;box-sizing:border-box;box-shadow:0 3px 12px #0A183025;">'
+        f'<div style="font-size:18px;font-weight:800;color:#183C63;'
+        f'margin-bottom:12px;">{label}</div>'
+        f'<div style="font-size:36px;font-weight:900;color:#10375D;'
+        f'font-variant-numeric:tabular-nums;">{count:,}</div>'
+        '</div>'
+        for label, count in kpi_items
+    )
+    st.markdown(
+        '<div dir="rtl" style="display:grid;grid-template-columns:'
+        'repeat(3,minmax(0,1fr));gap:14px;margin:18px 0 24px;">'
+        + kpi_cards + '</div>',
+        unsafe_allow_html=True,
+    )
     today_text = result["today"].strftime("%d/%m/%Y")
     today_filename = result["today"].isoformat()
     download_a, download_b = st.columns(2, gap="medium")
