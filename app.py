@@ -10218,7 +10218,7 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
                 .stApp [class*="st-key-neglect_choice_regular_"] button,
                 .stApp [class*="st-key-neglect_choice_followup_"] button {{
                     background:#FFFFFF !important;
-                    background-color:#1F4373 !important;
+                    background-color:#FFFFFF !important;
                     border:1px solid #C8D7E6 !important;
                     outline:0 !important;
                     box-shadow:none !important;
