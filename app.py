@@ -9424,6 +9424,15 @@ def _stc_download(sheets, title, filename):
         for name, data in sheets.items():
             data.to_excel(writer, sheet_name=name, index=False)
         _style_snb_activity_workbook(writer.book)
+        percent_headers = {
+            "نسبة تحقيق المستهدف",
+            "نسبة تحقيق المكالمات الناجحة",
+        }
+        for sheet in writer.book.worksheets:
+            for column in sheet.iter_cols(min_row=1, max_row=sheet.max_row):
+                if column[0].value in percent_headers:
+                    for cell in column[1:]:
+                        cell.number_format = "0.00%"
     st.download_button(title, buf.getvalue(), file_name=filename,
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
@@ -9577,6 +9586,15 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
             if kind != "يومي":
                 st.dataframe(daily[["التاريخ", collector, "مدة الدوام"]], hide_index=True)
     if kind == "يومي":
+        # Daily collector target attainment: 120 covered calls per collector.
+        # Store ratios as numeric values so Excel can display real percentages.
+        summary = summary.copy()
+        covered = pd.to_numeric(summary["المكالمات المغطاة"], errors="coerce").fillna(0)
+        successful = pd.to_numeric(summary["ناجحة"], errors="coerce").fillna(0)
+        summary["نسبة تحقيق المستهدف"] = covered / 120
+        summary["نسبة تحقيق المكالمات الناجحة"] = (
+            successful.div(covered.where(covered.ne(0))).fillna(0)
+        )
         sheets = {"المكالمات": display_result, "ملخص المحصلين": summary}
         if not whatsapp_notes.empty:
             sheets["إفادات واتس"] = whatsapp_notes
