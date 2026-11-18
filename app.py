@@ -9357,23 +9357,38 @@ def _stc_order_activity_columns(result, collector, identity, notes, stamps):
 
 
 def _stc_daily_note_times(result, collector, notes, stamps):
-    ordered = result.loc[stamps.loc[result.index].sort_values(kind="stable").index]
-    groups = ordered.groupby(collector, sort=False)
+    """Daily collector first/last notes and first post-break note (14:45)."""
+    columns = [
+        collector,
+        "ميعاد أول إفادة", "حالة أول إفادة",
+        "ميعاد آخر إفادة", "حالة آخر إفادة",
+        "ميعاد أول إفادة بعد البريك", "حالة أول إفادة بعد البريك",
+    ]
+    if result.empty:
+        return pd.DataFrame(columns=columns)
+
+    # Stable chronological ordering preserves the source order on ties.
+    ordered_stamps = stamps.loc[result.index].sort_values(kind="stable")
+    ordered = result.loc[ordered_stamps.index]
+    groups = ordered.groupby(collector, sort=False, dropna=False)
     first = groups.head(1).set_index(collector)
     last = groups.tail(1).set_index(collector)
-    times = stamps.loc[ordered.index]
-    after = ordered.loc[times.dt.hour * 60 + times.dt.minute >= 14 * 60 + 45]
-    post = after.drop_duplicates(collector).set_index(collector)
-    return pd.DataFrame({
-        "ميعاد أول إفادة": first["الوقت"],
-        "حالة أول إفادة": first["تقييم المكالمات"],
-        "أول إفادة بعد البريك": post[notes],
-        "ميعاد أول إفادة بعد البريك": post["الوقت"],
-        "حالة أول إفادة بعد البريك": post["تقييم المكالمات"],
-        "ميعاد آخر إفادة": last["الوقت"],
-        "حالة آخر إفادة": last["تقييم المكالمات"],
-    }, index=first.index).fillna("").reset_index()
 
+    # Post-break is based on the same selected daily activity rows.
+    after_mask = (
+        ordered_stamps.dt.hour * 60 + ordered_stamps.dt.minute >= 14 * 60 + 45
+    )
+    after = ordered.loc[after_mask.fillna(False)]
+    post = after.drop_duplicates(subset=[collector], keep="first").set_index(collector)
+
+    output = pd.DataFrame(index=first.index)
+    output["ميعاد أول إفادة"] = first["الوقت"]
+    output["حالة أول إفادة"] = first["تقييم المكالمات"]
+    output["ميعاد آخر إفادة"] = last["الوقت"].reindex(output.index)
+    output["حالة آخر إفادة"] = last["تقييم المكالمات"].reindex(output.index)
+    output["ميعاد أول إفادة بعد البريك"] = post["الوقت"].reindex(output.index)
+    output["حالة أول إفادة بعد البريك"] = post["تقييم المكالمات"].reindex(output.index)
+    return output.fillna("").reset_index().loc[:, columns]
 
 def _format_duty_span(span):
     seconds = int(round(span.total_seconds()))
@@ -9565,10 +9580,11 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
         sheets = {"المكالمات": display_result, "ملخص المحصلين": summary}
         if not whatsapp_notes.empty:
             sheets["إفادات واتس"] = whatsapp_notes
-        if not first:
-            sheets["أول إفادة بعد البريك"] = _stc_daily_note_times(result, collector, notes, stamps)
-            with st.expander("أول إفادة بعد البريك وحالتها"):
-                st.dataframe(sheets["أول إفادة بعد البريك"], hide_index=True)
+        sheets["أول وآخر إفادة"] = _stc_daily_note_times(
+            result, collector, notes, stamps
+        )
+        with st.expander("أول وآخر إفادة لكل محصل وحالة أول إفادة بعد البريك"):
+            st.dataframe(sheets["أول وآخر إفادة"], hide_index=True)
         _stc_download(sheets, "تحميل تقرير النشاط اليومي", "STC_Daily.xlsx")
     else:
         name = "Weekly" if kind == "أسبوعي" else "Monthly"
