@@ -9356,14 +9356,15 @@ def _stc_order_activity_columns(result, collector, identity, notes, stamps):
     return output.loc[:, first_columns + remaining]
 
 
-def _stc_daily_note_times(result, collector, notes, stamps):
-    """Daily collector first/last notes and first post-break note (14:45)."""
+def _stc_daily_note_times(result, collector, notes, stamps, include_after_break=True):
+    """Collector first/last notes; post-break columns only for full-day STC."""
     columns = [
         collector,
         "ميعاد أول إفادة", "حالة أول إفادة",
         "ميعاد آخر إفادة", "حالة آخر إفادة",
-        "ميعاد أول إفادة بعد البريك", "حالة أول إفادة بعد البريك",
     ]
+    if include_after_break:
+        columns += ["ميعاد أول إفادة بعد البريك", "حالة أول إفادة بعد البريك"]
     if result.empty:
         return pd.DataFrame(columns=columns)
 
@@ -9374,20 +9375,20 @@ def _stc_daily_note_times(result, collector, notes, stamps):
     first = groups.head(1).set_index(collector)
     last = groups.tail(1).set_index(collector)
 
-    # Post-break is based on the same selected daily activity rows.
-    after_mask = (
-        ordered_stamps.dt.hour * 60 + ordered_stamps.dt.minute >= 14 * 60 + 45
-    )
-    after = ordered.loc[after_mask.fillna(False)]
-    post = after.drop_duplicates(subset=[collector], keep="first").set_index(collector)
-
     output = pd.DataFrame(index=first.index)
     output["ميعاد أول إفادة"] = first["الوقت"]
     output["حالة أول إفادة"] = first["تقييم المكالمات"]
     output["ميعاد آخر إفادة"] = last["الوقت"].reindex(output.index)
     output["حالة آخر إفادة"] = last["تقييم المكالمات"].reindex(output.index)
-    output["ميعاد أول إفادة بعد البريك"] = post["الوقت"].reindex(output.index)
-    output["حالة أول إفادة بعد البريك"] = post["تقييم المكالمات"].reindex(output.index)
+    if include_after_break:
+        # Post-break starts at 14:45, based on the selected full-day rows.
+        after_mask = (
+            ordered_stamps.dt.hour * 60 + ordered_stamps.dt.minute >= 14 * 60 + 45
+        )
+        after = ordered.loc[after_mask.fillna(False)]
+        post = after.drop_duplicates(subset=[collector], keep="first").set_index(collector)
+        output["ميعاد أول إفادة بعد البريك"] = post["الوقت"].reindex(output.index)
+        output["حالة أول إفادة بعد البريك"] = post["تقييم المكالمات"].reindex(output.index)
     return output.fillna("").reset_index().loc[:, columns]
 
 def _format_duty_span(span):
@@ -9599,9 +9600,13 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
         if not whatsapp_notes.empty:
             sheets["إفادات واتس"] = whatsapp_notes
         sheets["أول وآخر إفادة"] = _stc_daily_note_times(
-            result, collector, notes, stamps
+            result, collector, notes, stamps, include_after_break=not first
         )
-        with st.expander("أول وآخر إفادة لكل محصل وحالة أول إفادة بعد البريك"):
+        note_title = (
+            "أول وآخر إفادة لكل محصل"
+            if first else "أول وآخر إفادة لكل محصل وحالة أول إفادة بعد البريك"
+        )
+        with st.expander(note_title):
             st.dataframe(sheets["أول وآخر إفادة"], hide_index=True)
         _stc_download(sheets, "تحميل تقرير النشاط اليومي", "STC_Daily.xlsx")
     else:
