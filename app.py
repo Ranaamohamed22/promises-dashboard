@@ -9404,6 +9404,23 @@ def _format_duty_span(span):
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
 
+def _weekly_duty_table(daily, collector):
+    """Display one row per collector and a dated column for each report day."""
+    dates = pd.to_datetime(daily["التاريخ"])
+    days = pd.date_range(dates.min(), dates.max()) if not dates.empty else []
+    names = ("الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد")
+    headers = [f"{names[day.weekday()]} {day:%d/%m}" for day in days]
+    return (
+        daily.assign(التاريخ=dates)
+        .pivot(index=collector, columns="التاريخ", values="مدة الدوام")
+        .reindex(columns=days)
+        .replace(r":\d{2}$", "", regex=True)
+        .fillna("—")
+        .set_axis(headers, axis="columns")
+        .reset_index()
+    )
+
+
 def _snb_duty_totals(time_notes):
     daily = pd.to_timedelta(time_notes["مدة الدوام"])
     totals = daily.groupby(time_notes["المحصل"]).sum().map(_format_duty_span)
@@ -9587,11 +9604,15 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
             "تحميل إفادات واتس Excel",
             "STC_WhatsApp_Notes.xlsx",
         )
+    weekly_duty = _weekly_duty_table(daily, collector) if kind == "أسبوعي" else None
     if duty_stamps is not None:
         with st.expander("مدة الدوام لكل محصل"):
-            st.dataframe(summary[[collector, "مدة الدوام"]], hide_index=True)
-            if kind != "يومي":
-                st.dataframe(daily[["التاريخ", collector, "مدة الدوام"]], hide_index=True)
+            if weekly_duty is not None:
+                st.dataframe(weekly_duty, hide_index=True)
+            else:
+                st.dataframe(summary[[collector, "مدة الدوام"]], hide_index=True)
+                if kind != "يومي":
+                    st.dataframe(daily[["التاريخ", collector, "مدة الدوام"]], hide_index=True)
     if kind == "يومي":
         # Daily collector target attainment: 120 covered calls per collector.
         # Store ratios as numeric values so Excel can display real percentages.
@@ -9619,6 +9640,8 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
         name = "Weekly" if kind == "أسبوعي" else "Monthly"
         _stc_download({"ملخص المحصلين": summary}, f"تحميل ملخص النشاط · {kind}", f"STC_{name}_Summary.xlsx")
         details = {"تفاصيل كل يوم": daily}
+        if weekly_duty is not None:
+            details["مدة الدوام لكل يوم"] = weekly_duty
         if kind == "شهري":
             part = result.loc[weekly_mask.reindex(result.index)].copy()
             part["بداية الأسبوع"] = starts.loc[part.index].dt.date
@@ -9880,13 +9903,7 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
         )
         duty_summary = None
         if activity_kind == "أسبوعي":
-            duty_keys = ["التاريخ", "المحصل"]
-            duty_summary = weekly_collectors[
-                ["اليوم", "التاريخ", "المحصل"]
-            ].merge(
-                time_notes[duty_keys + ["مدة الدوام"]],
-                on=duty_keys, how="left", validate="one_to_one",
-            )
+            duty_summary = _weekly_duty_table(time_notes, "المحصل")
             duty_sheet_name = "مدة الدوام لكل يوم"
         elif activity_kind == "شهري":
             duty_summary = _snb_duty_totals(time_notes)
