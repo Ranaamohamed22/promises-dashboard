@@ -7460,8 +7460,8 @@ def _snb_model_evaluations(uploaded_model):
 
 
 @st.cache_data(show_spinner=False, max_entries=8)
-def _prepare_snb_activity_bytes(file_bytes, file_name):
-    """Cached SNB activity preparation keyed by the exact uploaded bytes."""
+def _prepare_snb_activity_bytes(file_bytes, file_name, activity_kind):
+    """Prepare SNB activity for the selected report mode."""
     if file_name.lower().endswith(".csv"):
         try:
             frame = pd.read_csv(
@@ -7567,13 +7567,6 @@ def _prepare_snb_activity_bytes(file_bytes, file_name):
         combined_products = int(needs_change.sum())
         frame.loc[has_cc_or_pf, product] = "CC+PF"
 
-    frame = (
-        frame.loc[~frame.duplicated(subset=key_columns, keep="first")]
-        .drop(columns=key_columns)
-        .copy()
-    )
-    duplicates = initial_rows - len(frame)
-
     parsed = pd.to_datetime(frame[created], errors="coerce")
     # Pandas 2+ can parse heterogeneous export timestamp formats with "mixed".
     # Only apply that fallback when it actually recovers more timestamps.
@@ -7586,6 +7579,18 @@ def _prepare_snb_activity_bytes(file_bytes, file_name):
                 parsed = mixed
         except (ValueError, TypeError):
             pass
+
+    detected_kind, period_message = _activity_period(parsed)
+    report_kind = detected_kind if activity_kind == "تلقائي" else activity_kind
+    if report_kind == "أسبوعي":
+        date_key = "__ejada_key_activity_date"
+        frame[date_key] = parsed.dt.date
+        key_columns.append(date_key)
+
+    keep_rows = ~frame.duplicated(subset=key_columns, keep="first")
+    frame = frame.loc[keep_rows].drop(columns=key_columns).copy()
+    parsed = parsed.loc[keep_rows]
+    duplicates = initial_rows - len(frame)
 
     if len(frame) and parsed.notna().sum() == 0:
         raise ValueError("تعذر قراءة وقت Created on من ملف النشاط.")
@@ -7604,13 +7609,14 @@ def _prepare_snb_activity_bytes(file_bytes, file_name):
         "created": created, "notes": notes,
         "collector": collector, "product": product,
         "combined_products": combined_products,
-        "bad_created": int(parsed.isna().sum())
+        "bad_created": int(parsed.isna().sum()),
+        "detected_kind": detected_kind, "period_message": period_message,
     }
 
 
-def _prepare_snb_activity_file(uploaded_file):
+def _prepare_snb_activity_file(uploaded_file, activity_kind):
     return _prepare_snb_activity_bytes(
-        uploaded_file.getvalue(), uploaded_file.name
+        uploaded_file.getvalue(), uploaded_file.name, activity_kind
     )
 
 
@@ -9630,7 +9636,7 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
     with st.container(key="snb_activity_work_area"):
         # The activity kind is selected in the compact header row above.
         try:
-            prepared, stats = _prepare_snb_activity_file(activity_upload)
+            prepared, stats = _prepare_snb_activity_file(activity_upload, activity_kind)
             if _snb_secret("SNB_MODEL_ENCRYPTED"):
                 model_mapping, conflicted_notes, invalid_model = (
                     _snb_secret_model_evaluations()
@@ -9661,7 +9667,7 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                 f"التفاصيل: {exc}"
             )
 
-        detected_kind, message = _activity_period(prepared["__ejada_parsed_created"])
+        detected_kind, message = stats["detected_kind"], stats["period_message"]
         automatic = activity_kind == "تلقائي"
         if automatic:
             activity_kind = detected_kind
@@ -11141,7 +11147,7 @@ if page_uploaded is None:
                 _ejada_activity_kpis("SNB", 0, 0, 0)
             else:
                 try:
-                    _waiting_data, _ = _prepare_snb_activity_file(_waiting)
+                    _waiting_data, _ = _prepare_snb_activity_file(_waiting, activity_kind)
                     _ejada_activity_kpis(
                         "SNB", len(_waiting_data), None, None, len(_waiting_data)
                     )
