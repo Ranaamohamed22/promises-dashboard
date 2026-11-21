@@ -9878,18 +9878,29 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
             _snb_weekly_activity_trend(result, stats["collector"])
             if activity_kind == "أسبوعي" else (None, None)
         )
-        duty_totals = (_snb_duty_totals(time_notes)
-                       if activity_kind in ("أسبوعي", "شهري") else None)
+        duty_summary = None
+        if activity_kind == "أسبوعي":
+            duty_keys = ["التاريخ", "المحصل"]
+            duty_summary = weekly_collectors[
+                ["اليوم", "التاريخ", "المحصل"]
+            ].merge(
+                time_notes[duty_keys + ["مدة الدوام"]],
+                on=duty_keys, how="left", validate="one_to_one",
+            )
+            duty_sheet_name = "مدة الدوام لكل يوم"
+        elif activity_kind == "شهري":
+            duty_summary = _snb_duty_totals(time_notes)
+            duty_sheet_name = "إجمالي مدة الدوام"
         duty_col, waste_col = st.columns(2, gap="small")
         with duty_col:
             title = "أول وآخر إفادة وحالتهما"
-            if duty_totals is not None:
+            if duty_summary is not None:
                 title += " ومدة الدوام"
             if show_break:
                 title += " وأول إفادة بعد البريك وحالتها"
             with st.expander(title, expanded=False):
-                if duty_totals is not None:
-                    _expander_table(duty_totals, "snb_total_duty")
+                if duty_summary is not None:
+                    _expander_table(duty_summary, "snb_duty_summary")
                 _expander_table(time_notes, "snb_collector_time_notes")
         with waste_col:
             with st.expander(
@@ -9993,8 +10004,8 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                 ),
                 index=False,
             )
-            if duty_totals is not None:
-                duty_totals.to_excel(writer, sheet_name="إجمالي مدة الدوام", index=False)
+            if duty_summary is not None:
+                duty_summary.to_excel(writer, sheet_name=duty_sheet_name, index=False)
             _snb_export_visible_columns(wasted_details).to_excel(
                 writer, sheet_name=details_sheet, index=False
             )
