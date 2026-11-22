@@ -9161,6 +9161,8 @@ def _stc_prepare_activity_bytes(file_bytes, file_name):
     identity = _snb_find_column(frame, "Debitor", "رقم هوية العميل", "رقم الهوية", "هوية العميل",
                                 "National ID", "National ID Number", "Identity Number",
                                 "ID Number", "ID Numer", "ID", "Debtor")
+    if identity is None:
+        identity = _snb_find_column(frame, "Debitor Name")
     if collector is None or identity is None:
         raise ValueError("ملف نشاط STC محتاج Created by لاسم المحصل وDebitor لرقم هوية العميل.")
     date_col = _snb_find_column(
@@ -9216,13 +9218,14 @@ def _activity_week_choice(stamps, key, monthly=False):
 
 
 @st.cache_data(show_spinner=False, max_entries=8)
-def _stc_duplicate_mask(frame, collector, identity, notes):
-    # STC duplicates: same collector + Debitor + Notes; time is not a key.
+def _stc_duplicate_mask(frame, collector, identity, notes, dates=None):
     keys = pd.DataFrame({
         "collector": frame[collector].fillna("").astype(str).str.strip(),
         "identity": frame[identity].fillna("").astype(str).str.strip(),
         "notes": frame[notes].fillna("").astype(str).str.strip(),
     })
+    if dates is not None:
+        keys["date"] = dates
     return keys["identity"].ne("") & keys.duplicated(keep="first")
 
 
@@ -9495,13 +9498,16 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
         digest = hashlib.sha256(activity_upload.getvalue()).hexdigest()[:20]
         version = st.session_state.activity_upload_versions["STC"]["activity"]
         key = f"stc_{digest}_{version}"
-        duplicates = _stc_duplicate_mask(source, collector, identity, notes)
+        kind = _activity_period(stamps)[0] if activity_kind == "تلقائي" else activity_kind
+        dates = stamps.dt.normalize() if kind == "أسبوعي" else None
+        duplicates = _stc_duplicate_mask(source, collector, identity, notes, dates)
         count = int(duplicates.sum())
         if count:
+            scope = " داخل نفس اليوم" if dates is not None else ""
             choice = duplicate_slot.radio(
-                f"فيه {count:,} صف متكرر حسب Created by وDebitor وNotes (الإفادة).",
+                f"فيه {count:,} صف متكرر{scope} حسب {collector} و{identity} و{notes}.",
                 ["تأكيد حذف التكرارات والاحتفاظ بأول صف", "الاحتفاظ بكل الصفوف"],
-                index=None, horizontal=True, key="duplicate_choice_notes_v2_" + key,
+                index=None, horizontal=True, key=f"stc_duplicate_choice_{kind}_{key}",
                 help="الاختيار بيطبّق على التقرير فقط. ملفك الأصلي بيفضل زي ما هو."
             )
             if choice is None:
@@ -9521,7 +9527,6 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
     _stc_render_saved_model(mapping)
     if activity_upload is None or not mapping:
         return
-    kind = _activity_period(stamps)[0] if activity_kind == "تلقائي" else activity_kind
     day = stamps.dt.normalize()
     first = False
     starts = weekly_mask = None
