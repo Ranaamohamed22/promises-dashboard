@@ -188,53 +188,160 @@ def build_comprehensive_report(source_bytes):
     ), status_counts
 
 def render_snb_comprehensive_page():
-    st.markdown("### 📋 التقرير الشامل — البنك الأهلي السعودي")
-    st.caption("ارفعي التقرير الأصلي لتطبيق خطوات BUCKET بالترتيب. يمكن إضافة خطوات جديدة للتقرير لاحقًا.")
-    uploaded = st.file_uploader(
-        "رفع ملف التقرير الشامل (Excel)", type=["xlsx"], key="snb_comprehensive_source"
-    )
-    st.markdown("**الخطوات الحالية:**")
+    """Activity-sized uploader on the right and KPIs level with it on top."""
     st.markdown(
-        "1. BN: أول خانتين من آخر BUCKET، مع تحويل 29 - 999 إلى Writeoff  \n"
-        "2. B-1: قيمة BN ناقص 1  \n"
-        "3. B-2: قيمة B-1 ناقص 1  \n"
-        "4. B-3: قيمة B-2 ناقص 1  \n"
-        "5. BN - B1: آخر BUCKET ناقص أول BUCKET؛ B1 غير ظاهر، وWr ينتج #VALUE!  \n"
-        "6. حالة المعالجة: معالج إذا الفرق سالب أو بوكت أحدث انخفض عن بوكت سابق"
-    )
-    if uploaded is None:
-        st.info("ارفعي الملف الأصلي لبدء معالجة التقرير الشامل.")
-        return
-    try:
-        output, count, bucket_names, statuses = build_comprehensive_report(uploaded.getvalue())
-    except Exception as error:
-        st.error(f"تعذر معالجة التقرير الشامل: {error}")
-        return
-    st.success(f"تم تجهيز التقرير لـ {count:,} صف.")
-    kpis = (
-        ("معالج من أول وآخر BUCKET", statuses["direct"]),
-        ("معالج في النص فقط", statuses["middle"]),
-        ("إجمالي المعالج", statuses["معالج"]),
-        ("غير معالج", statuses["غير معالج"]),
-    )
-    cards = "".join(
-        '<div style="background:#FFFFFF;border:1px solid #BFCEDF;'
-        'border-radius:13px;padding:17px 12px;text-align:center;'
-        'box-shadow:0 2px 9px #10254118;min-height:100px;">'
-        f'<div style="color:#1F4373;font-weight:800;font-size:15px;'
-        f'margin-bottom:9px;">{label}</div>'
-        f'<div style="color:#10375D;font-size:32px;font-weight:900;'
-        f'font-variant-numeric:tabular-nums;">{value:,}</div>'
-        '</div>'
-        for label, value in kpis
-    )
-    st.markdown(
-        '<div dir="rtl" style="display:grid;grid-template-columns:'
-        'repeat(auto-fit,minmax(175px,1fr));gap:12px;margin:14px 0 20px;">'
-        + cards + '</div>',
+        """
+        <style>
+        /* Comprehensive page ONLY: reuse Activity's upload-field and dropzone
+           rules from app.py, and position the KPI cards in the top empty area. */
+        div.st-key-snb_comprehensive_top_row {
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        div.st-key-snb_comprehensive_top_row > div[data-testid="stHorizontalBlock"] {
+            direction: rtl !important;
+            align-items: flex-start !important;
+            gap: 14px !important;
+            width: 100% !important;
+        }
+        div.st-key-snb_comprehensive_top_row [data-testid="stHorizontalBlock"] >
+        div[data-testid="stColumn"]:first-child {
+            flex: 0 0 315px !important;
+            width: 315px !important;
+            min-width: 0 !important;
+            max-width: 315px !important;
+        }
+        div.st-key-snb_comprehensive_top_row [data-testid="stHorizontalBlock"] >
+        div[data-testid="stColumn"]:nth-child(2) {
+            flex: 1 1 0 !important;
+            min-width: 0 !important;
+        }
+        div.st-key-upload_field_snb_comprehensive {
+            width: min(315px, 100%) !important;
+            max-width: 315px !important;
+            margin: 0 !important;
+            gap: 5px !important;
+        }
+        div.st-key-upload_box_snb_comprehensive {
+            width: 100% !important;
+            max-width: 315px !important;
+            padding: 8px !important;
+            margin: 0 !important;
+            border-radius: 10px !important;
+        }
+        div.st-key-upload_box_snb_comprehensive [data-testid="stFileUploader"] {
+            width: 100% !important;
+            min-width: 0 !important;
+            margin-bottom: 0 !important;
+        }
+        div.st-key-upload_box_snb_comprehensive
+        [data-testid="stFileUploaderDropzone"] {
+            min-height: 54px !important;
+            padding: 6px !important;
+        }
+        div.st-key-snb_comprehensive_kpi_area {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+        }
+        @media (max-width: 940px) {
+            div.st-key-snb_comprehensive_top_row >
+            div[data-testid="stHorizontalBlock"] {
+                flex-wrap: wrap !important;
+            }
+            div.st-key-snb_comprehensive_top_row [data-testid="stHorizontalBlock"] >
+            div[data-testid="stColumn"]:nth-child(2) {
+                flex: 1 1 100% !important;
+                width: 100% !important;
+            }
+        }
+        </style>
+        """,
         unsafe_allow_html=True,
     )
-    st.caption(f"أول BUCKET: {bucket_names[0]} | آخر BUCKET: {bucket_names[1]}")
+    with st.container(key="snb_comprehensive_top_row"):
+        upload_col, kpi_col = st.columns([1, 3.2], gap="small", vertical_alignment="top")
+        with upload_col:
+            # This is the same container structure and CSS classes as
+            # upload_field("رفع ملف النشاط", "activity_file") in app.py.
+            with st.container(key="upload_field_snb_comprehensive"):
+                st.markdown(
+                    '<div class="upload-field-label">رفع ملف الشامل</div>',
+                    unsafe_allow_html=True,
+                )
+                with st.container(border=True, key="upload_box_snb_comprehensive"):
+                    uploaded = st.file_uploader(
+                        "رفع ملف التقرير الشامل (Excel)",
+                        type=["xlsx"],
+                        label_visibility="collapsed",
+                        key="snb_comprehensive_source",
+                    )
+
+        output = None
+        count = 0
+        bucket_names = None
+        statuses = None
+        error = None
+        if uploaded is not None:
+            try:
+                output, count, bucket_names, statuses = build_comprehensive_report(
+                    uploaded.getvalue()
+                )
+            except Exception as exc:
+                error = str(exc)
+
+        with kpi_col:
+            with st.container(key="snb_comprehensive_kpi_area"):
+                if statuses is not None:
+                    kpis = (
+                        ("معالج من أول وآخر BUCKET", statuses["direct"]),
+                        ("معالج في النص فقط", statuses["middle"]),
+                        ("إجمالي المعالج", statuses["معالج"]),
+                        ("غير معالج", statuses["غير معالج"]),
+                    )
+                    cards = "".join(
+                        '<div style="background:#FFFFFF;border:1px solid #BFCEDF;'
+                        'border-radius:13px;padding:14px 9px;text-align:center;'
+                        'box-shadow:0 2px 9px #10254118;min-height:101px;'
+                        'box-sizing:border-box;">'
+                        f'<div style="color:#1F4373;font-weight:800;font-size:14px;'
+                        f'margin-bottom:8px;">{label}</div>'
+                        f'<div style="color:#10375D;font-size:31px;font-weight:900;'
+                        f'font-variant-numeric:tabular-nums;">{value:,}</div>'
+                        '</div>'
+                        for label, value in kpis
+                    )
+                    st.markdown(
+                        '<div dir="rtl" style="display:grid;grid-template-columns:'
+                        'repeat(4,minmax(0,1fr));gap:10px;margin:0;">'
+                        + cards + '</div>',
+                        unsafe_allow_html=True,
+                    )
+                elif uploaded is None:
+                    st.info("ارفعي ملف التقرير الشامل لعرض مؤشرات المعالجة.")
+                else:
+                    st.error(f"تعذر معالجة التقرير الشامل: {error}")
+
+    st.markdown("### 📋 التقرير الشامل — البنك الأهلي السعودي")
+    st.caption(
+        "تظهر المؤشرات فور رفع الملف، ويمكن تحميل التقرير بنفس خطوات BUCKET المعتمدة."
+    )
+    with st.expander("عرض خطوات المعالجة", expanded=False):
+        st.markdown(
+            "1. BN: أول خانتين من آخر BUCKET، مع تحويل 29 - 999 إلى Writeoff  \n"
+            "2. B-1: قيمة BN ناقص 1  \n"
+            "3. B-2: قيمة B-1 ناقص 1  \n"
+            "4. B-3: قيمة B-2 ناقص 1  \n"
+            "5. BN - B1: آخر BUCKET ناقص أول BUCKET؛ B1 غير ظاهر، وWr ينتج #VALUE!  \n"
+            "6. حالة المعالجة: معالج إذا الفرق سالب أو بوكت أحدث انخفض عن بوكت سابق"
+        )
+    if output is None:
+        return
+    st.caption(
+        f"تم تجهيز {count:,} صف | أول BUCKET: {bucket_names[0]} "
+        f"| آخر BUCKET: {bucket_names[1]}"
+    )
     st.download_button(
         "📥 تحميل التقرير الشامل بعد المعالجة",
         data=output,
