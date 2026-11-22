@@ -230,14 +230,31 @@ def calculate_neglect_filters(raw_df, bank):
         "الحالة الفرعية", "حالة العميل"
     )
 
-    # Fixed, approved choices only. Uploaded Excel values do not modify this list.
+    # Keep the 13 approved defaults at the top, but also list every unique
+    # non-empty Sub State found in the uploaded portfolio. File-only states
+    # remain unchecked until selected explicitly; custom additions are bank-specific.
     extras = st.session_state.setdefault(f"neglect_custom_substates_{bank}", [])
-    known = {_normalize_neglect_substate(value) for value in _NEGLECT_FIXED_SUB_STATES}
     states = list(_NEGLECT_FIXED_SUB_STATES)
-    for value in extras:
-        if _normalize_neglect_substate(value) not in known:
-            states.append(value)
-            known.add(_normalize_neglect_substate(value))
+    known = {_normalize_neglect_substate(state) for state in states}
+
+    # Prioritize manually added labels so the corresponding checkbox stays
+    # selected when the same value also exists in a freshly uploaded file.
+    for custom in extras:
+        normalized = _normalize_neglect_substate(custom)
+        if normalized and normalized not in known:
+            states.append(custom)
+            known.add(normalized)
+
+    file_choices = {}
+    if sub_col:
+        for value in source[sub_col].dropna():
+            display = re.sub(r"\s+", " ", str(value)).strip()
+            normalized = _normalize_neglect_substate(display)
+            if normalized and normalized not in known:
+                file_choices.setdefault(normalized, display)
+    for normalized in sorted(file_choices, key=lambda key: file_choices[key].casefold()):
+        states.append(file_choices[normalized])
+        known.add(normalized)
 
     digest = hashlib.sha1(f"{bank}|neglect_fixed_v1".encode("utf-8")).hexdigest()[:10]
     state_key = f"neglect_states_{bank}_{digest}"
@@ -11878,8 +11895,78 @@ else:
                             margin:3px 0 !important;
                             border-color:#DCE4ED !important;
                         }
-                        [class*="st-key-neglect_state_checklist_"] {
-                            max-height:170px !important;
+                        /* Approved wide popover: keep all options in three neat columns. */
+                        div[data-testid="stPopoverContent"]:has([class*="st-key-neglect_substate_popup_"]),
+                        div[data-testid="stPopoverBody"]:has([class*="st-key-neglect_substate_popup_"]) {
+                            width:min(1010px, calc(100vw - 32px)) !important;
+                            max-width:calc(100vw - 32px) !important;
+                            border-radius:15px !important;
+                            box-shadow:0 10px 30px rgba(12,39,75,.15) !important;
+                        }
+                        [class*="st-key-neglect_substate_popup_"] {
+                            direction:rtl !important;
+                            padding:7px 9px 3px !important;
+                        }
+                        [class*="st-key-neglect_substate_popup_"] [data-testid="stHorizontalBlock"] {
+                            gap:10px !important;
+                        }
+                        [class*="st-key-neglect_substate_popup_"] [data-testid="stTextInput"] input {
+                            text-align:right !important;
+                            border:1px solid #B7C9DD !important;
+                            border-radius:9px !important;
+                            height:40px !important;
+                        }
+                        [class*="st-key-neglect_substate_popup_"] [data-testid="stButton"] button {
+                            height:40px !important;
+                            border-radius:9px !important;
+                            font-weight:800 !important;
+                        }
+                        [class*="st-key-neglect_substate_grid_"] {
+                            direction:rtl !important;
+                            border-color:#D4DFEA !important;
+                            border-radius:11px !important;
+                            background:#FFFFFF !important;
+                        }
+                        [class*="st-key-neglect_substate_grid_"] > div [data-testid="stHorizontalBlock"] {
+                            direction:rtl !important;
+                            align-items:flex-start !important;
+                        }
+                        [class*="st-key-neglect_substate_grid_"] [data-testid="stCheckbox"] {
+                            padding:8px 10px !important;
+                            border:1px solid #D7E0EA !important;
+                            border-radius:10px !important;
+                            background:#FFFFFF !important;
+                            min-height:42px !important;
+                            box-sizing:border-box !important;
+                            margin:4px 0 !important;
+                        }
+                        [class*="st-key-neglect_substate_grid_"] [data-testid="stCheckbox"]:has(input:checked) {
+                            background:#EDF8EF !important;
+                            border-color:#9ED9AE !important;
+                        }
+                        [class*="st-key-neglect_substate_grid_"] [data-testid="stCheckbox"] label {
+                            display:flex !important;
+                            flex-direction:row-reverse !important;
+                            justify-content:space-between !important;
+                            gap:8px !important;
+                        }
+                        [class*="st-key-neglect_substate_grid_"] [data-testid="stCheckbox"] label p {
+                            text-align:right !important;
+                            color:#153A6B !important;
+                            font-weight:800 !important;
+                            font-size:12px !important;
+                            white-space:normal !important;
+                            line-height:1.3 !important;
+                        }
+                        [class*="st-key-neglect_substate_grid_"] [data-testid="stCheckbox"] input {
+                            accent-color:#24A446 !important;
+                        }
+                        @media(max-width:720px) {
+                            div[data-testid="stPopoverContent"]:has([class*="st-key-neglect_substate_popup_"]),
+                            div[data-testid="stPopoverBody"]:has([class*="st-key-neglect_substate_popup_"]) {
+                                width:calc(100vw - 20px) !important;
+                                max-width:calc(100vw - 20px) !important;
+                            }
                         }
                         [class*="st-key-promise_diagnostic_"][class*="_neglect"] {
                             width:100% !important;
@@ -11947,7 +12034,9 @@ else:
                             unsafe_allow_html=True
                         )
 
-                        # Excel-style dropdown, compact in the report; searchable inside.
+                        # Three-column, searchable Sub State checklist like the
+                        # approved design. All file values are listed, while only
+                        # the original 13 choices are selected by default.
                         number_col, label_col, content_col = st.columns(
                             [0.34, 1.25, 4.4], gap="small",
                             vertical_alignment="center"
@@ -11960,71 +12049,90 @@ else:
                             with st.popover(
                                 f"الحالات المحددة: {len(_filter['selected_states'])} من {len(states)}",
                                 use_container_width=True,
+                                key=f"neglect_substate_selector_{selected_bank}",
                             ):
-                                st.caption("القائمة الأساسية ثابتة؛ اختاري الحالات المطلوبة أو ابحثي عنها.")
-                                state_search = st.text_input(
-                                    "بحث الحالات",
-                                    placeholder="ابحثي باسم الحالة...",
-                                    key=f"neglect_state_search_{selected_bank}_fixed",
-                                )
-                                select_col, clear_col = st.columns(2, gap="small")
-                                with select_col:
-                                    st.button(
-                                        "تحديد الكل",
-                                        key=f"neglect_select_all_{selected_bank}_{digest}",
-                                        type="primary", use_container_width=True,
-                                        on_click=_set_neglect_state_checkboxes,
-                                        args=(checkbox_prefix, states, True),
+                                with st.container(key=f"neglect_substate_popup_{selected_bank}"):
+                                    st.caption("اختاري الحالات من القائمة أو استخدمي البحث.")
+                                    select_col, clear_col, search_col = st.columns(
+                                        [1, 1, 2.35], gap="small", vertical_alignment="center"
                                     )
-                                with clear_col:
-                                    st.button(
-                                        "إلغاء التحديد",
-                                        key=f"neglect_clear_all_{selected_bank}_{digest}",
-                                        use_container_width=True,
-                                        on_click=_set_neglect_state_checkboxes,
-                                        args=(checkbox_prefix, states, False),
-                                    )
-
-                                visible_states = [
-                                    state for state in states
-                                    if not state_search.strip()
-                                    or state_search.strip().casefold() in state.casefold()
-                                ]
-                                with st.container(height=250, border=True):
-                                    if not visible_states:
-                                        st.info("لا توجد حالات مطابقة للبحث.")
-                                    for state in visible_states:
-                                        st.checkbox(
-                                            state,
-                                            key=_neglect_state_checkbox_key(
-                                                checkbox_prefix, state
-                                            ),
+                                    with select_col:
+                                        st.button(
+                                            "✔ تحديد الكل",
+                                            key=f"neglect_select_all_{selected_bank}_{digest}",
+                                            type="primary", use_container_width=True,
+                                            on_click=_set_neglect_state_checkboxes,
+                                            args=(checkbox_prefix, states, True),
+                                        )
+                                    with clear_col:
+                                        st.button(
+                                            "✕ إلغاء التحديد",
+                                            key=f"neglect_clear_all_{selected_bank}_{digest}",
+                                            use_container_width=True,
+                                            on_click=_set_neglect_state_checkboxes,
+                                            args=(checkbox_prefix, states, False),
+                                        )
+                                    with search_col:
+                                        state_search = st.text_input(
+                                            "بحث الحالات",
+                                            placeholder="ابحثي باسم الحالة...",
+                                            key=f"neglect_state_search_{selected_bank}_fixed",
+                                            label_visibility="collapsed",
                                         )
 
-                                st.caption("إضافة حالة جديدة من اختيارك")
-                                add_input_col, add_button_col = st.columns(
-                                    [3, 1], gap="small", vertical_alignment="bottom"
-                                )
-                                with add_input_col:
-                                    st.text_input(
-                                        "اسم الحالة الجديدة",
-                                        placeholder="اكتبي اسم الحالة كما يظهر في الملف",
-                                        max_chars=120,
-                                        key=f"neglect_new_substate_{selected_bank}",
-                                        label_visibility="collapsed",
+                                    visible_states = [
+                                        state for state in states
+                                        if not state_search.strip()
+                                        or state_search.strip().casefold() in state.casefold()
+                                    ]
+                                    with st.container(
+                                        height=310, border=True,
+                                        key=f"neglect_substate_grid_{selected_bank}"
+                                    ):
+                                        if not visible_states:
+                                            st.info("لا توجد حالات مطابقة للبحث.")
+                                        else:
+                                            # Round-robin placement puts the first
+                                            # three choices in the first visual row.
+                                            state_columns = st.columns(3, gap="medium")
+                                            for column_index, state_column in enumerate(state_columns):
+                                                with state_column:
+                                                    for state in visible_states[column_index::3]:
+                                                        st.checkbox(
+                                                            state,
+                                                            key=_neglect_state_checkbox_key(
+                                                                checkbox_prefix, state
+                                                            ),
+                                                        )
+                                    st.caption(
+                                        "كل الحالات الموجودة في ملف Sub State ظاهرة هنا؛ "
+                                        "الحالات غير المحددة يمكن إضافتها للنتيجة بعلامة صح."
                                     )
-                                with add_button_col:
-                                    st.button(
-                                        "إضافة +",
-                                        key=f"neglect_add_substate_{selected_bank}",
-                                        use_container_width=True,
-                                        on_click=_add_neglect_custom_state,
-                                        args=(selected_bank, checkbox_prefix),
+                                    st.divider()
+                                    st.caption("إضافة حالة جديدة من اختيارك (إذا لم تكن في الملف)")
+                                    add_input_col, add_button_col = st.columns(
+                                        [3, 1], gap="small", vertical_alignment="bottom"
                                     )
-                                st.caption(
-                                    "الحالات المضافة يدويًا متاحة في جلسة الاستخدام الحالية "
-                                    "فقط، ومستقلة لكل بنك."
-                                )
+                                    with add_input_col:
+                                        st.text_input(
+                                            "اسم الحالة الجديدة",
+                                            placeholder="اكتبي اسم الحالة كما يظهر في الملف",
+                                            max_chars=120,
+                                            key=f"neglect_new_substate_{selected_bank}",
+                                            label_visibility="collapsed",
+                                        )
+                                    with add_button_col:
+                                        st.button(
+                                            "إضافة +",
+                                            key=f"neglect_add_substate_{selected_bank}",
+                                            use_container_width=True,
+                                            on_click=_add_neglect_custom_state,
+                                            args=(selected_bank, checkbox_prefix),
+                                        )
+                                    st.caption(
+                                        "الحالات المضافة يدويًا متاحة في جلسة الاستخدام الحالية "
+                                        "فقط، ومستقلة لكل بنك."
+                                    )
 
                 # Left-hand diagnostics and final KPI.
                 with diag_col:
