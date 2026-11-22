@@ -173,6 +173,52 @@ def _set_neglect_state_checkboxes(prefix, states, checked):
         st.session_state[_neglect_state_checkbox_key(prefix, state)] = bool(checked)
 
 
+_NEGLECT_FIXED_SUB_STATES = (
+    "وعد بسداد مبلغ المعالجة",
+    "رافض السداد*",
+    "مسجون*",
+    "مماطل*",
+    "الجوال مغلق",
+    "تم سداد جزء وليس مبلغ المعالجة",
+    "لا يجيب",
+    "وعد بسداد تسوية",
+    "وعد بسداد جزء من المتأخرات",
+    "وعد بسداد قسط",
+    "وعد بسداد كامل المتأخرات",
+    "وعد بسداد كامل المديونية",
+    "يرغب بجدولة المديونية",
+)
+
+
+def _normalize_neglect_substate(value):
+    """Match the Excel states, tolerating surrounding stars and extra spaces."""
+    if pd.isna(value):
+        return ""
+    return re.sub(r"\s+", " ", str(value)).strip().strip("*").strip().casefold()
+
+
+def _add_neglect_custom_state(bank, checkbox_prefix):
+    """Add only an explicitly requested custom state for the current bank."""
+    input_key = f"neglect_new_substate_{bank}"
+    new_state = re.sub(r"\s+", " ", str(st.session_state.get(input_key, "") or "")).strip()
+    if not new_state:
+        return
+    extras = st.session_state.setdefault(f"neglect_custom_substates_{bank}", [])
+    all_states = list(_NEGLECT_FIXED_SUB_STATES) + extras
+    normalized = _normalize_neglect_substate(new_state)
+    match = next(
+        (state for state in all_states
+         if _normalize_neglect_substate(state) == normalized),
+        None,
+    )
+    if match is None:
+        extras.append(new_state)
+        match = new_state
+    st.session_state[_neglect_state_checkbox_key(checkbox_prefix, match)] = True
+    st.session_state[input_key] = ""
+    st.session_state[f"neglect_state_search_{bank}_fixed"] = ""
+
+
 def calculate_neglect_filters(raw_df, bank):
     """Apply neglect filters in the exact requested order and return live diagnostics."""
     if raw_df is None:
@@ -183,27 +229,21 @@ def calculate_neglect_filters(raw_df, bank):
         source, "Sub State", "sub state", "substate",
         "الحالة الفرعية", "حالة العميل"
     )
-    states = sorted({
-        str(value).strip()
-        for value in source[sub_col].dropna()
-        if str(value).strip()
-    }) if sub_col else []
 
-    digest = hashlib.sha1(
-        (bank + "|neglect_mockup_v3|" + str(len(source)) + "|" + "|".join(states)).encode("utf-8")
-    ).hexdigest()[:10]
+    # Fixed, approved choices only. Uploaded Excel values do not modify this list.
+    extras = st.session_state.setdefault(f"neglect_custom_substates_{bank}", [])
+    known = {_normalize_neglect_substate(value) for value in _NEGLECT_FIXED_SUB_STATES}
+    states = list(_NEGLECT_FIXED_SUB_STATES)
+    for value in extras:
+        if _normalize_neglect_substate(value) not in known:
+            states.append(value)
+            known.add(_normalize_neglect_substate(value))
+
+    digest = hashlib.sha1(f"{bank}|neglect_fixed_v1".encode("utf-8")).hexdigest()[:10]
     state_key = f"neglect_states_{bank}_{digest}"
     checkbox_prefix = f"neglect_state_choice_{bank}_{digest}"
     if state_key not in st.session_state:
-        preferred_defaults = {
-            "رافض السداد", "مسجون", "مستحيل",
-            "الجوال مغلق", "تم سداد كامل المبلغ"
-        }
-        matched_defaults = [
-            state for state in states
-            if re.sub(r"\s+", " ", state).strip() in preferred_defaults
-        ]
-        st.session_state[state_key] = matched_defaults or list(states)
+        st.session_state[state_key] = list(_NEGLECT_FIXED_SUB_STATES)
     initial_selected = set(st.session_state.get(state_key, []))
     for state in states:
         checkbox_key = _neglect_state_checkbox_key(checkbox_prefix, state)
@@ -250,16 +290,22 @@ def calculate_neglect_filters(raw_df, bank):
     else:
         after_writeoff = after_status.copy()
 
-    # Step 3: apply selected Sub State values.
+    # Step 3: filter using the fixed list and user-added states only.
     selected_states = [
         state for state in states
         if st.session_state.get(
             _neglect_state_checkbox_key(checkbox_prefix, state), False
         )
     ]
+    st.session_state[state_key] = list(selected_states)
+    selected_normalized = {
+        _normalize_neglect_substate(state) for state in selected_states
+    }
     after_substate = (
         after_writeoff.loc[
-            after_writeoff[sub_col].fillna("").astype(str).str.strip().isin(selected_states)
+            after_writeoff[sub_col].map(_normalize_neglect_substate).isin(
+                selected_normalized
+            )
         ].copy()
         if sub_col else after_writeoff.copy()
     )
@@ -10772,19 +10818,6 @@ def process_page_data(
     df_promises = pd.concat(promises_dfs, ignore_index=True) if promises_dfs else pd.DataFrame()
     # Retain the raw portfolio for the interactive, sequential neglect diagnostics.
     st.session_state.setdefault("neglect_source_df", {})[bank] = df_promises
-    # Keep ALL Sub State values from the uploaded bank portfolio available for
-    # Neglect selection, even if no row with that value survives the date filters.
-    raw_sub_col = find_col_in(
-        df_promises, ["Sub State", "sub state", "substate",
-                      "الحالة الفرعية", "حالة العميل"]
-    )
-    raw_sub_options = (
-        sorted({str(value).strip()
-                for value in df_promises[raw_sub_col].dropna()
-                if str(value).strip()})
-        if raw_sub_col is not None else []
-    )
-    st.session_state.setdefault("neglect_substate_options", {})[bank] = raw_sub_options
     if activity_dfs:
         df_act_raw = pd.concat(activity_dfs, ignore_index=True)
     else:
@@ -11914,7 +11947,7 @@ else:
                             unsafe_allow_html=True
                         )
 
-                        # The only visible control in this panel is Sub State selection.
+                        # Excel-style dropdown, compact in the report; searchable inside.
                         number_col, label_col, content_col = st.columns(
                             [0.34, 1.25, 4.4], gap="small",
                             vertical_alignment="center"
@@ -11924,73 +11957,74 @@ else:
                         with label_col:
                             st.markdown("<div class='neglect-step-label'>اختيار حالات (Sub State):</div>", unsafe_allow_html=True)
                         with content_col:
-                            search_col, select_col, clear_col = st.columns(
-                                [2.4, 0.9, 0.9], gap="small",
-                                vertical_alignment="center"
-                            )
-                            with search_col:
+                            with st.popover(
+                                f"الحالات المحددة: {len(_filter['selected_states'])} من {len(states)}",
+                                use_container_width=True,
+                            ):
+                                st.caption("القائمة الأساسية ثابتة؛ اختاري الحالات المطلوبة أو ابحثي عنها.")
                                 state_search = st.text_input(
                                     "بحث الحالات",
                                     placeholder="ابحثي باسم الحالة...",
-                                    key=f"neglect_state_search_{selected_bank}_{digest}",
-                                    label_visibility="collapsed"
+                                    key=f"neglect_state_search_{selected_bank}_fixed",
                                 )
-                            with select_col:
-                                st.button(
-                                    "تحديد الكل", key=f"neglect_select_all_{selected_bank}_{digest}",
-                                    type="primary", use_container_width=True,
-                                    on_click=_set_neglect_state_checkboxes,
-                                    args=(checkbox_prefix, states, True)
-                                )
-                            with clear_col:
-                                st.button(
-                                    "إلغاء التحديد", key=f"neglect_clear_all_{selected_bank}_{digest}",
-                                    use_container_width=True,
-                                    on_click=_set_neglect_state_checkboxes,
-                                    args=(checkbox_prefix, states, False)
-                                )
+                                select_col, clear_col = st.columns(2, gap="small")
+                                with select_col:
+                                    st.button(
+                                        "تحديد الكل",
+                                        key=f"neglect_select_all_{selected_bank}_{digest}",
+                                        type="primary", use_container_width=True,
+                                        on_click=_set_neglect_state_checkboxes,
+                                        args=(checkbox_prefix, states, True),
+                                    )
+                                with clear_col:
+                                    st.button(
+                                        "إلغاء التحديد",
+                                        key=f"neglect_clear_all_{selected_bank}_{digest}",
+                                        use_container_width=True,
+                                        on_click=_set_neglect_state_checkboxes,
+                                        args=(checkbox_prefix, states, False),
+                                    )
 
-                        preferred_state_order = [
-                            "رافض السداد", "مسجون", "طلبات", "XPTP",
-                            "مستحيل", "العميل متوفي", "جاري البحث", "تم سداد كامل المبلغ",
-                            "left message", "الجوال مغلق", "الرقم غير صحيح", "لا يجيب"
-                        ]
-                        _normalized_state_lookup = {
-                            re.sub(r"\s+", " ", state).strip().casefold(): state
-                            for state in states
-                        }
-                        ordered_states = []
-                        for preferred_state in preferred_state_order:
-                            _matched = _normalized_state_lookup.get(
-                                re.sub(r"\s+", " ", preferred_state).strip().casefold()
-                            )
-                            if _matched is not None and _matched not in ordered_states:
-                                ordered_states.append(_matched)
-                        ordered_states.extend(
-                            state for state in states if state not in ordered_states
-                        )
-                        visible_states = [
-                            state for state in ordered_states
-                            if not str(state_search).strip()
-                            or str(state_search).strip().casefold() in state.casefold()
-                        ]
-                        with st.container(
-                            height=245, border=False,
-                            key=f"neglect_state_checklist_{selected_bank}_{digest}"
-                        ):
-                            state_columns = st.columns(3, gap="small")
-                            group_size = max(1, (len(visible_states) + 2) // 3)
-                            for column_index, state_column in enumerate(state_columns):
-                                start_index = column_index * group_size
-                                end_index = start_index + group_size
-                                with state_column:
-                                    for state in visible_states[start_index:end_index]:
+                                visible_states = [
+                                    state for state in states
+                                    if not state_search.strip()
+                                    or state_search.strip().casefold() in state.casefold()
+                                ]
+                                with st.container(height=250, border=True):
+                                    if not visible_states:
+                                        st.info("لا توجد حالات مطابقة للبحث.")
+                                    for state in visible_states:
                                         st.checkbox(
                                             state,
                                             key=_neglect_state_checkbox_key(
                                                 checkbox_prefix, state
-                                            )
+                                            ),
                                         )
+
+                                st.caption("إضافة حالة جديدة من اختيارك")
+                                add_input_col, add_button_col = st.columns(
+                                    [3, 1], gap="small", vertical_alignment="bottom"
+                                )
+                                with add_input_col:
+                                    st.text_input(
+                                        "اسم الحالة الجديدة",
+                                        placeholder="اكتبي اسم الحالة كما يظهر في الملف",
+                                        max_chars=120,
+                                        key=f"neglect_new_substate_{selected_bank}",
+                                        label_visibility="collapsed",
+                                    )
+                                with add_button_col:
+                                    st.button(
+                                        "إضافة +",
+                                        key=f"neglect_add_substate_{selected_bank}",
+                                        use_container_width=True,
+                                        on_click=_add_neglect_custom_state,
+                                        args=(selected_bank, checkbox_prefix),
+                                    )
+                                st.caption(
+                                    "الحالات المضافة يدويًا متاحة في جلسة الاستخدام الحالية "
+                                    "فقط، ومستقلة لكل بنك."
+                                )
 
                 # Left-hand diagnostics and final KPI.
                 with diag_col:
