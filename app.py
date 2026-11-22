@@ -9499,13 +9499,18 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
         version = st.session_state.activity_upload_versions["STC"]["activity"]
         key = f"stc_{digest}_{version}"
         kind = _activity_period(stamps)[0] if activity_kind == "تلقائي" else activity_kind
-        dates = stamps.dt.normalize() if kind == "أسبوعي" else None
-        duplicates = _stc_duplicate_mask(source, collector, identity, notes, dates)
+        # Duplicate business key: prefer the debtor's NAME, not the ID.
+        # This only affects duplicate detection; all other STC metrics retain
+        # their existing identity field. Always compare within the same day.
+        dedup_identity = _snb_find_column(source, "Debitor Name") or identity
+        dates = stamps.dt.normalize()
+        duplicates = _stc_duplicate_mask(
+            source, collector, dedup_identity, notes, dates
+        )
         count = int(duplicates.sum())
         if count:
-            scope = " داخل نفس اليوم" if dates is not None else ""
             choice = duplicate_slot.radio(
-                f"فيه {count:,} صف متكرر{scope} حسب {collector} و{identity} و{notes}.",
+                f"فيه {count:,} صف متكرر داخل نفس اليوم حسب {collector} و{dedup_identity} و{notes}.",
                 ["تأكيد حذف التكرارات والاحتفاظ بأول صف", "الاحتفاظ بكل الصفوف"],
                 index=None, horizontal=True, key=f"stc_duplicate_choice_{kind}_{key}",
                 help="الاختيار بيطبّق على التقرير فقط. ملفك الأصلي بيفضل زي ما هو."
