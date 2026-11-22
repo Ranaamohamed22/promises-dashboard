@@ -31,14 +31,14 @@ def _find_bucket_columns(sheet):
     )
     if first is None:
         raise ValueError("لازم الملف يحتوي على أول عمود DPD_BUCKET.")
-    # Only numbered BUCKET periods with a space belong to the historical
-    # tracking sequence (BUCKET 07 ... BUCKET 21).
-    # Bucket_1 ... Bucket_6 are a DIFFERENT set of fields and must never
-    # participate in the treatment status comparison.
+    # Numbered history columns may be written as BUCKET 07 or BUCKET_18.
+    # Columns Bucket_1 ... Bucket_6 belong to a different set of fields,
+    # so only period numbers >= 7 participate in chronological comparisons.
     historical = [
         (index + 1, int(re.search(r"\d+$", title).group()))
         for index, title in enumerate(headers)
-        if re.fullmatch(r"BUCKET\s+\d+", title, re.I)
+        if re.fullmatch(r"BUCKET[ _]+\d+", title, re.I)
+        and int(re.search(r"\d+$", title).group()) >= 7
     ]
     if not historical:
         raise ValueError("لازم الملف يحتوي على أعمدة BUCKET التاريخية.")
@@ -62,25 +62,27 @@ def _is_writeoff(value):
     )
 
 
-def _is_treated(sheet, row, history_columns, first_number, latest_number):
-    """First-to-last improvement OR any intermediate chronological decrease.
+def _treatment_category(sheet, row, history_columns, first_number, latest_number):
+    """Return a mutually exclusive treatment category for the KPI cards.
 
-    Ignore invalid intermediate codes. An invalid first or latest BUCKET
-    (including Writeoff) yields #VALUE! in the difference and 'غير معالج'.
+    'direct' = BN - B1 is negative.
+    'middle' = a chronological bucket decreased, but the first/last
+    difference did not already classify the account as treated.
+    Invalid first/latest values, including Writeoff, remain untreated.
     """
     if first_number is None or latest_number is None:
-        return False
+        return "untreated"
     if latest_number - first_number < 0:
-        return True
+        return "direct"
     highest_prior = None
     for col in history_columns:
         number = _bucket_number(sheet.cell(row, col).value)
         if number is None:
             continue
         if highest_prior is not None and number < highest_prior:
-            return True
+            return "middle"
         highest_prior = number if highest_prior is None else max(highest_prior, number)
-    return False
+    return "untreated"
 
 
 def build_comprehensive_report(source_bytes):
@@ -113,7 +115,7 @@ def build_comprehensive_report(source_bytes):
     last_ref = get_column_letter(last_bucket)
     first_ref = get_column_letter(first_bucket)
     header_style = sheet.cell(1, last_bucket)
-    status_counts = {"معالج": 0, "غير معالج": 0}
+    status_counts = {"معالج": 0, "غير معالج": 0, "direct": 0, "middle": 0}
 
     for offset, (title, _) in enumerate(COMPREHENSIVE_STEPS):
         cell = sheet.cell(1, start + offset, title)
@@ -132,12 +134,11 @@ def build_comprehensive_report(source_bytes):
 
         b1 = _bucket_number(sheet.cell(row, first_bucket).value)
         bn = None if _is_writeoff(latest_cell.value) else _bucket_number(latest_cell.value)
-        status = (
-            "معالج"
-            if _is_treated(sheet, row, bucket_history, b1, bn)
-            else "غير معالج"
-        )
+        category = _treatment_category(sheet, row, bucket_history, b1, bn)
+        status = "غير معالج" if category == "untreated" else "معالج"
         status_counts[status] += 1
+        if category in ("direct", "middle"):
+            status_counts[category] += 1
         # B1 is intentionally NOT a visible column: refer to the original
         # first bucket directly in the BN-B1 formula.
         formulas = (
@@ -209,7 +210,30 @@ def render_snb_comprehensive_page():
     except Exception as error:
         st.error(f"تعذر معالجة التقرير الشامل: {error}")
         return
-    st.success(f"تم تجهيز التقرير لـ {count:,} صف. معالج: {statuses['معالج']:,} | غير معالج: {statuses['غير معالج']:,}")
+    st.success(f"تم تجهيز التقرير لـ {count:,} صف.")
+    kpis = (
+        ("معالج من أول وآخر BUCKET", statuses["direct"]),
+        ("معالج في النص فقط", statuses["middle"]),
+        ("إجمالي المعالج", statuses["معالج"]),
+        ("غير معالج", statuses["غير معالج"]),
+    )
+    cards = "".join(
+        '<div style="background:#FFFFFF;border:1px solid #BFCEDF;'
+        'border-radius:13px;padding:17px 12px;text-align:center;'
+        'box-shadow:0 2px 9px #10254118;min-height:100px;">'
+        f'<div style="color:#1F4373;font-weight:800;font-size:15px;'
+        f'margin-bottom:9px;">{label}</div>'
+        f'<div style="color:#10375D;font-size:32px;font-weight:900;'
+        f'font-variant-numeric:tabular-nums;">{value:,}</div>'
+        '</div>'
+        for label, value in kpis
+    )
+    st.markdown(
+        '<div dir="rtl" style="display:grid;grid-template-columns:'
+        'repeat(auto-fit,minmax(175px,1fr));gap:12px;margin:14px 0 20px;">'
+        + cards + '</div>',
+        unsafe_allow_html=True,
+    )
     st.caption(f"أول BUCKET: {bucket_names[0]} | آخر BUCKET: {bucket_names[1]}")
     st.download_button(
         "📥 تحميل التقرير الشامل بعد المعالجة",
