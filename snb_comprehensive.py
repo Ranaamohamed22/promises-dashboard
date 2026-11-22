@@ -149,7 +149,14 @@ def build_comprehensive_report(source_bytes):
         )
         for offset in range(5):
             target = sheet.cell(row, start + offset)
-            target.value = formulas[offset]
+            # Do not leave blanks or misleading cached numbers when BN is Wr:
+            # Excel must show #VALUE! for invalid arithmetic.
+            if (offset in (1, 2, 3) and bn is None) or (
+                offset == 4 and (bn is None or b1 is None)
+            ):
+                target.value = "#VALUE!"
+            else:
+                target.value = formulas[offset]
             if latest_cell.has_style:
                 target._style = copy(latest_cell._style)
             target.number_format = "General" if offset == 0 else "0;-0;0"
