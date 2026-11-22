@@ -32,15 +32,19 @@ def _find_bucket_columns(sheet):
     )
     if first is None:
         raise ValueError("لازم الملف يحتوي على أول عمود DPD_BUCKET.")
-    # Keep the real left-to-right order, including Bucket_6 ... Bucket_1
-    # and the numbered BUCKET 07 ... BUCKET 21 columns.
+    # Names carry the chronological period: Bucket_1 ... Bucket_6,
+    # followed by BUCKET 07 ... BUCKET 21. The 1-6 columns appear
+    # physically after BUCKET 09 in some source files, so position
+    # is not a reliable definition of "newer".
     historical = [
-        index + 1 for index, title in enumerate(headers)
+        (index + 1, int(re.search(r"\d+$", title).group()))
+        for index, title in enumerate(headers)
         if re.fullmatch(r"BUCKET[ _]*\d+", title, re.I)
     ]
     if not historical:
         raise ValueError("لازم الملف يحتوي على أعمدة BUCKET التاريخية.")
-    return first, historical[-1], [first] + historical
+    ordered = [col for col, _ in sorted(historical, key=lambda item: (item[1], item[0]))]
+    return first, historical[-1][0], [first] + ordered
 
 
 def _processing_status_formula(row, history_columns, latest_col, first_col):
