@@ -57,23 +57,23 @@ def _processing_status_formula(row, history_columns, latest_col, first_col):
     defs = []
     declines = []
     for index, col in enumerate(history_columns):
-        label = f"bucket_{index:02d}"
+        label = f"_xlpm.bucket_{index:02d}"
         ref = f"{get_column_letter(col)}{row}"
         defs.extend((label, f'IFERROR(VALUE(LEFT({ref},2)),-1)'))
         if index == 0:
-            defs.extend(("highest_00", label))
+            defs.extend(("_xlpm.highest_00", label))
             continue
-        prior = f"highest_{index - 1:02d}"
-        decline = f"decline_{index:02d}"
+        prior = f"_xlpm.highest_{index - 1:02d}"
+        decline = f"_xlpm.decline_{index:02d}"
         defs.extend((decline, f"AND({label}>=0,{label}<{prior})"))
-        defs.extend((f"highest_{index:02d}", f"MAX({prior},{label})"))
+        defs.extend((f"_xlpm.highest_{index:02d}", f"MAX({prior},{label})"))
         declines.append(decline)
     latest = f"{latest_col}{row}"
     first = f"{first_col}{row}"
     # The user specifically asked to evaluate BN - B1 (not B1 - BN).
     first_to_latest = f"IFERROR(VALUE({latest})-VALUE({first})<0,FALSE)"
     test = ",".join([first_to_latest] + declines)
-    return "=LET(" + ",".join(defs) + f',IF(OR({test}),"معالج","غير معالج"))'
+    return "=_xlfn.LET(" + ",".join(defs) + f',IF(OR({test}),"معالج","غير معالج"))'
 
 def build_comprehensive_report(source_bytes):
     """Apply the ordered steps afresh to the uploaded workbook; no stored data."""
