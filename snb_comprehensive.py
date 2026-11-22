@@ -113,11 +113,11 @@ def render_snb_comprehensive_page():
     )
     st.markdown("**الخطوات الحالية:**")
     st.markdown(
-        "1. BN: أول خانتين من آخر BUCKET  \\n"
-        "2. B-1: قيمة BN ناقص 1  \\n"
-        "3. B-2: قيمة B-1 ناقص 1  \\n"
-        "4. B-3: قيمة B-2 ناقص 1  \\n"
-        "5. B1: أول خانتين من أول DPD_BUCKET  \\n"
+        "1. BN: أول خانتين من آخر BUCKET  \n"
+        "2. B-1: قيمة BN ناقص 1  \n"
+        "3. B-2: قيمة B-1 ناقص 1  \n"
+        "4. B-3: قيمة B-2 ناقص 1  \n"
+        "5. B1: أول خانتين من أول DPD_BUCKET  \n"
         "6. B1 - BN: طرح BN من B1"
     )
     if uploaded is None:
