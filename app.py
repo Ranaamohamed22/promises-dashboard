@@ -9621,6 +9621,25 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
             "STC_WhatsApp_Notes.xlsx",
         )
     weekly_duty = _weekly_duty_table(daily, collector) if kind == "أسبوعي" else None
+    if weekly_duty is not None:
+        # Weekly STC: show a separate duty duration for every calendar day,
+        # not the combined weekly duration in the collector summary.
+        summary = summary.drop(columns=["مدة الدوام"], errors="ignore").merge(
+            weekly_duty, on=collector, how="left", validate="one_to_one"
+        )
+        # Count the distinct days actually included in the selected week.
+        # The same weekly denominator applies to every collector.
+        days_in_report = max(1, int(result["التاريخ"].nunique()))
+        covered = pd.to_numeric(summary["المكالمات المغطاة"], errors="coerce").fillna(0)
+        successful = pd.to_numeric(summary["ناجحة"], errors="coerce").fillna(0)
+        summary["نسبة تحقيق المستهدف"] = covered / (120 * days_in_report)
+        summary["نسبة تحقيق المكالمات الناجحة"] = (
+            successful.div(covered.where(covered.ne(0))).fillna(0)
+        )
+        st.caption(
+            f"مستهدف النشاط الأسبوعي لكل محصل: 120 × {days_in_report} "
+            f"يوم نشاط = {120 * days_in_report:,} مكالمة."
+        )
     if duty_stamps is not None:
         with st.expander("مدة الدوام لكل محصل"):
             if weekly_duty is not None:
@@ -9652,17 +9671,51 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
         with st.expander(note_title):
             st.dataframe(sheets["أول وآخر إفادة"], hide_index=True)
         _stc_download(sheets, "تحميل تقرير النشاط اليومي", "STC_Daily.xlsx")
+    elif kind == "أسبوعي":
+        # Export a single STC weekly workbook like SNB's Activity export.
+        # The Activity sheet contains the individual calls without duty totals;
+        # the collector summary has daily duty columns and attainment rates.
+        weekly_activity = display_result.drop(columns=["مدة الدوام"], errors="ignore")
+        weekly_sheets = {
+            "Activity": weekly_activity,
+            "ملخص المحصلين": summary,
+            "تفاصيل كل يوم": daily,
+            "مدة الدوام لكل يوم": weekly_duty,
+        }
+        if not whatsapp_notes.empty:
+            weekly_sheets["إفادات واتس"] = whatsapp_notes
+        _stc_download(
+            weekly_sheets, "تحميل تقرير النشاط الأسبوعي الكامل",
+            "STC_Weekly.xlsx",
+        )
+        # Keep the previous individual exports available for existing workflows.
+        with st.expander("تحميل ملفات الأسبوع منفصلة (اختياري)"):
+            _stc_download(
+                {"ملخص المحصلين": summary},
+                "تحميل ملخص النشاط · أسبوعي",
+                "STC_Weekly_Summary.xlsx",
+            )
+            _stc_download(
+                {"تفاصيل كل يوم": daily, "مدة الدوام لكل يوم": weekly_duty},
+                "تحميل تفاصيل النشاط · أسبوعي",
+                "STC_Weekly_Details.xlsx",
+            )
     else:
-        name = "Weekly" if kind == "أسبوعي" else "Monthly"
-        _stc_download({"ملخص المحصلين": summary}, f"تحميل ملخص النشاط · {kind}", f"STC_{name}_Summary.xlsx")
+        _stc_download(
+            {"ملخص المحصلين": summary},
+            "تحميل ملخص النشاط · شهري",
+            "STC_Monthly_Summary.xlsx",
+        )
         details = {"تفاصيل كل يوم": daily}
-        if weekly_duty is not None:
-            details["مدة الدوام لكل يوم"] = weekly_duty
-        if kind == "شهري":
-            part = result.loc[weekly_mask.reindex(result.index)].copy()
-            part["بداية الأسبوع"] = starts.loc[part.index].dt.date
-            details["تفاصيل كل أسبوع"] = _stc_summary(part, ["بداية الأسبوع", collector], stamps)
-        _stc_download(details, f"تحميل تفاصيل النشاط · {kind}", f"STC_{name}_Details.xlsx")
+        part = result.loc[weekly_mask.reindex(result.index)].copy()
+        part["بداية الأسبوع"] = starts.loc[part.index].dt.date
+        details["تفاصيل كل أسبوع"] = _stc_summary(
+            part, ["بداية الأسبوع", collector], stamps
+        )
+        _stc_download(
+            details, "تحميل تفاصيل النشاط · شهري",
+            "STC_Monthly_Details.xlsx",
+        )
 
 
 def render_snb_activity_report(model_upload, activity_upload, activity_kind, error_slot, shift_selector, shift_notice):
