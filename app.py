@@ -7397,6 +7397,87 @@ def _render_bank_activity_model_manager(bank):
     st.rerun()
 
 
+def _stc_render_manual_note_entry():
+    """Manually add a rated STC note from Activity without an uploaded report."""
+    notice = st.session_state.pop("stc_manual_note_saved_notice", None)
+    if notice:
+        st.success(notice)
+    with st.expander("➕ إضافة إفادة يدويًا لموديل STC", expanded=False):
+        st.caption(
+            "اكتبي الإفادة زي ما بتظهر في Notes، وحددي ناجحة أو غير ناجحة. "
+            "التقييم يتحفظ في موديل STC المشفّر ويُستخدم تلقائيًا للمكالمات "
+            "اللي إفادتها مطابقة. مش بيغيّر بيانات ملف النشاط الأصلي."
+        )
+        with st.form("stc_activity_manual_note_form", clear_on_submit=False):
+            note = st.text_area(
+                "الإفادة (Notes)", placeholder="اكتبي نص الإفادة هنا",
+                key="stc_activity_manual_note_text",
+            )
+            rating = st.radio(
+                "تقييم الإفادة", ["ناجحة", "غير ناجحة"],
+                horizontal=True, key="stc_activity_manual_note_rating",
+            )
+            admin_password = st.text_input(
+                "كلمة مرور إدارة الموديل", type="password",
+                key="stc_activity_manual_note_password",
+            )
+            overwrite = st.checkbox(
+                "أوافق على استبدال التقييم القديم إذا كان مختلفًا",
+                value=False, key="stc_activity_manual_note_overwrite",
+            )
+            submitted = st.form_submit_button(
+                "💾 حفظ الإفادة في موديل STC", type="primary",
+            )
+        if not submitted:
+            return
+
+        note = note.strip()
+        normalized = _snb_normalize_note(note)
+        if not normalized:
+            st.error("اكتبي الإفادة الأول.")
+            return
+        settings = _snb_model_git_settings()
+        if not settings["token"] or not _snb_secret("MODEL_ENCRYPTION_KEY"):
+            st.error("الحفظ يحتاج إعداد GITHUB_TOKEN وMODEL_ENCRYPTION_KEY في Streamlit Secrets.")
+            return
+        if not settings["admin_password"] or not hmac.compare_digest(
+            admin_password.encode("utf-8"),
+            settings["admin_password"].encode("utf-8"),
+        ):
+            st.error("كلمة مرور إدارة الموديل غير صحيحة.")
+            return
+        value = 1 if rating == "ناجحة" else 0
+        try:
+            saved, _, _ = _stc_load_saved_activity_model()
+            current = saved.get(normalized)
+            if current == -1:
+                st.warning(
+                    "الإفادة دي محفوظة للمراجعة اليدوية كل مرة؛ "
+                    "مش ممكن تغيير تصنيفها من النموذج ده."
+                )
+                return
+            if current == value:
+                st.info("الإفادة موجودة بالفعل في موديل STC بنفس التقييم.")
+                return
+            if current is not None and current != value and not overwrite:
+                st.warning(
+                    "الإفادة موجودة بتقييم مختلف. راجعي الاختيار وفعّلي "
+                    "موافقة استبدال التقييم القديم لو متأكدة."
+                )
+                return
+            _stc_save_activity_model(
+                [(note, value)], allow_overwrite=bool(overwrite),
+            )
+        except (RuntimeError, ValueError, OSError) as exc:
+            st.error(f"تعذّر حفظ الإفادة في موديل STC: {exc}")
+            return
+        st.session_state["stc_manual_note_saved_notice"] = (
+            "تم حفظ الإفادة في موديل STC كتقييم "
+            + rating + "، وهتتطبق تلقائيًا على الإفادات المطابقة."
+        )
+        st.rerun()
+
+
 def _stc_render_saved_model(saved_ratings):
     with st.expander("صيغة ملف موديل STC"):
         st.caption("اكتبي نص الإفادة في Notes والتقييم في التقييم: 1 للمكالمة الناجحة و0 لغير الناجحة.")
@@ -11227,6 +11308,9 @@ if page_uploaded is None:
 
         # STC has its OWN model, review and encrypted file — never SNB.
         if selected_bank == "STC":
+            # Keep manual note entry available even before an activity upload or
+            # duplicate-selection decision, just like SNB's note management.
+            _stc_render_manual_note_entry()
             _stc_uploaded = st.session_state.activity_page_uploads["STC"]
             render_stc_activity_report(
                 _stc_uploaded.get("activity"),
