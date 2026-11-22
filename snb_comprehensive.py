@@ -17,6 +17,7 @@ COMPREHENSIVE_STEPS = (
     ("B-3", "previous_3"),
     ("B1", "first_bucket"),
     ("B1 - BN", "bucket_difference"),
+    ("حالة المعالجة", "processing_status"),
 )
 
 
@@ -30,34 +31,63 @@ def _find_bucket_columns(sheet):
         None,
     )
     if first is None:
-        first = next(
-            (i + 1 for i, title in enumerate(headers)
-             if "BUCKET" in title.upper() and not re.fullmatch(r"BUCKET\s*\d+", title, re.I)),
-            None,
-        )
+        raise ValueError("لازم الملف يحتوي على أول عمود DPD_BUCKET.")
+    # Keep the real left-to-right order, including Bucket_6 ... Bucket_1
+    # and the numbered BUCKET 07 ... BUCKET 21 columns.
     historical = [
-        i + 1 for i, title in enumerate(headers)
-        if re.fullmatch(r"BUCKET\s*\d+", title, re.I)
+        index + 1 for index, title in enumerate(headers)
+        if re.fullmatch(r"BUCKET[ _]*\d+", title, re.I)
     ]
-    if first is None or not historical:
-        raise ValueError("لازم الملف يحتوي على أول عمود DPD_BUCKET وعمود تاريخي BUCKET برقم.")
-    return first, historical[-1]
+    if not historical:
+        raise ValueError("لازم الملف يحتوي على أعمدة BUCKET التاريخية.")
+    return first, historical[-1], [first] + historical
 
+
+def _processing_status_formula(row, history_columns, latest_col, first_col):
+    """Compare every later valid bucket with the highest earlier valid bucket.
+
+    LET prevents lengthy repeated formulas. Missing, #N/A, #VALUE! and other
+    non-numeric bucket values are skipped; a valid decrease anywhere wins.
+    The output always remains one of the two approved Arabic status labels.
+    """
+    defs = []
+    declines = []
+    for index, col in enumerate(history_columns):
+        label = f"bucket_{index:02d}"
+        ref = f"{get_column_letter(col)}{row}"
+        defs.extend((label, f'IFERROR(VALUE(LEFT({ref},2)),-1)'))
+        if index == 0:
+            defs.extend(("highest_00", label))
+            continue
+        prior = f"highest_{index - 1:02d}"
+        decline = f"decline_{index:02d}"
+        defs.extend((decline, f"AND({label}>=0,{label}<{prior})"))
+        defs.extend((f"highest_{index:02d}", f"MAX({prior},{label})"))
+        declines.append(decline)
+    latest = f"{latest_col}{row}"
+    first = f"{first_col}{row}"
+    # The user specifically asked to evaluate BN - B1 (not B1 - BN).
+    first_to_latest = f"IFERROR(VALUE({latest})-VALUE({first})<0,FALSE)"
+    test = ",".join([first_to_latest] + declines)
+    return "=LET(" + ",".join(defs) + f',IF(OR({test}),"معالج","غير معالج"))'
 
 def build_comprehensive_report(source_bytes):
     """Apply the ordered steps afresh to the uploaded workbook; no stored data."""
     workbook = load_workbook(BytesIO(source_bytes))
     sheet = workbook.active
-    first_bucket, last_bucket = _find_bucket_columns(sheet)
+    first_bucket, last_bucket, bucket_history = _find_bucket_columns(sheet)
     titles = [step[0] for step in COMPREHENSIVE_STEPS]
-    # If the user uploads a previously processed export, update its six columns
-    # instead of appending a new copy on each run.
+    # Reuse the existing computed columns on reruns, including older exports
+    # that have the first six columns but not the new status column yet.
     headers = [
         str(sheet.cell(1, idx).value or "").strip()
         for idx in range(1, sheet.max_column + 1)
     ]
+    previous_titles = titles[:-1]
     if headers[-len(titles):] == titles:
         start = sheet.max_column - len(titles) + 1
+    elif headers[-len(previous_titles):] == previous_titles:
+        start = sheet.max_column - len(previous_titles) + 1
     else:
         start = sheet.max_column + 1
     last_bucket_ref = get_column_letter(last_bucket)
@@ -82,13 +112,14 @@ def build_comprehensive_report(source_bytes):
             f'=IF({letters[2]}{row}="","",{letters[2]}{row}-1)',
             f'=IFERROR(LEFT({first_bucket_ref}{row},2),"")',
             f'=IF(OR({letters[4]}{row}="",{letters[0]}{row}=""),"",VALUE({letters[4]}{row})-VALUE({letters[0]}{row}))',
+            _processing_status_formula(row, bucket_history, letters[0], letters[4]),
         )
         for offset, formula in enumerate(formulas):
             target = sheet.cell(row, start + offset)
             target.value = formula
             if sheet.cell(row, last_bucket).has_style:
                 target._style = copy(sheet.cell(row, last_bucket)._style)
-            target.number_format = "General" if offset in (0, 4) else "0;-0;0"
+            target.number_format = "General" if offset in (0, 4, 6) else "0;-0;0"
             target.alignment = Alignment(horizontal="center", vertical="center")
     # Excel evaluates formulas when the downloaded file is opened.
     try:
@@ -97,7 +128,7 @@ def build_comprehensive_report(source_bytes):
         workbook.calculation.calcMode = "auto"
     except AttributeError:
         pass
-    sheet.auto_filter.ref = f"A1:{get_column_letter(max(sheet.max_column, start + 5))}{sheet.max_row}"
+    sheet.auto_filter.ref = f"A1:{get_column_letter(max(sheet.max_column, start + len(titles) - 1))}{sheet.max_row}"
     output = BytesIO()
     workbook.save(output)
     return output.getvalue(), sheet.max_row - 1, (
@@ -118,7 +149,8 @@ def render_snb_comprehensive_page():
         "3. B-2: قيمة B-1 ناقص 1  \n"
         "4. B-3: قيمة B-2 ناقص 1  \n"
         "5. B1: أول خانتين من أول DPD_BUCKET  \n"
-        "6. B1 - BN: طرح BN من B1"
+        "6. B1 - BN: طرح BN من B1  \n"
+        "7. حالة المعالجة: معالج إذا BN - B1 سالب أو أي BUCKET أحدث أقل من سابق، وإلا غير معالج"
     )
     if uploaded is None:
         st.info("ارفعي الملف الأصلي لبدء معالجة التقرير الشامل.")
