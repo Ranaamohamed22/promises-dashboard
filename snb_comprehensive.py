@@ -151,7 +151,11 @@ def build_comprehensive_report(source_bytes):
             target = sheet.cell(row, start + offset)
             # Do not leave blanks or misleading cached numbers when BN is Wr:
             # Excel must show #VALUE! for invalid arithmetic.
-            if (offset in (1, 2, 3) and bn is None) or (
+            if offset == 4 and _is_writeoff(latest_cell.value):
+                # The difference displays Writeoff only when the final bucket
+                # is Writeoff; do not change the status or other columns.
+                target.value = "Writeoff"
+            elif (offset in (1, 2, 3) and bn is None) or (
                 offset == 4 and (bn is None or b1 is None)
             ):
                 target.value = "#VALUE!"
