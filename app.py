@@ -9499,10 +9499,16 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
         version = st.session_state.activity_upload_versions["STC"]["activity"]
         key = f"stc_{digest}_{version}"
         kind = _activity_period(stamps)[0] if activity_kind == "تلقائي" else activity_kind
-        # Duplicate business key: prefer the debtor's NAME, not the ID.
-        # This only affects duplicate detection; all other STC metrics retain
-        # their existing identity field. Always compare within the same day.
-        dedup_identity = _snb_find_column(source, "Debitor Name") or identity
+        # Daily duplicate key: debtor ID + Notes + collector + calendar date.
+        # Never use Debitor Name for duplicate matching.
+        dedup_identity = _snb_find_column(
+            source, "Debitor", "Debtor", "رقم هوية العميل", "رقم الهوية",
+            "هوية العميل", "National ID", "National ID Number",
+            "Identity Number", "ID Number", "ID Numer", "ID"
+        )
+        if dedup_identity is None:
+            st.error("ملف النشاط لازم يحتوي على Debitor ID لحساب التكرارات، مش Debitor Name.")
+            return
         dates = stamps.dt.normalize()
         duplicates = _stc_duplicate_mask(
             source, collector, dedup_identity, notes, dates
