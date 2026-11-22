@@ -199,20 +199,20 @@ def render_snb_comprehensive_page():
             margin: 0 !important;
             padding: 0 !important;
         }
-        div.st-key-snb_comprehensive_top_row > div[data-testid="stHorizontalBlock"] {
+        div.st-key-snb_comprehensive_top_row [data-testid="stHorizontalBlock"]:has(.st-key-upload_field_snb_comprehensive) {
             direction: rtl !important;
             align-items: flex-start !important;
             gap: 14px !important;
             width: 100% !important;
         }
-        div.st-key-snb_comprehensive_top_row [data-testid="stHorizontalBlock"] >
+        div.st-key-snb_comprehensive_top_row [data-testid="stHorizontalBlock"]:has(.st-key-upload_field_snb_comprehensive) >
         div[data-testid="stColumn"]:first-child {
             flex: 0 0 315px !important;
             width: 315px !important;
             min-width: 0 !important;
             max-width: 315px !important;
         }
-        div.st-key-snb_comprehensive_top_row [data-testid="stHorizontalBlock"] >
+        div.st-key-snb_comprehensive_top_row [data-testid="stHorizontalBlock"]:has(.st-key-upload_field_snb_comprehensive) >
         div[data-testid="stColumn"]:nth-child(2) {
             flex: 1 1 0 !important;
             min-width: 0 !important;
