@@ -9537,10 +9537,31 @@ def _stc_download(sheets, title, filename):
             "نسبة تحقيق المكالمات الناجحة",
         }
         for sheet in writer.book.worksheets:
+            # Show native Excel gridlines as well as the explicit thin cell
+            # borders already applied by _style_snb_activity_workbook.
+            sheet.sheet_view.showGridLines = True
             for column in sheet.iter_cols(min_row=1, max_row=sheet.max_row):
                 if column[0].value in percent_headers:
                     for cell in column[1:]:
                         cell.number_format = "0.00%"
+
+        if filename.startswith("STC_Weekly") and "ملخص المحصلين" in writer.book:
+            # Match the supplied weekly summary reference: a single navy title
+            # bar, six columns, filterable navy headings and percentage values.
+            sheet = writer.book["ملخص المحصلين"]
+            sheet.insert_rows(1)
+            sheet.merge_cells("A1:F1")
+            title_cell = sheet["A1"]
+            title_cell.value = "STC Bank تقرير النشاط الأسبوعي"
+            title_cell.fill = PatternFill(fill_type="solid", fgColor="17375E")
+            title_cell.font = Font(name="Calibri", size=15, bold=True, color="FFFFFF")
+            title_cell.alignment = Alignment(horizontal="center", vertical="center")
+            sheet.row_dimensions[1].height = 34
+            sheet.row_dimensions[2].height = 34
+            sheet.auto_filter.ref = f"A2:F{sheet.max_row}"
+            sheet.freeze_panes = "A3"
+            sheet.sheet_view.showGridLines = True
+            sheet.sheet_view.rightToLeft = False
     st.download_button(title, buf.getvalue(), file_name=filename,
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
@@ -9703,11 +9724,10 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
         )
     weekly_duty = _weekly_duty_table(daily, collector) if kind == "أسبوعي" else None
     if weekly_duty is not None:
-        # Weekly STC: show a separate duty duration for every calendar day,
-        # not the combined weekly duration in the collector summary.
-        summary = summary.drop(columns=["مدة الدوام"], errors="ignore").merge(
-            weekly_duty, on=collector, how="left", validate="one_to_one"
-        )
+        # Keep daily duty durations in the separate "مدة الدوام لكل يوم"
+        # worksheet. The weekly collector summary contains only six KPI
+        # columns, in the order of the approved report layout.
+        summary = summary.drop(columns=["مدة الدوام"], errors="ignore")
         # Count the distinct days actually included in the selected week.
         # The same weekly denominator applies to every collector.
         days_in_report = max(1, int(result["التاريخ"].nunique()))
@@ -9753,13 +9773,16 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
             st.dataframe(sheets["أول وآخر إفادة"], hide_index=True)
         _stc_download(sheets, "تحميل تقرير النشاط اليومي", "STC_Daily.xlsx")
     elif kind == "أسبوعي":
-        # Export a single STC weekly workbook like SNB's Activity export.
-        # The Activity sheet contains the individual calls without duty totals;
-        # the collector summary has daily duty columns and attainment rates.
+        # Exact six-column collector summary requested for the weekly export.
+        # Daily duty and wasted-time details remain in the separate sheets.
+        weekly_export_summary = summary.loc[:, [
+            collector, "المكالمات المغطاة", "ناجحة", "غير ناجحة",
+            "نسبة تحقيق المستهدف", "نسبة تحقيق المكالمات الناجحة",
+        ]].rename(columns={collector: "اسم المحصل"})
         weekly_activity = display_result.drop(columns=["مدة الدوام"], errors="ignore")
         weekly_sheets = {
             "Activity": weekly_activity,
-            "ملخص المحصلين": summary,
+            "ملخص المحصلين": weekly_export_summary,
             "تفاصيل كل يوم": daily,
             "مدة الدوام لكل يوم": weekly_duty,
         }
@@ -9772,7 +9795,7 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
         # Keep the previous individual exports available for existing workflows.
         with st.expander("تحميل ملفات الأسبوع منفصلة (اختياري)"):
             _stc_download(
-                {"ملخص المحصلين": summary},
+                {"ملخص المحصلين": weekly_export_summary},
                 "تحميل ملخص النشاط · أسبوعي",
                 "STC_Weekly_Summary.xlsx",
             )
