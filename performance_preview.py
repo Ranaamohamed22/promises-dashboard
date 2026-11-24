@@ -579,6 +579,8 @@ def render_performance():
 
 
 apply_preview_theme()
+# Explicit visual build marker to diagnose stale Community Cloud deployments.
+st.caption("معاينة التصميم — واجهة V2 | تحديث 25 نوفمبر 2026")
 render_top_navigation()
 page = st.session_state.get("ejada_preview_page", "تقرير الأداء")
 if page == "تقرير الأداء":
