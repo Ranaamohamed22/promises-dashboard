@@ -77,6 +77,11 @@ _PREVIEW_CSS = """
 }
 .stApp [data-testid="stAlert"] {
     border-radius:10px;
+    background:var(--ejada-surface-alt)!important;
+    border:1px solid var(--ejada-border)!important;
+}
+.stApp [data-testid="stAlert"] [data-testid="stMarkdownContainer"] p {
+    color:var(--ejada-text)!important;
 }
 .st-key-preview_navbar {
     background:var(--ejada-surface);
