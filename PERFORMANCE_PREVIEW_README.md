@@ -46,3 +46,22 @@ production application rather than showing nonfunctional buttons.
 5. Do not merge this branch until the UI is accepted and the checks pass.
 
 **Note:** This preview is not deployed on the live production Streamlit app.
+
+
+## Visual adjustments (bank branding and navigation)
+- The top horizontal report navigation follows the existing EJADA tab-row
+  pattern. Pages other than SNB Performance/Comprehensive remain clearly
+  marked as preview placeholders; they do not replace production reports.
+- Use the bank selector at top left to switch SNB (navy/green) and STC
+  (purple) brand-inspired colors. This is only a presentation change.
+- Use the adjacent theme selector to switch to soft charcoal with high-contrast
+  text; the selected bank's accent color remains distinct.
+- The compact upload controls show portfolio first (right-hand side in RTL)
+  and payments second; outer half-page upload boxes are removed.
+- STC performance data is intentionally NOT processed through the SNB-only
+  performance calculation engine. The STC selection previews branding and
+  displays a clear notice rather than a misleading SNB result.
+- The source app.py, the report builders, and Excel exports have not changed.
+- This prototype requires visual review in Streamlit Cloud; automated
+  tests validate calculation preservation, widget startup and theme toggles,
+  not exact pixel-for-pixel screenshot matching.
