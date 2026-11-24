@@ -227,18 +227,64 @@ def render_snb_performance_page():
         st.rerun()
     generation = st.session_state["snb_perf_upload_generation"]
 
-    # Match the Activity page: keep the two upload controls in the top row,
-    # rather than pushing them down with a full-width title and caption.
-    portfolio_col, payments_col, heading_col = st.columns(
-        [1.2, 1.2, 1.0], gap="small", vertical_alignment="center"
+    # Presentation-only upload layout. The source identifiers and all business
+    # calculations below remain unchanged. In the app's RTL direction, the
+    # portfolio upload appears before payments (rightmost first).
+    st.markdown(
+        """
+        <style>
+        .stApp .st-key-snb_perf_portfolio_upload,
+        .stApp .st-key-snb_perf_payments_upload {
+            width:min(265px,100%)!important;
+            max-width:265px!important;
+            margin-left:auto!important;
+        }
+        .stApp .st-key-snb_perf_portfolio_upload [data-testid="stFileUploader"],
+        .stApp .st-key-snb_perf_payments_upload [data-testid="stFileUploader"] {
+            max-width:265px!important;direction:rtl!important;
+        }
+        .stApp .st-key-snb_perf_portfolio_upload [data-testid="stFileUploaderDropzone"],
+        .stApp .st-key-snb_perf_payments_upload [data-testid="stFileUploaderDropzone"] {
+            min-height:50px!important;
+            padding:5px!important;
+            border-radius:9px!important;
+            background:#F3FBF7!important;
+            border:1px dashed #8EC8A5!important;
+        }
+        .stApp .st-key-snb_perf_portfolio_upload [data-testid="stFileUploaderDropzoneInstructions"],
+        .stApp .st-key-snb_perf_payments_upload [data-testid="stFileUploaderDropzoneInstructions"] {
+            display:none!important;
+        }
+        .stApp .st-key-snb_perf_portfolio_upload [data-testid="stFileUploaderDropzone"] button,
+        .stApp .st-key-snb_perf_payments_upload [data-testid="stFileUploaderDropzone"] button {
+            min-height:33px!important;
+            padding:4px 12px!important;
+            width:fit-content!important;
+        }
+        .stApp .st-key-snb_perf_portfolio_upload p,
+        .stApp .st-key-snb_perf_payments_upload p {
+            font-weight:700;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
     )
-    with portfolio_col:
+    portfolio_col, payments_col, heading_col = st.columns(
+        [1.1, 1.1, 2.3], gap="small", vertical_alignment="top"
+    )
+    with portfolio_col, st.container(key="snb_perf_portfolio_upload"):
+        st.markdown("**📄 رفع ملف المحفظة**")
         portfolio_file = st.file_uploader(
-            "رفع ملف المحفظة", type=["xlsx"], key=f"snb_perf_portfolio_{generation}"
+            "رفع ملف المحفظة", type=["xlsx"],
+            label_visibility="collapsed",
+            key=f"snb_perf_portfolio_{generation}",
         )
-    with payments_col:
+    with payments_col, st.container(key="snb_perf_payments_upload"):
+        st.markdown("**📄 رفع ملف السدادات**")
         payments_file = st.file_uploader(
-            "رفع ملف السدادات", type=["xlsx"], key=f"snb_perf_payments_{generation}"
+            "رفع ملف السدادات", type=["xlsx"],
+            label_visibility="collapsed",
+            key=f"snb_perf_payments_{generation}",
         )
     with heading_col:
         st.markdown("**📊 تقرير الأداء — SNB**")

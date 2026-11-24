@@ -1,0 +1,33 @@
+name: Production UI safety checks
+
+on:
+  push:
+    branches:
+      - "release/bank-themes-compact-uploads"
+      - main
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: SNB regression + UI startup
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Compile production entrypoints
+        run: python -m compileall -q app.py snb_performance.py snb_comprehensive.py run.py
+      - name: Run synthetic bank-report regressions and UI smoke test
+        run: python -m unittest discover -s tests -p "test_*.py" -v

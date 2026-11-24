@@ -72,7 +72,12 @@ if not st.session_state.get('_separate_home_overview_v1', False):
     st.session_state.current_page = 'Home'
     st.session_state['_separate_home_overview_v1'] = True
 if 'theme_choice' not in st.session_state:
-    st.session_state.theme_choice = 'ثيم إجادة (Navy)'
+    st.session_state.theme_choice = 'حسب البنك (تلقائي)'
+# Migrate only the old default; preserve user-chosen dark/light variants.
+if not st.session_state.get('_bank_theme_migration_v1', False):
+    if st.session_state.theme_choice == 'ثيم إجادة (Navy)':
+        st.session_state.theme_choice = 'حسب البنك (تلقائي)'
+    st.session_state['_bank_theme_migration_v1'] = True
 if 'act_uploader_ver' not in st.session_state:
     st.session_state.act_uploader_ver = {'SNB': 0, 'STC': 0}
 
@@ -138,7 +143,11 @@ def bank_logo(bank, placement):
         f'src="{BANK_LOGOS[bank]}"></div>'
     )
 
-THEMES = ['ثيم إجادة (Navy)', 'الوضع الداكن (Black)', 'التصميم الفاتح (Light)', 'كحلي فاتح', 'كحلي غامق']
+THEMES = [
+    'حسب البنك (تلقائي)', 'أسود هادي (Charcoal)',
+    'ثيم إجادة (Navy)', 'الوضع الداكن (Black)',
+    'التصميم الفاتح (Light)', 'كحلي فاتح', 'كحلي غامق',
+]
 
 def toggle_theme():
     current = st.session_state.theme_choice
@@ -404,11 +413,60 @@ ejada_grey_blue = "#586F8C"
 ejada_border_light = "#99AABF"
 ejada_soft_grey = "#F2F2F2"
 white_bg = "#FFFFFF"  
-snb_green = "#2CA549"  
+# Brand-aware colors drive presentation only; report calculations stay intact.
+BANK_BRAND_UI = {
+    "SNB": {
+        "accent": "#07883E", "accent_soft": "#E8F7EE",
+        "accent_text": "#075D32", "background": "#F3F7FC",
+    },
+    "STC": {
+        "accent": "#693AB7", "accent_soft": "#F2EAFD",
+        "accent_text": "#56279E", "background": "#F8F5FC",
+    },
+}
+_brand_style = BANK_BRAND_UI[st.session_state.get("selected_bank", "SNB")]
+brand_accent = _brand_style["accent"]
+brand_soft = _brand_style["accent_soft"]
+brand_accent_text = _brand_style["accent_text"]
+snb_green = brand_accent  
 
 CHART_PALETTE = ["#1F4373", "#304D73", "#586F8C", "#99AABF", "#F2F2F2"]
 
-if st.session_state.theme_choice in NAVY_BACKGROUNDS:
+if st.session_state.theme_choice == "حسب البنك (تلقائي)":
+    bg_color = _brand_style["background"]
+    card_color = white_bg
+    border_color = "#CCD8E8"
+    primary_color = brand_accent
+    primary_text = "#FFFFFF"
+    text_color = ejada_navy_dark
+    label_color = "#153754"
+    sub_text_color = "#536B80"
+    gauge_bg = "#E2E8F0"
+    nav_btn_bg = "#FFFFFF"
+    nav_btn_text = ejada_navy_dark
+    nav_btn_border = "#CCD8E8"
+    kpi_title_color = ejada_navy_dark
+    header_logo_color = "#153754"
+    input_bg = "#FFFFFF"
+    input_text = ejada_navy_dark
+elif st.session_state.theme_choice == "أسود هادي (Charcoal)":
+    bg_color = "#303741"
+    card_color = "#FFFFFF"
+    border_color = "#8594A8"
+    primary_color = brand_accent
+    primary_text = "#FFFFFF"
+    text_color = "#1F4373"
+    label_color = "#F4F7FB"
+    sub_text_color = "#D9E3EE"
+    gauge_bg = "#4E5A68"
+    nav_btn_bg = "#FFFFFF"
+    nav_btn_text = "#1F4373"
+    nav_btn_border = "#A6B3C2"
+    kpi_title_color = "#1F4373"
+    header_logo_color = "#F4F7FB"
+    input_bg = "#FFFFFF"
+    input_text = "#1F4373"
+elif st.session_state.theme_choice in NAVY_BACKGROUNDS:
     bg_color = NAVY_BACKGROUNDS[st.session_state.theme_choice]
     card_color = white_bg 
     border_color = ejada_border_light
@@ -462,6 +520,7 @@ else:
 
 _overview_upload_panel_bg = (
     bg_color if st.session_state.theme_choice in NAVY_BACKGROUNDS
+    else "#39424D" if st.session_state.theme_choice == "أسود هادي (Charcoal)"
     else "#222B39" if st.session_state.theme_choice == "الوضع الداكن (Black)"
     else "#FFFFFF"
 )
@@ -2185,7 +2244,7 @@ st.markdown(f"""
     .selected-bank {{display:inline-flex;align-items:center;gap:7px;background:white;border-radius:6px;padding:4px 9px;font:900 22px Tahoma,sans-serif;}}
     .selected-bank.SNB {{color:#005645;}}
     .selected-bank.STC {{color:#4f008c;}}
-    .selected-bank::before {{content:"";width:10px;height:10px;background:#24a145;border-radius:50%;}}
+    .selected-bank::before {{content:"";width:10px;height:10px;background:{brand_accent};border-radius:50%;}}
     .st-key-ejada_change_bank_btn button, .st-key-ejada_model_manager_btn button {{width:max-content !important;min-width:0 !important;padding:4px 9px !important;white-space:nowrap !important;}}
     .st-key-promise_comparison div[class*="st-key-promise_diagnostic_"] {{max-width:100% !important;margin:0 !important;}}
     .st-key-promise_comparison table.ejada-diagnostic-table {{width:100% !important;margin:0 !important;}}
@@ -2203,19 +2262,19 @@ st.markdown(f"""
     .st-key-promise_comparison {{margin-top:calc(16px + 0.5cm);}}
     .st-key-promise_comparison table.ejada-diagnostic-table th.step-heading {{text-align:center !important;}}
     .st-key-brand_header {{position:relative;padding:0 0 10px;}}
-    .st-key-brand_header .st-key-theme_toggle {{position:absolute !important;right:0;top:0;width:fit-content !important;}}
+    .st-key-brand_header .st-key-theme_picker {{position:absolute !important;right:0;top:0;width:min(220px,100%);z-index:6;}}
     .st-key-promise_comparison [data-testid="stExpander"] details[open] {{height:auto !important;max-height:none !important;overflow:visible !important;}}
     .st-key-promise_comparison table.ejada-diagnostic-table {{display:table !important;}}
     .st-key-promise_comparison table.ejada-diagnostic-table :is(td, th) {{padding:9px 10px !important;line-height:1.4;}}
     .stApp div[class*="st-key-uploaded_chip_"] {{min-height:40px !important;padding:6px 8px !important;align-items:center !important;}}
     .stApp div[class*="st-key-uploaded_chip_"] .uploaded-filename {{line-height:1.5;direction:ltr;text-align:left;}}
-    .stApp .st-key-bank_report_bar {{background:#fff;border-radius:18px;padding:12px 18px;}}
-    .stApp .st-key-report_pills {{direction:rtl;background:#f2f3f4;border-radius:28px;padding:4px;gap:3px !important;max-width:100%;}}
+    .stApp .st-key-bank_report_bar {{background:#fff;border:1px solid {border_color};border-radius:18px;padding:12px 18px;}}
+    .stApp .st-key-report_pills {{direction:rtl;background:{brand_soft};border-radius:28px;padding:4px;gap:3px !important;max-width:100%;}}
     html body .stApp .st-key-report_pills [data-testid="stButton"] button[kind] {{background:transparent !important;border:1px solid transparent !important;box-shadow:none !important;border-radius:22px !important;padding:5px 14px !important;min-height:36px !important;}}
-    html body .stApp .st-key-report_pills [data-testid="stButton"] button[kind="primary"] {{background:#fff !important;border-color:#e0e2e4 !important;box-shadow:0 1px 3px #1f334518 !important;}}
+    html body .stApp .st-key-report_pills [data-testid="stButton"] button[kind="primary"] {{background:#fff !important;border-color:{brand_accent} !important;box-shadow:0 1px 3px #1f334518 !important;}}
     html body .stApp .st-key-report_pills [data-testid="stButton"] button[kind] p {{color:#263745 !important;-webkit-text-fill-color:#263745 !important;font-size:15px !important;}}
     html body .stApp .st-key-report_pills [data-testid="stButton"] button[kind="secondary"] p {{font-weight:500 !important;}}
-    .stApp [class*="st-key-upload_field_"] {{width:min(315px,100%) !important;min-width:0;gap:5px !important;margin-left:auto;}}
+    .stApp [class*="st-key-upload_field_"] {{width:min(265px,100%) !important;min-width:0;gap:5px !important;margin-left:auto;}}
     .stApp [class*="st-key-upload_field_"] > [data-testid="stElementContainer"]:has(.upload-field-label) {{min-height:24px !important;margin:0 !important;display:flow-root !important;}}
     .stApp .upload-field-label {{direction:rtl;text-align:center;font-size:17px;font-weight:800;line-height:1.4;color:{label_color};}}
     .stApp [class*="st-key-upload_box_"] {{box-sizing:border-box;width:100% !important;padding:8px !important;border:1px solid {border_color} !important;border-radius:10px;background:transparent !important;}}
@@ -2229,6 +2288,42 @@ st.markdown(f"""
     .stApp .st-key-activity_toggle_align button {{width:max-content !important;max-width:100% !important;padding:5px 10px !important;}}
     .stApp .st-key-snb_activity_work_area [data-testid="stCaptionContainer"],
     .stApp .st-key-snb_activity_work_area [data-testid="stCaptionContainer"] p {{direction:rtl;text-align:right;color:{label_color} !important;-webkit-text-fill-color:{label_color} !important;}}
+    /* Bank-aware controls and contrast (presentation only). */
+    .stApp .st-key-report_pills [data-testid="stButton"] button[kind="primary"] p {{
+        color:{brand_accent_text} !important;-webkit-text-fill-color:{brand_accent_text} !important;
+        font-weight:900 !important;
+    }}
+    .stApp .selected-bank.SNB {{color:#075D32 !important;}}
+    .stApp .selected-bank.STC {{color:#56279E !important;}}
+    .stApp .upload-field-label {{color:{label_color} !important;}}
+    .stApp [class*="st-key-upload_box_"] {{
+        max-width:265px !important;padding:5px !important;background:transparent !important;
+    }}
+    .stApp [class*="st-key-upload_box_"] [data-testid="stFileUploaderDropzone"] {{
+        min-height:50px !important;padding:5px !important;
+        border:1px dashed {brand_accent} !important;background:{brand_soft} !important;
+    }}
+    .stApp [class*="st-key-upload_box_"] [data-testid="stFileUploaderDropzone"] button {{
+        background:{brand_accent} !important;color:#FFFFFF !important;
+        min-height:33px !important;height:33px !important;
+    }}
+    .stApp [class*="st-key-upload_box_"] [data-testid="stFileUploaderDropzone"] button p {{
+        color:#FFFFFF !important;
+    }}
+    .st-key-theme_picker [data-baseweb="select"]>div {{
+        background:#FFFFFF !important;border:1px solid {border_color} !important;
+        border-radius:9px !important;
+    }}
+    .st-key-theme_picker [data-baseweb="select"] * {{
+        color:#1F4373 !important;-webkit-text-fill-color:#1F4373 !important;
+    }}
+    .stApp [data-testid="stWidgetLabel"] p, .stApp [data-testid="stFileUploader"] label {{
+        opacity:1 !important;
+    }}
+    @media(max-width:940px) {{
+        .st-key-brand_header .st-key-theme_picker {{position:relative !important;margin-left:auto !important;}}
+        .stApp .st-key-bank_report_bar {{padding:7px !important;}}
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -2236,7 +2331,12 @@ st.markdown(f"""
 # 0. الصف العلوي: Overview وبجواره زر القمر
 # ==========================================
 with st.container(key="brand_header"):
-    st.button("🌓", key="theme_toggle", on_click=toggle_theme, help=f"الثيم الحالي: {st.session_state.theme_choice} · اضغطي لتغيير اللون")
+    with st.container(key="theme_picker"):
+        st.selectbox(
+            "🎨 الثيم", options=THEMES, key="theme_choice",
+            label_visibility="visible",
+            help="اختاري ثيم البنك التلقائي أو الأسود الهادي أو الثيمات القديمة.",
+        )
     st.markdown(f"""
 <div class="ejada-header" style="text-align:center;direction:ltr;line-height:1.12;color:{header_logo_color};font-weight:900;">
   <div style="font-size:43px;font-family:Tahoma,sans-serif;">إجـــادة</div>
