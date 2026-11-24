@@ -23,5 +23,23 @@ class TestProductionUi(unittest.TestCase):
         self.assertEqual(ui.session_state["theme_choice"], "أسود هادي (Charcoal)")
         self.assertEqual(ui.session_state["selected_bank"], "SNB")
 
+        # SNB performance must still render the exact original upload widgets.
+        ui.button(key="nav_perf_btn").click().run()
+        self.assertEqual(len(ui.exception), 0)
+        self.assertEqual(ui.session_state["current_page"], "Performance")
+        self.assertIsNotNone(ui.get("file_uploader", key="snb_perf_portfolio_0"))
+        self.assertIsNotNone(ui.get("file_uploader", key="snb_perf_payments_0"))
+
+        # Change bank through the original home flow; STC remains independent.
+        ui.button(key="ejada_change_bank_btn").click().run()
+        self.assertEqual(len(ui.exception), 0)
+        ui.button(key="home_open_bank_STC").click().run()
+        self.assertEqual(len(ui.exception), 0)
+        self.assertEqual(ui.session_state["selected_bank"], "STC")
+        ui.selectbox(key="theme_choice").set_value("حسب البنك (تلقائي)").run()
+        self.assertEqual(len(ui.exception), 0)
+        self.assertEqual(ui.session_state["theme_choice"], "حسب البنك (تلقائي)")
+        self.assertEqual(ui.session_state["selected_bank"], "STC")
+
 if __name__ == "__main__":
     unittest.main()
