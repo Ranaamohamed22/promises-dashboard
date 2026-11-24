@@ -57,6 +57,7 @@ class TestSnbPerformance(unittest.TestCase):
 
     def test_nonnumeric_payment_is_rejected(self):
         altered = self.payments.copy()
+        altered["Payment"] = altered["Payment"].astype(object)
         altered.loc[0, "Payment"] = "not a number"
         with self.assertRaisesRegex(ValueError, "Payment"):
             build_snb_performance(
