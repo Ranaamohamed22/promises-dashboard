@@ -87,7 +87,7 @@ class PreviewTest(unittest.TestCase):
 
     def test_empty_portfolio_has_no_false_percentage(self):
         view = prepare_performance_preview(
-            to_excel_bytes(self.portfolio.iloc[:0]), to_excel_bytes(self.payments.iloc[:0])
+            to_excel_bytes(self.portfolio.iloc[:0]), to_excel_bytes(self.payments)
         )
         self.assertEqual(view["total_rows"], 0)
         self.assertIsNone(view["rate"])
@@ -95,8 +95,10 @@ class PreviewTest(unittest.TestCase):
 
     def test_preview_renders_before_any_file_upload(self):
         # Smoke test of the actual Streamlit entrypoint, not only the data layer.
+        from pathlib import Path
         from streamlit.testing.v1 import AppTest
-        at = AppTest.from_file("performance_preview.py", default_timeout=30).run()
+        script = Path(__file__).resolve().parents[1] / "performance_preview.py"
+        at = AppTest.from_file(str(script), default_timeout=30).run()
         self.assertEqual(len(at.exception), 0)
 
 
