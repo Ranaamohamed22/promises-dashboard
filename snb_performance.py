@@ -9,6 +9,7 @@ import streamlit as st
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
+from snb_portfolio_tab import render_portfolio_summary
 
 
 PORTFOLIO_REQUIRED = ("Account Number", "مبلغ المعالجة")
@@ -289,6 +290,23 @@ def render_snb_performance_page():
     with heading_col:
         st.markdown("**📊 تقرير الأداء — SNB**")
         st.caption("ارفعي المحفظة والسدادات معًا لتحديث التقرير تلقائيًا.")
+    # The existing "المعالج" output and business logic are kept in a separate
+    # render helper below, entirely unchanged. Portfolio loads independently.
+    processed_tab, portfolio_tab = st.tabs(["المعالج", "المحفظة"])
+    with processed_tab:
+        if portfolio_file is None or payments_file is None:
+            st.info("ارفعي ملف المحفظة وملف السدادات معًا لتشغيل تقرير المعالج.")
+        else:
+            _render_original_snb_processed_report(portfolio_file, payments_file)
+    with portfolio_tab:
+        if portfolio_file is None:
+            st.info("ارفعي ملف المحفظة فقط لعرض ملخص المحصلين والمنتجات والمراحل.")
+        else:
+            render_portfolio_summary(portfolio_file.getvalue())
+
+
+def _render_original_snb_processed_report(portfolio_file, payments_file):
+    """Unchanged existing processed/download logic, moved intact below tabs."""
     if portfolio_file is None or payments_file is None:
         st.info("ارفعي ملف المحفظة وملف السدادات معًا لتشغيل تقرير الأداء.")
         return

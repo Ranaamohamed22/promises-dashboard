@@ -30,6 +30,10 @@ class TestProductionUi(unittest.TestCase):
         # File uploaders are not exposed by Streamlit AppTest. Verify that
         # the Performance page's own reset control rendered successfully.
         self.assertIsNotNone(ui.button(key="snb_perf_reset_uploads"))
+        self.assertEqual(
+            [tab.label for tab in ui.tabs],
+            ["المعالج", "المحفظة"],
+        )
 
         # Change bank through the original home flow; STC remains independent.
         ui.button(key="ejada_change_bank_btn").click().run()

@@ -2324,6 +2324,82 @@ st.markdown(f"""
         .st-key-brand_header .st-key-theme_picker {{position:relative !important;margin-left:auto !important;}}
         .stApp .st-key-bank_report_bar {{padding:7px !important;}}
     }}
+
+    /* Unified compact uploaders for SNB and STC: measured against approved
+       Upload-card screenshot. This does not alter uploader keys or uploads. */
+    .stApp [data-testid="stFileUploader"] {{
+        box-sizing:border-box !important;
+        width:min(340px,100%) !important;max-width:340px !important;
+        min-width:0 !important;margin:0 auto !important;
+    }}
+    .stApp [data-testid="stFileUploaderDropzone"] {{
+        box-sizing:border-box !important;width:100% !important;
+        min-height:65px !important;height:auto !important;
+        max-height:none !important;padding:7px 8px !important;
+        border:1px dashed {brand_accent} !important;
+        border-radius:10px !important;
+        background:{brand_soft} !important;
+        display:flex !important;align-items:center !important;
+        justify-content:center !important;overflow:visible !important;
+    }}
+    .stApp [data-testid="stFileUploaderDropzoneInstructions"] {{
+        display:none !important;
+    }}
+    .stApp [data-testid="stFileUploaderDropzone"] button {{
+        min-height:38px !important;height:auto !important;
+        border-radius:9px !important;
+        padding:6px 15px !important;
+        background:{brand_accent} !important;
+        border:1px solid {brand_accent} !important;
+        color:#FFFFFF !important;
+    }}
+    .stApp [data-testid="stFileUploaderDropzone"] button p {{
+        color:#FFFFFF !important;-webkit-text-fill-color:#FFFFFF !important;
+        font-weight:750 !important;
+    }}
+    .stApp div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-activity_model_upload_card),
+    .stApp div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-activity_file_upload_card),
+    .stApp div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-overview_activity_upload_card),
+    .stApp div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-overview_model_upload_card),
+    .stApp div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-overview_promises_upload_card),
+    .stApp div[data-testid="stVerticalBlockBorderWrapper"]:has([class*="st-key-ejada_shared_upload_card_"]) {{
+        width:min(340px,100%) !important;max-width:340px !important;
+        min-width:0 !important;
+        height:auto !important;min-height:0 !important;max-height:none !important;
+        overflow:visible !important;
+        padding:7px 9px !important;margin-left:auto !important;
+        margin-right:0 !important;
+        border:1px solid {border_color} !important;
+        border-radius:11px !important;
+    }}
+    .stApp div[class*="st-key-activity_model_upload_card"],
+    .stApp div[class*="st-key-activity_file_upload_card"],
+    .stApp div[class*="st-key-overview_activity_upload_card"],
+    .stApp div[class*="st-key-overview_model_upload_card"],
+    .stApp div[class*="st-key-overview_promises_upload_card"],
+    .stApp div[class*="st-key-ejada_shared_upload_card_"] {{
+        width:min(340px,100%) !important;max-width:340px !important;
+        min-width:0 !important;height:auto !important;min-height:0 !important;
+        max-height:none !important;
+    }}
+    .stApp [class*="st-key-upload_field_"],
+    .stApp [class*="st-key-upload_box_"] {{
+        width:min(340px,100%) !important;max-width:340px !important;
+        min-width:0 !important;height:auto !important;min-height:0 !important;
+    }}
+    .stApp [class*="st-key-report_upload_bar_"] [data-testid="stHorizontalBlock"]:has([class*="st-key-ejada_shared_upload_card_"]) > [data-testid="stColumn"]:first-child {{
+        flex:0 0 340px !important;min-width:0 !important;max-width:340px !important;
+    }}
+    /* Preserve native file chips, X, and + controls after upload. */
+    .stApp [data-testid="stFileChips"] {{
+        min-width:0 !important;width:100% !important;
+    }}
+    @media(max-width:560px) {{
+        .stApp [data-testid="stFileUploader"],
+        .stApp [class*="st-key-upload_field_"] {{
+            width:100% !important;max-width:100% !important;
+        }}
+    }}
 </style>
 """, unsafe_allow_html=True)
 

@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - "release/bank-themes-compact-uploads"
+      - "feature/compact-uploaders-portfolio-tab"
       - main
   pull_request:
     branches: [main]
