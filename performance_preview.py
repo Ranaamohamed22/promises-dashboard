@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from preview_reporting import prepare_performance_preview
+from preview_theme import resolve_theme, THEME_OPTIONS
 from snb_comprehensive import render_snb_comprehensive_page
 
 
@@ -18,177 +19,335 @@ st.set_page_config(
     page_title="EJADA | Performance Design Preview",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
-st.markdown(
-    """
-<style>
-:root {
-    --ejada-navy: #071f3c;
-    --ejada-navy-light: #0c2b50;
-    --ejada-green: #04852c;
-    --ejada-text: #122744;
-    --ejada-border: #d6e2f0;
-    --ejada-bg: #f4f8fd;
-}
-.stApp {background:var(--ejada-bg);}
+# Resolve the selected bank/theme before drawing any widgets.
+# This affects colors only; STC uploads never use SNB business logic.
+if "ejada_preview_bank" not in st.session_state:
+    st.session_state["ejada_preview_bank"] = "SNB"
+if "ejada_preview_theme_mode" not in st.session_state:
+    st.session_state["ejada_preview_theme_mode"] = "حسب البنك"
+preview_bank = st.session_state["ejada_preview_bank"]
+preview_theme_mode = st.session_state["ejada_preview_theme_mode"]
+palette = resolve_theme(preview_bank, preview_theme_mode)
+
+_PREVIEW_CSS = """
+.stApp {background:var(--ejada-background)!important;color:var(--ejada-text)!important;}
 [data-testid="stMainBlockContainer"] {
-    max-width: 1580px; padding-top:1.3rem; padding-left:1.6rem;
-    padding-right:1.6rem; padding-bottom:3rem;
+    max-width:1580px;padding-top:0.75rem;padding-left:1.4rem;
+    padding-right:1.4rem;padding-bottom:3rem;
 }
-[data-testid="stSidebar"] {background:var(--ejada-navy)!important; border-right:1px solid #d5e1ee;}
-[data-testid="stSidebar"] * {color:white!important;}
-[data-testid="stSidebar"] [data-testid="stButton"] button {
-    background:transparent!important;
-    border:1px solid transparent!important;
+[data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"] {display:none!important;}
+.stApp h1,.stApp h2,.stApp h3,.stApp h4,
+.stApp [data-testid="stMarkdownContainer"] h1,
+.stApp [data-testid="stMarkdownContainer"] h2 {
+    color:var(--ejada-text)!important;
+}
+.stApp [data-testid="stWidgetLabel"] p,
+.stApp [data-testid="stCaptionContainer"] p,
+.stApp [data-testid="stFileUploader"] label,
+.stApp [data-testid="stFileUploader"] span,
+.stApp [data-testid="stFileUploader"] small {
+    color:var(--ejada-muted)!important;
+    opacity:1!important;
+}
+.stApp [data-testid="stWidgetLabel"] p {font-weight:750!important;}
+.stApp [data-testid="stSelectbox"] [data-baseweb="select"]>div {
+    background:var(--ejada-surface)!important;
+    border:1px solid var(--ejada-border)!important;
+    color:var(--ejada-text)!important;
     border-radius:10px!important;
-    justify-content:flex-start!important;
-    min-height:41px!important;
-    text-align:right!important;
+    min-height:38px!important;
 }
-[data-testid="stSidebar"] [data-testid="stButton"] button:hover {
-    background:#113b69!important;
+.stApp [data-testid="stSelectbox"] [data-baseweb="select"] * {
+    color:var(--ejada-text)!important;
 }
-[data-testid="stSidebar"] [data-testid="stButton"] button[kind="primary"] {
-    background:linear-gradient(90deg,#006e2f,#05a13e)!important;
-    border-color:#1a9c4b!important;
-    font-weight:800!important;
+.stApp [data-testid="stSelectbox"] [data-baseweb="select"] svg {
+    fill:var(--ejada-text)!important;
 }
-.preview-logo {
-    display:flex; align-items:center; gap:12px; padding:12px 5px 20px;
-    font-size:20px; font-weight:900; line-height:1.15; direction:ltr;
-    color:white;
+.stApp [data-testid="stAlert"] {
+    border-radius:10px;
 }
-.preview-logo-icon {
-    display:flex; align-items:center; justify-content:center; width:41px;
-    height:41px; border-radius:8px; background:#009339;
-    font-size:24px;
+.st-key-preview_navbar {
+    background:var(--ejada-surface);
+    border:1px solid var(--ejada-border);
+    border-top:3px solid var(--ejada-accent);
+    border-radius:12px;
+    padding:9px 12px!important;
+    margin-bottom:16px!important;
 }
-.preview-section-label {
-    margin:18px 0 7px; padding:7px 4px 5px; border-top:1px solid #31516f;
-    text-align:right; direction:rtl; font-size:13px; font-weight:700;
-    color:#dbe8f5!important;
+.st-key-preview_navbar [data-testid="stHorizontalBlock"]{
+    align-items:center!important;
 }
-.preview-muted-nav {font-size:12px;color:#a6bbd2!important;line-height:1.9;direction:rtl;}
-.preview-banner {
-    background:#e9f8ee; border:1px solid #b6ddc2; border-radius:10px;
-    padding:8px 14px; margin:0 0 16px; font-size:12px;
-    direction:rtl; color:#175436;
+.preview-bank-chip {
+    direction:ltr;display:flex;align-items:center;gap:8px;
+    white-space:nowrap;font-size:18px;font-weight:900;color:var(--ejada-text);
+    min-height:38px;
+}
+.preview-bank-chip:before {
+    content:"";width:10px;height:10px;border-radius:100%;
+    background:var(--ejada-accent);display:inline-block;
+}
+.st-key-preview_report_pills {
+    direction:rtl!important;
+    display:flex;align-items:center;justify-content:flex-start;
+    flex-wrap:wrap!important;gap:4px!important;
+    padding:4px!important;border-radius:30px;
+    background:var(--ejada-surface-alt);
+}
+.st-key-preview_report_pills [data-testid="stButton"] button {
+    white-space:nowrap!important;border:1px solid transparent!important;
+    border-radius:23px!important;
+    min-height:36px!important;
+    padding:5px 11px!important;
+    background:transparent!important;
+    box-shadow:none!important;
+    font-size:13px!important;
+}
+.st-key-preview_report_pills [data-testid="stButton"] button p {
+    color:var(--ejada-text)!important;
+    font-weight:650!important;
+    white-space:nowrap!important;
+}
+.st-key-preview_report_pills [data-testid="stButton"] button[kind="primary"] {
+    background:var(--ejada-accent-soft)!important;
+    border-color:var(--ejada-border)!important;
+    box-shadow:0 1px 4px #101e2f12!important;
+}
+.st-key-preview_report_pills [data-testid="stButton"] button[kind="primary"] p {
+    color:var(--ejada-accent-text)!important;font-weight:900!important;
 }
 .preview-header {
-    background:white; border:1px solid var(--ejada-border);
-    padding:23px 22px 18px; border-radius:16px; direction:rtl;
-    display:flex; align-items:center; justify-content:space-between;
-    gap:18px; margin-bottom:16px;
+    background:var(--ejada-surface);
+    border:1px solid var(--ejada-border);
+    padding:19px 23px 16px;
+    border-radius:15px;
+    direction:rtl;
+    margin-bottom:13px;
 }
-.preview-header h1 {font-size:29px; color:var(--ejada-text); margin:0 0 5px;font-weight:900;}
-.preview-header p {color:#64768c; margin:0;font-size:14px;}
-.preview-bank {
-    white-space:nowrap; background:#f9fbff; border:1px solid #c8d6e5;
-    border-radius:9px; padding:9px 16px; color:#1c3c5c; font-weight:750;
+.preview-header h1 {
+    font-size:26px;color:var(--ejada-text);margin:0 0 5px;font-weight:900;
+}
+.preview-header p {color:var(--ejada-muted);margin:0;font-size:14px;}
+.preview-banner {
+    background:var(--ejada-accent-soft);
+    border:1px solid var(--ejada-border);
+    border-radius:10px;
+    padding:8px 14px;margin:0 0 16px;
+    font-size:12px;direction:rtl;color:var(--ejada-text);
 }
 .preview-section-heading {
-    text-align:right;direction:rtl;font-size:22px;font-weight:850;
-    color:var(--ejada-text);margin:18px 0 8px;
+    text-align:right;direction:rtl;
+    font-size:22px;font-weight:850;color:var(--ejada-text);
+    margin:18px 0 8px;
+}
+.st-key-preview_upload_row [data-testid="stHorizontalBlock"] {
+    direction:rtl!important;
+    align-items:flex-start!important;
+}
+.st-key-preview_portfolio_field,
+.st-key-preview_payments_field {
+    width:min(285px,100%)!important;
+    max-width:285px!important;
+    padding:0!important;
+    border:none!important;
+    background:transparent!important;
+}
+.preview-upload-heading {
+    color:var(--ejada-text)!important;
+    font-size:15px;font-weight:850;
+    text-align:right;direction:rtl;
+    margin:0 0 5px;
+}
+.st-key-preview_portfolio_field [data-testid="stFileUploader"],
+.st-key-preview_payments_field [data-testid="stFileUploader"] {
+    width:min(285px,100%)!important;max-width:285px!important;
+    direction:rtl!important;
+}
+.st-key-preview_portfolio_field [data-testid="stFileUploaderDropzone"],
+.st-key-preview_payments_field [data-testid="stFileUploaderDropzone"] {
+    min-height:54px!important;
+    padding:6px 9px!important;
+    background:var(--ejada-accent-soft)!important;
+    border:1px dashed var(--ejada-accent)!important;
+    border-radius:9px!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+}
+.st-key-preview_upload_row [data-testid="stFileUploaderDropzoneInstructions"] {
+    display:none!important;
+}
+.st-key-preview_upload_row [data-testid="stFileUploaderDropzone"] button {
+    background:var(--ejada-accent)!important;
+    border:1px solid var(--ejada-accent)!important;
+    border-radius:8px!important;
+    padding:5px 14px!important;
+    min-height:34px!important;
+    color:white!important;
+}
+.st-key-preview_upload_row [data-testid="stFileUploaderDropzone"] button p {
+    color:white!important;
+}
+.st-key-preview_upload_row [data-testid="stFileUploaderDropzone"] button:hover {
+    background:var(--ejada-accent-hover)!important;
 }
 .preview-kpis {
-    display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
-    gap:12px; direction:rtl; margin:14px 0 22px;
+    display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:12px;direction:rtl;margin:14px 0 22px;
 }
 .preview-kpi {
-    background:linear-gradient(180deg,#f9fcff,#edf4fd);
-    border:1px solid #c8daf0;border-radius:14px;min-height:128px;
-    padding:15px 11px;text-align:center;color:var(--ejada-text);
+    background:var(--ejada-surface-alt);
+    border:1px solid var(--ejada-border);
+    border-radius:14px;min-height:118px;
+    padding:14px 10px;text-align:center;color:var(--ejada-text);
 }
-.preview-kpi.green {
-    background:linear-gradient(180deg,#f5fff8,#e6f9ed);
-    border-color:#b5e5c7;
+.preview-kpi.highlight {
+    background:var(--ejada-accent-soft);
+    border-color:var(--ejada-accent);
 }
-.preview-kpi-icon {font-size:24px;margin-bottom:4px;line-height:1;}
-.preview-kpi-label {font-size:14px;font-weight:750;margin:6px auto;}
-.preview-kpi-value {font-size:32px;line-height:1.2;font-weight:900;color:#061d34;}
-.preview-kpi.green .preview-kpi-value {color:#007a29;}
+.preview-kpi-icon {
+    font-size:24px;margin-bottom:4px;line-height:1;
+    color:var(--ejada-accent);
+}
+.preview-kpi-label {
+    font-size:14px;font-weight:750;margin:6px auto;
+    color:var(--ejada-text);
+}
+.preview-kpi-value {
+    font-size:32px;line-height:1.2;font-weight:900;color:var(--ejada-text);
+}
+.preview-kpi.highlight .preview-kpi-value {color:var(--ejada-accent-text);}
 .preview-panel-title {
     direction:rtl;text-align:right;font-size:17px;font-weight:800;
     margin:6px 0 12px;color:var(--ejada-text);
 }
-.preview-caption {direction:rtl;text-align:right;color:#60758b;font-size:12px;}
-.preview-download-row {direction:rtl;text-align:right;margin:8px 0;}
-[data-testid="stFileUploader"] {
-    direction:rtl;
-}
-[data-testid="stFileUploaderDropzone"] {
-    background:#f1fcf5!important;
-    border:1px dashed #89c69e!important;
+.stApp [data-testid="stVerticalBlockBorderWrapper"] {
+    border-color:var(--ejada-border)!important;
+    background:var(--ejada-surface)!important;
     border-radius:12px!important;
-    min-height:90px!important;
 }
-[data-testid="stTabs"] [role="tablist"] {justify-content:space-between;gap:2px;direction:rtl;}
-[data-testid="stTabs"] [role="tab"] {font-weight:700;color:#344965;}
-[data-testid="stTabs"] [aria-selected="true"] {color:var(--ejada-green)!important;}
+[data-testid="stTabs"] [role="tablist"] {
+    justify-content:space-between;gap:2px;direction:rtl;
+    background:var(--ejada-surface-alt);border-radius:9px;
+}
+[data-testid="stTabs"] [role="tab"] {
+    font-weight:750!important;color:var(--ejada-text)!important;
+}
+[data-testid="stTabs"] [aria-selected="true"] {
+    color:var(--ejada-accent-text)!important;
+}
 [data-testid="stTabs"] [data-baseweb="tab-highlight"] {
-    background-color:var(--ejada-green)!important;
+    background-color:var(--ejada-accent)!important;
 }
-@media (max-width:1000px) {
+.stApp [data-testid="stDownloadButton"] button {
+    border-color:var(--ejada-accent)!important;
+    background:var(--ejada-accent-soft)!important;
+}
+.stApp [data-testid="stDownloadButton"] button p{
+    color:var(--ejada-accent-text)!important;
+}
+.stApp [data-testid="stDataFrame"] {
+    border:1px solid var(--ejada-border)!important;
+    border-radius:9px;
+}
+@media (max-width:1200px) {
+    .st-key-preview_navbar [data-testid="stHorizontalBlock"]{flex-wrap:wrap!important;}
+}
+@media (max-width:940px) {
     .preview-kpis {grid-template-columns:repeat(2,minmax(0,1fr));}
-    .preview-header {flex-direction:column;align-items:stretch;}
-    [data-testid="stMainBlockContainer"] {padding-left:.6rem;padding-right:.6rem;}
+    [data-testid="stMainBlockContainer"]{
+        padding-left:.7rem;padding-right:.7rem;
+    }
 }
 @media (max-width:520px) {
     .preview-kpis {grid-template-columns:1fr;}
-    .preview-header h1 {font-size:23px;}
+    .preview-header h1 {font-size:22px;}
+    .st-key-preview_report_pills [data-testid="stButton"] button{
+        font-size:12px!important;
+    }
 }
-</style>
-""",
-    unsafe_allow_html=True,
-)
+"""
+
+
+def apply_preview_theme():
+    variable_css = ":root,.stApp{" + "".join(
+        f"--ejada-{name.replace('_', '-')}:{value};"
+        for name, value in palette.items()
+    ) + "}"
+    st.markdown("<style>" + variable_css + _PREVIEW_CSS + "</style>",
+                unsafe_allow_html=True)
 
 
 def set_page(page):
     st.session_state["ejada_preview_page"] = page
 
 
-def render_sidebar():
-    with st.sidebar:
-        st.markdown(
-            '<div class="preview-logo"><span class="preview-logo-icon">📈</span>'
-            '<span>Promises<br>Dashboard</span></div>',
-            unsafe_allow_html=True,
-        )
-        page = st.session_state.get("ejada_preview_page", "تقرير الأداء")
-        st.button(
-            "⌂  الرئيسية", use_container_width=True,
-            type="primary" if page == "الرئيسية" else "secondary",
-            on_click=set_page, args=("الرئيسية",),
-        )
-        st.markdown('<div class="preview-section-label">لوحات المتابعة</div>', unsafe_allow_html=True)
-        st.markdown(
-            '<div class="preview-muted-nav">نظرة عامة · الوعود · الإهمال · النشاط'
-            '<div style="font-size:11px;">متاحة في التطبيق الأساسي</div></div>',
-            unsafe_allow_html=True,
-        )
-        st.markdown('<div class="preview-section-label">التقارير</div>', unsafe_allow_html=True)
-        st.button(
-            "▥  تقرير الأداء", use_container_width=True,
-            type="primary" if page == "تقرير الأداء" else "secondary",
-            on_click=set_page, args=("تقرير الأداء",),
-        )
-        st.button(
-            "▤  التقرير الشامل", use_container_width=True,
-            type="primary" if page == "التقرير الشامل" else "secondary",
-            on_click=set_page, args=("التقرير الشامل",),
-        )
-        st.markdown('<div class="preview-section-label">الإدارة</div>', unsafe_allow_html=True)
-        st.caption("إدارة موديل النشاط والإعدادات موجودة في التطبيق الأساسي.")
-        st.caption("نسخة تصميم تجريبية — لا تغيّر البيانات أو إعدادات الإنتاج.")
+def render_top_navigation():
+    """Match the existing application's compact, horizontal report row."""
+    pages = [
+        ("نظرة عامة", "نظرة عامة"),
+        ("الوعود القائمة والمكسورة", "الوعود القائمة والمكسورة"),
+        ("الإهمال", "الإهمال"),
+        ("النشاط", "النشاط"),
+    ]
+    if preview_bank == "SNB":
+        pages.extend([
+            ("تقرير الأداء", "تقرير الأداء"),
+            ("التقرير الشامل", "التقرير الشامل"),
+        ])
+    page = st.session_state.get("ejada_preview_page", "تقرير الأداء")
+    with st.container(key="preview_navbar"):
+        bank_col, nav_col = st.columns([3.9, 8.1], gap="small", vertical_alignment="center")
+        with bank_col:
+            label_col, bank_select_col, theme_col = st.columns(
+                [0.8, 1.05, 1.2], gap="small", vertical_alignment="center"
+            )
+            with label_col:
+                st.markdown(
+                    '<div class="preview-bank-chip">' + escape(preview_bank) + '</div>',
+                    unsafe_allow_html=True,
+                )
+            with bank_select_col:
+                st.selectbox(
+                    "البنك", options=["SNB", "STC"],
+                    key="ejada_preview_bank",
+                    label_visibility="collapsed",
+                    help="اختيار البنك يغير ألوان المعاينة حسب هوية البنك.",
+                )
+            with theme_col:
+                st.selectbox(
+                    "ثيم الألوان", options=THEME_OPTIONS,
+                    key="ejada_preview_theme_mode",
+                    label_visibility="collapsed",
+                    help="الأسود الهادي يحتفظ بلون البنك المميز.",
+                )
+        with nav_col:
+            with st.container(
+                key="preview_report_pills", horizontal=True,
+                horizontal_alignment="right", gap="small",
+            ):
+                for name, label in pages:
+                    st.button(
+                        label,
+                        key="preview_nav_" + {
+                            "نظرة عامة": "overview",
+                            "الوعود القائمة والمكسورة": "promises",
+                            "الإهمال": "neglect",
+                            "النشاط": "activity",
+                            "تقرير الأداء": "performance",
+                            "التقرير الشامل": "comprehensive",
+                        }[name],
+                        type="primary" if page == name else "secondary",
+                        on_click=set_page, args=(name,),
+                    )
 
 
 def render_header(title, subtitle):
     st.markdown(
         '<div class="preview-header">'
         '<div><h1>▥ ' + escape(title) + '</h1><p>' + escape(subtitle) + '</p></div>'
-        '<div class="preview-bank">البنك: &nbsp; SNB ▾</div>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -212,7 +371,7 @@ def render_kpis(view=None):
         ("%", "نسبة الصفوف المعالجة"),
     )
     cards = "".join(
-        '<div class="preview-kpi' + (' green' if i == 3 else '') + '">'
+        '<div class="preview-kpi' + (' highlight' if i == 3 else '') + '">'
         '<div class="preview-kpi-icon">' + icon + '</div>'
         '<div class="preview-kpi-label">' + label + '</div>'
         '<div class="preview-kpi-value">' + escape(values[i]) + '</div></div>'
@@ -320,19 +479,37 @@ def render_performance():
     st.markdown('<div class="preview-banner">نسخة تجريبية مستقلة: '
                 'كل الحسابات والتصدير تتم من خلال كود التقرير الأصلي دون تعديل.</div>',
                 unsafe_allow_html=True)
-    col_portfolio, col_payments = st.columns(2, gap="medium")
-    with col_portfolio, st.container(border=True):
-        st.markdown("**📄 ملف المحفظة**")
-        portfolio_file = st.file_uploader(
-            "ارفعي ملف المحفظة Excel",
-            type=["xlsx"], key="preview_portfolio",
+    # Preserve the original portfolio-then-payments order in RTL display.
+    # Compact native upload controls only; no large surrounding upload cards.
+    if preview_bank != "SNB":
+        render_kpis()
+        st.info(
+            "تم تطبيق ألوان STC للمعاينة فقط. تقرير الأداء هنا مبني على "
+            "حسابات SNB، لذلك رفع ملفات STC غير متاح في هذه النسخة التجريبية."
         )
-    with col_payments, st.container(border=True):
-        st.markdown("**📄 ملف السدادات**")
-        payments_file = st.file_uploader(
-            "ارفعي ملف السدادات Excel",
-            type=["xlsx"], key="preview_payments",
+        return
+    with st.container(key="preview_upload_row"):
+        col_portfolio, col_payments, _spacer = st.columns(
+            [1.25, 1.25, 2.2], gap="small", vertical_alignment="top"
         )
+        with col_portfolio, st.container(key="preview_portfolio_field"):
+            st.markdown(
+                '<div class="preview-upload-heading">📄 ملف المحفظة</div>',
+                unsafe_allow_html=True,
+            )
+            portfolio_file = st.file_uploader(
+                "ارفعي ملف المحفظة Excel", type=["xlsx"],
+                key="preview_portfolio", label_visibility="collapsed",
+            )
+        with col_payments, st.container(key="preview_payments_field"):
+            st.markdown(
+                '<div class="preview-upload-heading">📄 ملف السدادات</div>',
+                unsafe_allow_html=True,
+            )
+            payments_file = st.file_uploader(
+                "ارفعي ملف السدادات Excel", type=["xlsx"],
+                key="preview_payments", label_visibility="collapsed",
+            )
 
     if portfolio_file is None or payments_file is None:
         render_kpis()
@@ -386,13 +563,17 @@ def render_performance():
         )
 
 
-render_sidebar()
+apply_preview_theme()
+render_top_navigation()
 page = st.session_state.get("ejada_preview_page", "تقرير الأداء")
-if page == "الرئيسية":
-    render_header("الرئيسية", "هذه نسخة مستقلة لمراجعة تصميم SNB قبل دمجه.")
-    st.info("اختاري «تقرير الأداء» من الشريط الجانبي لمشاهدة التصميم التفاعلي. التطبيق الأصلي غير متأثر.")
-elif page == "التقرير الشامل":
-    render_header("التقرير الشامل", "النسخة الحالية من التقرير الشامل، دون تعديل لمنطق الحسابات.")
+if page == "تقرير الأداء":
+    render_performance()
+elif page == "التقرير الشامل" and preview_bank == "SNB":
+    render_header("التقرير الشامل", "تقرير SNB الحالي بحساباته الأصلية — معاينة التصميم فقط.")
     render_snb_comprehensive_page()
 else:
-    render_performance()
+    render_header(page, "معاينة ثيم الواجهة والتنقل — دون تغيير التقارير الأصلية.")
+    st.info(
+        "هذه الصفحة موجودة في التطبيق الأساسي، ولم ننقل بياناتها أو "
+        "نغيّر منطقها في نسخة التصميم التجريبية."
+    )
