@@ -53,6 +53,15 @@ _PREVIEW_CSS = """
     opacity:1!important;
 }
 .stApp [data-testid="stWidgetLabel"] p {font-weight:750!important;}
+.stApp [data-testid="stMainBlockContainer"] [data-testid="stMarkdownContainer"] p {
+    color:var(--ejada-text);
+}
+.stApp [data-testid="stMainBlockContainer"] [data-testid="stCaptionContainer"] p {
+    color:var(--ejada-muted)!important;
+}
+.stApp [data-testid="stFileUploaderDropzone"] [data-testid="stFileUploaderDropzoneInstructions"] p {
+    color:var(--ejada-text)!important;
+}
 .stApp [data-testid="stSelectbox"] [data-baseweb="select"]>div {
     background:var(--ejada-surface)!important;
     border:1px solid var(--ejada-border)!important;
@@ -390,16 +399,16 @@ def render_donut(view):
         labels=["الصفوف المعالجة", "صفوف غير مدرجة ضمن المعالج"],
         values=[treated, remainder],
         hole=0.68,
-        marker={"colors": ["#079a42", "#b3bdc9"]},
+        marker={"colors": [palette["accent"], palette["neutral_chart"]]},
         textinfo="none",
         sort=False,
     ))
     chart.update_layout(
         height=290, margin=dict(l=4, r=4, b=15, t=10),
-        paper_bgcolor="rgba(0,0,0,0)", font=dict(family="Arial"),
+        paper_bgcolor="rgba(0,0,0,0)", font=dict(family="Arial", color=palette["text"]),
         annotations=[dict(text=f'{view["rate"]:.1f}%', x=0.5, y=0.53,
-                          showarrow=False, font=dict(size=27, color="#102b45", family="Arial"))],
-        legend=dict(orientation="h", y=-0.05, x=0.5, xanchor="center", font=dict(size=11)),
+                          showarrow=False, font=dict(size=27, color=palette["text"], family="Arial"))],
+        legend=dict(orientation="h", y=-0.05, x=0.5, xanchor="center", font=dict(size=11, color=palette["text"])),
     )
     st.plotly_chart(chart, use_container_width=True, key="preview_pie")
 
@@ -412,19 +421,19 @@ def render_bar(breakdown, dimension, key):
     chart = go.Figure()
     chart.add_bar(
         x=data[dimension].astype(str), y=data["إجمالي الصفوف"],
-        name="إجمالي الصفوف", marker_color="#b6c6d7"
+        name="إجمالي الصفوف", marker_color=palette["neutral_chart"]
     )
     chart.add_bar(
         x=data[dimension].astype(str), y=data["الصفوف المعالجة"],
-        name="الصفوف المعالجة", marker_color="#03973c"
+        name="الصفوف المعالجة", marker_color=palette["accent"]
     )
     chart.update_layout(
         barmode="group", height=290,
         margin=dict(l=5, r=5, b=20, t=10),
         legend=dict(orientation="h", y=-0.28, x=0.5, xanchor="center"),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Arial"),
-        yaxis=dict(rangemode="tozero", gridcolor="#e5edf7", title=""),
+        font=dict(family="Arial", color=palette["text"]),
+        yaxis=dict(rangemode="tozero", gridcolor=palette["grid"], title=""),
         xaxis=dict(title=""),
     )
     st.plotly_chart(chart, use_container_width=True, key=key)
@@ -462,13 +471,14 @@ def render_visualizations(view):
         else:
             chart = go.Figure(go.Scatter(
                 x=daily["التاريخ"], y=daily["مبلغ السداد"],
-                mode="lines+markers", line=dict(color="#049139", width=3),
+                mode="lines+markers", line=dict(color=palette["accent"], width=3),
                 marker=dict(size=6), name="مبلغ السداد",
             ))
             chart.update_layout(
                 height=320, margin=dict(l=12, r=15, b=20, t=10),
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                yaxis=dict(title="مبلغ السداد", gridcolor="#e5edf7"),
+                font=dict(color=palette["text"]),
+                yaxis=dict(title="مبلغ السداد", gridcolor=palette["grid"]),
                 xaxis=dict(title="التاريخ"),
             )
             st.plotly_chart(chart, use_container_width=True, key="preview_payments_trend")
