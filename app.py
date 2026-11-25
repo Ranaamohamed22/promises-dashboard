@@ -1869,9 +1869,38 @@ st.markdown(f"""
     .stApp:has(.st-key-snb_glass_overview) [data-testid="stMain"] {{
         direction:rtl;color:white;background:radial-gradient(circle at 80% 20%,#0A7A3F 0,#0E2A47 55%) !important;
     }}
-    .stApp :is(.st-key-snb_glass_overview,.st-key-snb_ov_header,.st-key-snb_ov_navigation),
-    .stApp :is(.st-key-snb_glass_overview,.st-key-snb_ov_header,.st-key-snb_ov_navigation) * {{
-        font-family:Cairo,Tahoma,sans-serif;
+    html:has(.st-key-snb_ov_header),
+    body:has(.st-key-snb_ov_header),
+    .stApp:has(.st-key-snb_ov_header),
+    .stApp:has(.st-key-snb_ov_header) :is(.stMarkdown,button,input,label,p,span,div) {{
+        font-family:'Cairo',sans-serif !important;
+    }}
+    .stApp:has(.st-key-snb_ov_header),
+    .stApp:has(.st-key-snb_ov_header) .block-container {{
+        direction:rtl !important;text-align:right !important;
+    }}
+    .stApp:has(.st-key-snb_ov_header) .block-container {{padding-top:16px !important;}}
+    body:has(.st-key-snb_ov_header) :is(header[data-testid="stHeader"],[data-testid="stToolbar"],#MainMenu,footer,
+        [data-testid="stAppDeveloperBadge"],[data-testid="stAppDeveloperBadgeContent"],button[aria-label="Manage app"]) {{
+        display:none !important;
+    }}
+    html body .stApp .st-key-snb_ov_navigation .st-key-report_pills {{
+        direction:rtl !important;flex-wrap:nowrap !important;gap:8px !important;
+        justify-content:flex-start !important;background:transparent !important;overflow-x:auto;
+        width:100% !important;
+    }}
+    html body .stApp .st-key-snb_ov_navigation .st-key-report_pills [data-testid="stButton"] button[kind] {{
+        height:40px !important;min-height:40px !important;white-space:nowrap;
+        background:transparent !important;border:1px solid transparent !important;
+    }}
+    html body .stApp .st-key-snb_ov_navigation .st-key-report_pills [data-testid="stButton"] button[kind] p {{
+        color:white !important;-webkit-text-fill-color:white !important;
+    }}
+    html body .stApp .st-key-snb_ov_navigation .st-key-report_pills [data-testid="stButton"] button[kind="primary"] {{
+        background:white !important;
+    }}
+    html body .stApp .st-key-snb_ov_navigation .st-key-report_pills [data-testid="stButton"] button[kind="primary"] p {{
+        color:#0A7A3F !important;-webkit-text-fill-color:#0A7A3F !important;
     }}
     .stApp .st-key-snb_ov_header {{direction:rtl;padding:10px 0;border-bottom:1px solid #ffffff38;}}
     .snb-ov-brand {{display:flex;align-items:center;gap:16px;color:white;}}
@@ -1885,7 +1914,7 @@ st.markdown(f"""
         background:#fff !important;border:1px solid #ffffff40 !important;color:#0A7A3F !important;
     }}
     html body .stApp .st-key-snb_ov_header button p {{color:#0A7A3F !important;-webkit-text-fill-color:#0A7A3F !important;}}
-    .stApp .st-key-snb_glass_overview > [data-testid="stHorizontalBlock"] {{direction:rtl;gap:18px !important;}}
+    .stApp .st-key-snb_glass_overview > [data-testid="stHorizontalBlock"] {{direction:rtl !important;flex-direction:row !important;gap:18px !important;align-items:flex-start !important;}}
     @media(min-width:850px) {{
         .stApp .st-key-snb_glass_overview > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child {{
             flex:0 0 250px !important;width:250px !important;
@@ -1895,34 +1924,60 @@ st.markdown(f"""
         }}
     }}
     .stApp [class*="st-key-snb_ov_upload_"] {{
-        direction:rtl;color:white;gap:6px !important;border:1px solid #ffffff40;border-radius:12px;
-        padding:7px 8px;background:#ffffff1c;font-size:13px;
+        direction:rtl !important;display:flex !important;flex-wrap:nowrap !important;
+        align-items:center !important;justify-content:space-between !important;
+        color:white;gap:8px !important;border:1px solid #ffffff2e;border-radius:12px;
+        min-height:44px;padding:5px 8px;background:#ffffff14;font-size:13px;box-sizing:border-box;
     }}
-    .stApp [class*="st-key-snb_ov_upload_"] [data-testid="stFileUploader"] {{width:88px !important;}}
+    .stApp [class*="st-key-snb_ov_upload_"] [data-testid="stFileUploader"] {{
+        width:90px !important;min-width:90px !important;flex:none;
+    }}
     .stApp [class*="st-key-snb_ov_upload_"] [data-testid="stFileUploaderDropzone"] {{
-        background:transparent !important;padding:0 !important;border:0 !important;min-height:0 !important;
+        background:transparent !important;padding:0 !important;border:0 !important;
+        min-height:32px !important;overflow:visible !important;
     }}
     .stApp [class*="st-key-snb_ov_upload_"] [data-testid="stFileUploaderDropzoneInstructions"] {{display:none !important;}}
     html body .stApp [class*="st-key-snb_ov_upload_"] [data-testid="stFileUploaderDropzone"] button {{
-        background:white !important;color:#0A7A3F !important;min-height:30px !important;padding:3px 8px !important;
+        position:relative;display:grid !important;place-items:center;
+        width:90px !important;min-width:90px !important;height:32px !important;min-height:32px !important;
+        padding:0 14px !important;white-space:nowrap;overflow:visible !important;
+        border-radius:10px !important;background:white !important;color:#0A7A3F !important;
+        font-size:0 !important;
     }}
     html body .stApp [class*="st-key-snb_ov_upload_"] [data-testid="stFileUploaderDropzone"] button * {{
-        color:#0A7A3F !important;-webkit-text-fill-color:#0A7A3F !important;
+        display:none !important;
+    }}
+    html body .stApp [class*="st-key-snb_ov_upload_"] [data-testid="stFileUploaderDropzone"] button::before {{
+        content:none !important;
+    }}
+    html body .stApp [class*="st-key-snb_ov_upload_"] [data-testid="stFileUploaderDropzone"] button::after {{
+        content:"Upload" !important;position:static !important;
+        color:#0A7A3F !important;-webkit-text-fill-color:#0A7A3F !important;font:800 13px Cairo,sans-serif;
+    }}
+    html body .stApp [class*="st-key-snb_ov_upload_"] [data-testid="stButton"] button {{
+        background:#1f8f6a !important;border-color:#b9f5d8 !important;color:white !important;
     }}
     .snb-ov-title,.snb-ov-card h3 {{color:white !important;margin:0 !important;padding:0 !important;}}
-    .snb-ov-title {{font-size:24px !important;margin-bottom:13px !important;}}
+    .snb-ov-title {{font-size:24px !important;font-weight:800 !important;text-align:right !important;}}
     .snb-ov-card h3 {{font-size:16px !important;margin-bottom:7px !important;}}
     .snb-ov-card {{
-        color:white;background:#ffffff1c;border:1px solid #ffffff40;border-radius:19px;
-        padding:13px;margin-bottom:12px;box-shadow:0 7px 18px #041b3340;
+        color:white;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);
+        border-radius:20px;backdrop-filter:blur(14px);padding:16px 18px;
+        box-sizing:border-box;margin:0;box-shadow:0 7px 18px #041b3340;
     }}
     .snb-ov-card small {{color:#ffffffcf;}}
-    .snb-ov-metrics,.snb-ov-calls {{display:grid;gap:12px;}}
-    .snb-ov-metrics {{grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:12px;}}
+    .snb-ov-stack {{display:grid;gap:14px;align-items:start;}}
+    .snb-ov-metrics,.snb-ov-calls {{display:grid;gap:14px;}}
+    .snb-ov-metrics {{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch;}}
     .snb-ov-calls {{grid-template-columns:repeat(4,minmax(0,1fr));}}
-    .snb-ov-metric {{border-top:4px solid var(--accent);margin:0;display:grid;gap:2px;}}
-    .snb-ov-metric strong {{font-size:clamp(30px,4vw,44px);color:white;line-height:1.15;}}
-    .snb-ov-card + .snb-ov-card {{margin-top:12px;}}
+    .snb-ov-metric {{
+        border-top:4px solid var(--accent);min-height:130px;height:100%;
+        display:flex;flex-direction:column;align-items:center;text-align:center;
+    }}
+    .snb-ov-metric > span {{font-size:14px;font-weight:700;}}
+    .snb-ov-metric > strong {{flex:1;display:grid;place-items:center;font-size:40px;color:#fff;font-weight:800;line-height:1.15;}}
+    .snb-ov-metric > small {{min-height:1.35em;font-size:12px;}}
+    .snb-ov-empty {{display:grid;place-items:center;min-height:42px;font-size:16px;color:white;}}
     .snb-ov-call {{padding:8px;border-radius:11px;background:#ffffff13;min-width:0;overflow-wrap:anywhere;}}
     .snb-ov-call > b {{display:block;color:#5be39a;}}
     .snb-ov-bar {{height:5px;background:#ffffff27;border-radius:999px;margin:5px 0;overflow:hidden;}}
@@ -1948,7 +2003,7 @@ st.markdown(f"""
     .snb-ov-column > span {{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);font-size:10px;}}
     .snb-ov-column > i {{display:block;height:100%;background:var(--bar);border-radius:4px 4px 0 0;}}
     @media(max-width:849px) {{
-        .stApp .st-key-snb_glass_overview > [data-testid="stHorizontalBlock"] {{flex-direction:column;}}
+        .stApp .st-key-snb_glass_overview > [data-testid="stHorizontalBlock"] {{flex-direction:column !important;}}
         .stApp .st-key-snb_glass_overview > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
             width:100% !important;flex:1 1 auto !important;
         }}
@@ -11467,7 +11522,7 @@ def _snb_overview_collectors(frame):
 
 
 def _snb_overview_metric(title, value, color="#5be39a", note=""):
-    hint = f"<small>{note}</small>" if note else ""
+    hint = f"<small>{note}</small>"
     return (f'<section class="snb-ov-card snb-ov-metric" style="--accent:{color}">'
             f'<span>{title}</span><strong>{value}</strong>{hint}</section>')
 
@@ -11527,6 +11582,8 @@ def _render_snb_overview():
         return "—" if value is None else f"{value:.1%}"
 
     def section(title, content):
+        if content == "—":
+            content = '<div class="snb-ov-empty">—</div>'
         return f'<section class="snb-ov-card"><h3>{title}</h3>{content}</section>'
 
     def bar(value):
@@ -11562,9 +11619,9 @@ def _render_snb_overview():
                 follow_rows.append(f'<div class="snb-ov-rank"><i>{index}</i><span>{_xml_escape(name)}</span>'
                                    f'<b>{count:,}</b>{bar(count / followup_rank.iloc[0])}</div>')
             st.markdown(
-                _snb_overview_metric("متابعات اليوم", number(followups))
+                '<div class="snb-ov-stack">' + _snb_overview_metric("متابعات اليوم", number(followups))
                 + section("تقسيم حالات العملاء", donut)
-                + section("أكتر المحصلين متابعة اليوم", "".join(follow_rows) or "—"),
+                + section("أكتر المحصلين متابعة اليوم", "".join(follow_rows) or "—") + "</div>",
                 unsafe_allow_html=True,
             )
         with main:
@@ -11622,11 +11679,16 @@ def _render_snb_overview():
                 '<span>● قائمة</span><span>● مكسورة</span></div></div>' + chart
             )
             st.markdown(
-                '<h1 class="snb-ov-title">نظرة عامة على التحصيل</h1><div class="snb-ov-metrics">'
-                + "".join(_snb_overview_metric(*metric) for metric in metrics)
-                + '</div>' + section("نسبة نجاح المكالمات لكل محصل",
+                '<div class="snb-ov-stack"><h1 class="snb-ov-title">نظرة عامة على التحصيل</h1>'
+                + "".join(
+                    '<div class="snb-ov-metrics">'
+                    + "".join(_snb_overview_metric(*metric) for metric in row)
+                    + '</div>'
+                    for row in (metrics[:3], metrics[3:])
+                )
+                + section("نسبة نجاح المكالمات لكل محصل",
                                       f'<div class="snb-ov-calls">{"".join(calls)}</div>' if calls else "—")
-                + f'<section class="snb-ov-card">{recommendation}</section>',
+                + f'<section class="snb-ov-card">{recommendation}</section></div>',
                 unsafe_allow_html=True,
             )
             if export and promises_available:
