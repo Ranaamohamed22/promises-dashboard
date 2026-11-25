@@ -1808,7 +1808,7 @@ st.markdown(f"""
         display:grid;place-items:center;border-radius:50%;width:36px;height:36px;
         background:white;color:#0A7A3F;font-weight:900;
     }}
-    .stApp .st-key-ejada_home_bank_picker {{gap:14px !important;margin-top:8px;}}
+    .stApp .st-key-ejada_home_bank_picker {{gap:14px !important;margin-top:-24px;}}
     .stApp .st-key-home_portfolio_switch {{
         display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr));
         direction:rtl;width:min(100%,420px) !important;margin-inline:auto;
@@ -1828,7 +1828,8 @@ st.markdown(f"""
         color:#0A7A3F !important;-webkit-text-fill-color:#0A7A3F !important;font-weight:900 !important;
     }}
     .ejada-home-intro {{text-align:center;padding:0 8px;}}
-    .ejada-home-intro h1 {{font-size:30px;font-weight:900;color:white;margin:0 0 6px;}}
+    .stApp .st-key-ejada_home_bank_picker > [data-testid="stElementContainer"]:has(.ejada-home-intro) {{min-height:64px !important;}}
+    .ejada-home-intro h1 {{font-size:30px;font-weight:900;color:white;margin:0 0 6px;padding:0 !important;}}
     .ejada-home-intro p {{font-size:15px;}}
     .ejada-home-intro p,.ejada-home-footer {{color:#ffffffbb !important;margin:0;}}
     .stApp :is(.st-key-home_reports_SNB,.st-key-home_reports_STC) {{
@@ -1838,7 +1839,7 @@ st.markdown(f"""
     }}
     .stApp .st-key-home_reports_STC {{--report-accent:#4F008C;--report-icon:#4F008C;}}
     .stApp [class*="st-key-home_report_card_"] {{
-        position:relative;overflow:hidden;gap:0 !important;
+        position:relative;overflow:hidden;gap:0 !important;min-height:110px;
         background:#ffffff1c;border:1px solid #ffffff40;
         border-top:4px solid var(--report-accent);border-radius:18px;
         box-shadow:0 10px 24px #041b3366;
@@ -11400,7 +11401,7 @@ if page_uploaded is None:
                 unsafe_allow_html=True,
             )
             icons = {
-                "Overview": "◉", "Promises": "⚑", "Neglect": "⚠",
+                "Overview": "◉", "Promises": "⚑", "Neglect": "⚠︎",
                 "Activity": "⟳", "Performance": "▥", "Comprehensive": "▤",
             }
             with st.container(key=f"home_reports_{bank}"):
