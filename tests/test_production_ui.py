@@ -18,15 +18,16 @@ class TestProductionUi(unittest.TestCase):
         self.assertEqual(ui.session_state["selected_bank"], "SNB")
         self.assertEqual(ui.session_state["current_page"], "Overview")
 
+        # SNB performance must still render the exact original upload widgets.
+        ui.button(key="nav_perf_btn").click().run()
+        self.assertEqual(len(ui.exception), 0)
+        self.assertEqual(ui.session_state["current_page"], "Performance")
+
         ui.selectbox(key="theme_choice").set_value("أسود هادي (Charcoal)").run()
         self.assertEqual(len(ui.exception), 0)
         self.assertEqual(ui.session_state["theme_choice"], "أسود هادي (Charcoal)")
         self.assertEqual(ui.session_state["selected_bank"], "SNB")
 
-        # SNB performance must still render the exact original upload widgets.
-        ui.button(key="nav_perf_btn").click().run()
-        self.assertEqual(len(ui.exception), 0)
-        self.assertEqual(ui.session_state["current_page"], "Performance")
         # Keep native upload controls and tabs, without the custom reset button.
         # Streamlit's AppTest does not expose file_uploader directly.
         self.assertNotIn(
