@@ -296,8 +296,8 @@ def render_snb_performance_page():
                 portfolio_file, payments_file
             )
     with portfolio_tab:
-        if portfolio_file is None:
-            st.info("ارفعي ملف المحفظة فقط لعرض ملخص المحصلين والمنتجات والمراحل.")
+        if portfolio_file is None or payments_file is None:
+            st.info("ارفعي ملف المحفظة وملف السدادات معًا لعرض جدول المحفظة.")
         else:
             portfolio_table = render_portfolio_summary(portfolio_file.getvalue())
             if processed_result is not None and portfolio_table is not None:
