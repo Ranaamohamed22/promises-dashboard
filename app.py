@@ -11846,40 +11846,63 @@ def _snb_promises_export(summary, types, active, broken, collectors):
     return stream.getvalue()
 
 
+def _clean_snb_promise_text(value):
+    text = "" if value is None or pd.isna(value) else str(value)
+    text = re.sub(r"[\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff\u00a0]", "", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _snb_promise_data(raw, today):
+    sub = raw["Sub State"].map(_clean_snb_promise_text)
+    is_promise = sub.str.contains("وعد بسداد", regex=False, na=False)
+    dates = pd.to_datetime(raw["Follow up Due Date"], errors="coerce").dt.date
+    valid = dates.notna()
+    current = is_promise & valid & dates.ge(today)
+    broken = is_promise & valid & dates.lt(today)
+    types = sub[is_promise].str.removeprefix("وعد بسداد ").value_counts()
+    return raw.loc[current], raw.loc[broken], types, int(is_promise.sum()), int((is_promise & ~valid).sum())
+
+
 def _render_snb_promises(files):
-    source = {}
-    active, broken, _, _, _, _, _, _, _, _, _ = process_page_data(
-        bank="SNB", promises_files=files or [], include_report=False, raw_portfolio=source
-    )
-    raw = source.get("frame", pd.DataFrame())
-    required = {"Follow up Due Date", "Follow up Last Date", "حالة المعالجة - التمويل",
-                "تحديث فئة العميل - التمويل", "Classification"}
-    ready = required.issubset(raw.columns)
+    frames = []
+    for uploaded in files or []:
+        try:
+            data = io.BytesIO(uploaded.getvalue())
+            frame = (pd.read_csv(data, dtype=str) if uploaded.name.lower().endswith(".csv")
+                     else pd.read_excel(data, sheet_name="Sheet1", dtype=str))
+            frames.append(frame)
+        except (ValueError, OSError) as exc:
+            st.error(f"تعذر قراءة الملف {uploaded.name}: {exc}")
+    raw = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    ready = {"Sub State", "Follow up Due Date"}.issubset(raw.columns)
     account_col = _snb_find_column(raw, "Account Number", "رقم الحساب", "Customer Account Number",
                                    "Debitor", "Debtor", "ID Numer", "ID Number")
     accounts = None
     if account_col:
-        identifiers = raw[account_col].dropna().astype(str).str.strip()
+        identifiers = raw[account_col].map(_clean_snb_promise_text)
         accounts = identifiers[identifiers.ne("")].nunique()
+    today = datetime.now(ZoneInfo("Africa/Cairo")).date()
+    active, broken, types, _, missing_dates = (
+        _snb_promise_data(raw, today) if ready else
+        (pd.DataFrame(), pd.DataFrame(), pd.Series(dtype=int), None, None)
+    )
     counts = (len(active), len(broken)) if ready else (None, None)
     total = sum(counts) if ready else 0
     ratio = counts[1] / total if total else None
     summary = [("إجمالي الحسابات", accounts), ("الوعود القائمة", counts[0]),
                ("الوعود المكسورة", counts[1]), ("نسبة الكسر (محسوبة)", ratio)]
     colors = ("var(--accent)", "var(--broken)", "var(--snb-end)", "var(--snb-start)")
-    types = pd.Series(dtype=int)
     collectors = {}
-    if ready:
-        active, broken = raw.loc[active.index], raw.loc[broken.index]
-        type_col = _snb_find_column(raw, "نوع الوعد", "نوع الوعد-التمويل", "نوع وعد السداد",
-                                    "Promise Type", "Promise_Type", "Promise Category",
-                                    "Promise to Pay Type", "Claim/نوع الوعد-التمويل")
-        if type_col:
-            labels = raw.loc[active.index.union(broken.index), type_col].dropna().astype(str).str.strip()
-            types = labels[labels.ne("")].value_counts()
+    if ready and "Salesperson" in raw.columns:
+        identity_col = _snb_find_column(raw, "Collector ID", "Salesperson ID", "Agent ID", "User ID")
         for position, group in enumerate((active, broken)):
-            identities = _snb_overview_collectors(group)
-            for key, count in identities[identities.map(lambda key: bool(key[1]))].value_counts().items():
+            names = group["Salesperson"].map(_clean_snb_promise_text).str.replace(
+                r"SNB\s*II\s*NPL\s*II", "", regex=True
+            ).str.strip()
+            ids = (group[identity_col].map(_clean_snb_promise_text) if identity_col
+                   else pd.Series("", index=group.index))
+            keys = pd.Series(list(zip(ids, names)), index=group.index, dtype=object)
+            for key, count in keys[names.ne("")].value_counts().items():
                 collectors.setdefault(key, [0, 0])[position] = count
     ordered = sorted(collectors.items(), key=lambda item: -sum(item[1]))
     export = _snb_promises_export(summary, types, active, broken, ordered) if ready else b""
@@ -11905,6 +11928,9 @@ def _render_snb_promises(files):
                     "ملف المحفظة لا يحتوي على أعمدة الوعود المطلوبة" if not ready else None
                 ), key="snb_pr_download",
             )
+        if missing_dates:
+            with st.expander("تشخيص"):
+                st.write(f"وعود بتاريخ فارغ أو غير قابل للقراءة: {missing_dates:,}")
         metrics = []
         for index, ((title, value), color) in enumerate(zip(summary, colors)):
             display = "—" if value is None else (f"{value:.1%}" if index == len(summary) - 1 else f"{value:,}")
