@@ -13,7 +13,7 @@ class TestProductionUi(unittest.TestCase):
         self.assertEqual(len(ui.exception), 0)
         self.assertEqual(ui.session_state["theme_choice"], "حسب البنك (تلقائي)")
 
-        ui.button(key="home_open_bank_SNB").click().run()
+        ui.button(key="home_report_open_Overview").click().run()
         self.assertEqual(len(ui.exception), 0)
         self.assertEqual(ui.session_state["selected_bank"], "SNB")
         self.assertEqual(ui.session_state["current_page"], "Overview")
@@ -41,7 +41,8 @@ class TestProductionUi(unittest.TestCase):
         # Change bank through the original home flow; STC remains independent.
         ui.button(key="ejada_change_bank_btn").click().run()
         self.assertEqual(len(ui.exception), 0)
-        ui.button(key="home_open_bank_STC").click().run()
+        ui.button(key="home_switch_STC").click().run()
+        ui.button(key="home_report_open_Overview").click().run()
         self.assertEqual(len(ui.exception), 0)
         self.assertEqual(ui.session_state["selected_bank"], "STC")
         ui.selectbox(key="theme_choice").set_value("حسب البنك (تلقائي)").run()
