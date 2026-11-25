@@ -9,7 +9,7 @@ import streamlit as st
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
-from snb_portfolio_tab import render_portfolio_summary
+from snb_portfolio_tab import render_portfolio_summary, write_portfolio_sheet
 
 
 PORTFOLIO_REQUIRED = ("Account Number", "مبلغ المعالجة")
@@ -218,6 +218,22 @@ def build_snb_performance(portfolio_bytes, payments_bytes):
     }
 
 
+def build_combined_snb_performance_workbook(processed_bytes, portfolio_table):
+    """Combine original, unchanged processed export with styled portfolio tab.
+
+    Existing processed report bytes and business rules are unchanged.
+    New output has exactly two Excel worksheets: المعالج and المحفظة.
+    """
+    book = load_workbook(BytesIO(processed_bytes))
+    if book.sheetnames != ["المعالج"]:
+        raise ValueError("تقرير المعالج لا يحتوي على الشيت المتوقع؛ تم إيقاف الدمج الآمن.")
+    portfolio_sheet = book.create_sheet("المحفظة")
+    write_portfolio_sheet(portfolio_sheet, portfolio_table)
+    output = BytesIO()
+    book.save(output)
+    return output.getvalue()
+
+
 def render_snb_performance_page():
     # Keep existing uploader keys stable; files can be cleared or replaced
     # directly using Streamlit's built-in uploader controls.
@@ -269,19 +285,34 @@ def render_snb_performance_page():
                 label_visibility="collapsed",
                 key=f"snb_perf_payments_{generation}",
             )
-    # The existing "المعالج" output and business logic are kept in a separate
-    # render helper below, entirely unchanged. Portfolio loads independently.
+    # One Performance page, two distinct tabs; both use the SAME uploads.
     processed_tab, portfolio_tab = st.tabs(["المعالج", "المحفظة"])
+    processed_result = None
     with processed_tab:
         if portfolio_file is None or payments_file is None:
             st.info("ارفعي ملف المحفظة وملف السدادات معًا لتشغيل تقرير المعالج.")
         else:
-            _render_original_snb_processed_report(portfolio_file, payments_file)
+            processed_result = _render_original_snb_processed_report(
+                portfolio_file, payments_file
+            )
     with portfolio_tab:
         if portfolio_file is None:
             st.info("ارفعي ملف المحفظة فقط لعرض ملخص المحصلين والمنتجات والمراحل.")
         else:
-            render_portfolio_summary(portfolio_file.getvalue())
+            portfolio_table = render_portfolio_summary(portfolio_file.getvalue())
+            if processed_result is not None and portfolio_table is not None:
+                # New optional single-file export; old individual Excel downloads
+                # remain available and unchanged in their respective tabs.
+                st.download_button(
+                    "📥 تحميل ملف واحد: المعالج + المحفظة",
+                    data=build_combined_snb_performance_workbook(
+                        processed_result["processed_bytes"], portfolio_table
+                    ),
+                    file_name=f"SNB_Performance_Combined_{processed_result['today'].isoformat()}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="snb_perf_download_combined",
+                    use_container_width=False,
+                )
 
 
 def _render_original_snb_processed_report(portfolio_file, payments_file):
@@ -365,3 +396,4 @@ def _render_original_snb_processed_report(portfolio_file, payments_file):
         )
         if result["daily_count"] == 0:
             st.info("لا توجد سدادات بتاريخ اليوم")
+    return result
