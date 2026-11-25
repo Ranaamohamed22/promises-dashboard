@@ -52,6 +52,29 @@ class PortfolioSummaryTests(unittest.TestCase):
         self.assertEqual(diag["included_rows"], 5)
         self.assertEqual(diag["excluded_stages"], 1)
 
+    def test_real_crm_product_header_typo_is_supported(self):
+        # Synthetic fixture with the exact column names in the uploaded
+        # Sheet1. Never commit any real customer or bank account records.
+        source = pd.DataFrame({
+            "Salesperson": ["Collector A", "Collector A", "Collector B"],
+            "نوع المتنج-التمويل": ["RF", "CC", "PF"],
+            "ملاحظات-التمويل": ["DPD30", "NPL", "DPD60"],
+            "Account Number": ["TEST001", "TEST002", "TEST003"],
+            "Net Amount": [120.25, 340.50, 200.00],
+        })
+        table, diag = build_portfolio_summary(workbook_bytes(source))
+        self.assertEqual(diag["included_rows"], 3)
+        self.assertEqual(diag["excluded_stages"], 0)
+        self.assertEqual(table["المنتج"].tolist(), ["CC", "RF", "PF"])
+        self.assertEqual(table["اسم المحصل"].tolist(),
+                         ["Collector A", "Collector A", "Collector B"])
+        self.assertEqual(table["DPD30 | عدد الحسابات"].sum(), 1)
+        self.assertEqual(table["DPD60 | عدد الحسابات"].sum(), 1)
+        self.assertEqual(table["NPL | عدد الحسابات"].sum(), 1)
+        total_debt = sum(table[f"{stage} | إجمالي المديونية"].sum()
+                         for stage in STAGES)
+        self.assertAlmostEqual(total_debt, 660.75)
+
     def test_count_is_nonblank_rows_not_distinct_ids(self):
         repeated = self.sample.iloc[:2].copy()
         repeated["ملاحظات-التمويل"] = ["Dpd30", "Dpd30"]
