@@ -85,12 +85,44 @@ def build_portfolio_summary(portfolio_bytes):
     with blanks treated as zero. Unrecognized stages are disclosed and never
     silently included in one of the three columns.
     """
-    source = pd.read_excel(BytesIO(portfolio_bytes), dtype=object)
-    collector_col = _required_column(source, COLLECTOR_CANDIDATES, "اسم المحصل")
-    product_col = _required_column(source, PRODUCT_CANDIDATES, "المنتج")
-    stage_col = _required_column(source, STAGE_CANDIDATES, "مرحلة المحفظة")
-    debt_col = _required_column(source, DEBT_CANDIDATES, "إجمالي المديونية")
-    account_col = _required_column(source, ACCOUNT_CANDIDATES, "رقم الحساب")
+    required = (
+        (COLLECTOR_CANDIDATES, "اسم المحصل"),
+        (PRODUCT_CANDIDATES, "المنتج"),
+        (STAGE_CANDIDATES, "مرحلة المحفظة"),
+        (DEBT_CANDIDATES, "إجمالي المديونية"),
+        (ACCOUNT_CANDIDATES, "رقم الحساب"),
+    )
+    with pd.ExcelFile(BytesIO(portfolio_bytes)) as workbook:
+        first_sheet = workbook.sheet_names[0]
+        source = workbook.parse(first_sheet, dtype=object)
+        try:
+            columns = [_required_column(source, candidates, label)
+                       for candidates, label in required]
+        except ValueError as first_error:
+            matches = []
+            for name in workbook.sheet_names[1:]:
+                headers = workbook.parse(name, nrows=0)
+                try:
+                    columns = [_required_column(headers, candidates, label)
+                               for candidates, label in required]
+                except ValueError:
+                    continue
+                matches.append((name, columns))
+            if len(matches) > 1:
+                names = "، ".join(name for name, _ in matches)
+                raise ValueError(
+                    f"أكثر من شيت فيه أعمدة المحفظة ({names}). "
+                    "خلي شيت المحفظة المطلوب أول شيت في الملف."
+                ) from first_error
+            if not matches:
+                raise ValueError(
+                    f"لم أجد شيت فيه كل أعمدة المحفظة المطلوبة. "
+                    f"أول شيت اتقرأ: «{first_sheet}». {first_error}"
+                ) from first_error
+            name, columns = matches[0]
+            source = workbook.parse(name, dtype=object)
+
+    collector_col, product_col, stage_col, debt_col, account_col = columns
 
     collector = source[collector_col].astype("string").fillna("").str.strip()
     product = source[product_col].astype("string").fillna("").str.strip().str.upper()
