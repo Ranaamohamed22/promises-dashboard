@@ -1865,8 +1865,8 @@ st.markdown(f"""
         .stApp [class*="st-key-home_report_card_"] {{transition:none;}}
         .stApp [class*="st-key-home_report_card_"]:is(:hover,:focus-within) {{transform:none;}}
     }}
-    .stApp:has(.st-key-snb_glass_overview),
-    .stApp:has(.st-key-snb_glass_overview) [data-testid="stMain"] {{
+    .stApp:has(:is(.st-key-snb_glass_overview,.st-key-snb_glass_promises)),
+    .stApp:has(:is(.st-key-snb_glass_overview,.st-key-snb_glass_promises)) [data-testid="stMain"] {{
         direction:rtl;color:white;background:radial-gradient(circle at 80% 20%,#0A7A3F 0,#0E2A47 55%) !important;
     }}
     html:has(.st-key-snb_ov_header),
@@ -2010,6 +2010,44 @@ st.markdown(f"""
         .snb-ov-calls {{grid-template-columns:repeat(2,minmax(0,1fr));}}
     }}
     @media(max-width:530px) {{.snb-ov-metrics {{grid-template-columns:minmax(0,1fr);}}}}
+    .st-key-snb_glass_promises {{direction:rtl;color:white;}}
+    .st-key-snb_pr_titlebar {{gap:12px !important;}}
+    html body .stApp .st-key-snb_pr_download button {{
+        background:#fff !important;border:1px solid #ffffff40 !important;border-radius:10px;
+        color:#0A7A3F !important;white-space:nowrap;
+    }}
+    html body .stApp .st-key-snb_pr_download button p {{
+        color:#0A7A3F !important;-webkit-text-fill-color:#0A7A3F !important;
+    }}
+    .st-key-snb_pr_download button:disabled {{opacity:.55;}}
+    .snb-pr-metrics {{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));text-align:center;}}
+    .snb-pr-metrics > div {{display:grid;justify-items:center;gap:4px;padding:4px 8px;}}
+    .snb-pr-metrics > div + div {{border-inline-start:1px solid #ffffff2e;}}
+    .snb-pr-metrics strong {{font-size:clamp(25px,4vw,44px);line-height:1.2;font-weight:800;color:white;}}
+    .snb-pr-metrics i {{width:28px;height:3px;border-radius:3px;}}
+    .snb-pr-pills {{display:flex;gap:8px;flex-wrap:wrap;}}
+    .snb-pr-pills > span,.snb-pr-card header > span {{
+        display:inline-flex;align-items:center;gap:6px;border-radius:999px;background:#ffffff14;
+        border:1px solid #ffffff2e;padding:3px 9px;font-size:12px;color:#b9f5d8;white-space:nowrap;
+    }}
+    .snb-pr-pills i {{width:7px;height:7px;border-radius:50%;}}
+    .snb-pr-grid {{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin-top:10px;}}
+    .snb-pr-card {{display:grid;gap:9px;min-width:0;}}
+    .snb-pr-card header {{display:flex;align-items:flex-start;justify-content:space-between;gap:5px;}}
+    .snb-pr-card header > b {{min-width:0;overflow-wrap:anywhere;font-size:13px;}}
+    .snb-pr-card header > span {{flex-shrink:0;}}
+    .snb-pr-bar {{
+        height:5px;border-radius:999px;
+        background:linear-gradient(to left,#5be39a var(--active),#7fd6e0 var(--active));
+    }}
+    .snb-pr-counts {{display:flex;justify-content:space-between;gap:5px;flex-wrap:wrap;font-size:12px;}}
+    .snb-pr-counts > span:first-child {{color:#5be39a;}}
+    .snb-pr-counts > span:last-child {{color:#7fd6e0;}}
+    .snb-pr-counts b {{font-size:20px;}}
+    .snb-pr-message {{text-align:center;color:#b9f5d8;margin:0;}}
+    @media(max-width:1100px) {{.snb-pr-grid {{grid-template-columns:repeat(3,minmax(0,1fr));}}}}
+    @media(max-width:650px) {{.snb-pr-grid,.snb-pr-metrics {{grid-template-columns:repeat(2,minmax(0,1fr));}}}}
+    @media(max-width:370px) {{.snb-pr-grid {{grid-template-columns:minmax(0,1fr);}}}}
     /* Limit white diagnostic expander to the size of its steps table. */
     div[class*="st-key-promise_diagnostic_SNB_"] {{
         width: 100% !important;
@@ -2624,7 +2662,9 @@ st.markdown(f"""
 # ==========================================
 _snb_overview_page = (st.session_state.current_page == "Overview"
                       and st.session_state.selected_bank == "SNB")
-if _snb_overview_page:
+_snb_promises_page = (st.session_state.current_page == "Promises"
+                      and st.session_state.selected_bank == "SNB")
+if _snb_overview_page or _snb_promises_page:
     with st.container(key="snb_ov_header", horizontal=True, vertical_alignment="center"):
         st.markdown(
             '<div class="snb-ov-brand"><span><b>إجادة</b><small dir="ltr">EJADA</small></span>'
@@ -2633,6 +2673,9 @@ if _snb_overview_page:
         current_uploads = st.session_state.get("overview_uploads", {}).get("SNB", {})
         upload_times = st.session_state.get("snb_overview_upload_times", {})
         latest = max((value for key, value in upload_times.items() if current_uploads.get(key)), default=None)
+        if _snb_promises_page:
+            files = st.session_state.get("page_files", {}).get("SNB", {}).get("Promises")
+            latest = st.session_state.get("snb_promises_upload_time") if files else None
         date_text = latest.strftime("%Y-%m-%d %H:%M") if latest else "—"
         st.markdown(
             f'<span class="snb-ov-update">آخر تحديث للملفات <b dir="ltr">{date_text}</b></span>',
@@ -2696,7 +2739,7 @@ def _render_ejada_main_navigation():
                     type="primary" if st.session_state.current_page == page else "secondary"
                 )
 
-if _snb_overview_page:
+if _snb_overview_page or _snb_promises_page:
     with st.container(key="snb_ov_navigation"):
         _render_ejada_main_navigation()
 elif st.session_state.current_page != 'Home':
@@ -2723,7 +2766,7 @@ else:
     # The Home screen exposes bank logos only, not report navigation.
     pass
 
-if not _snb_overview_page and st.session_state.current_page not in ("Home", "Activity", "Performance", "Neglect"):
+if not (_snb_overview_page or _snb_promises_page) and st.session_state.current_page not in ("Home", "Activity", "Performance", "Neglect"):
     divider_bottom = "3px" if st.session_state.current_page == "Comprehensive" else "20px"
     st.markdown(
         f"<hr style='margin: 10px 0 {divider_bottom} 0; border-color: {border_color}; clear: both;'>",
@@ -6983,6 +7026,8 @@ else:
 def save_uploaded_files(store, bank, kind, widget_key):
     files = st.session_state[widget_key]
     st.session_state[store][bank][kind] = files or None
+    if files and (store, bank, kind) == ("page_files", "SNB", "Promises"):
+        st.session_state["snb_promises_upload_time"] = datetime.now(ZoneInfo("Africa/Cairo"))
 
 
 def clear_overview_upload(bank, report_kind):
@@ -10993,7 +11038,7 @@ def _read_uploaded_frame_cached(file_bytes, file_name):
 # دالة معالجة بيانات أي صفحة
 def process_page_data(
     uploaded_files=None, bank="SNB", activity_files=None,
-    promises_files=None, include_report=True
+    promises_files=None, include_report=True, raw_portfolio=None
 ):
     explicit_sources = activity_files is not None or promises_files is not None
     if explicit_sources:
@@ -11009,6 +11054,7 @@ def process_page_data(
 
     today = pd.Timestamp(date.today()).normalize()
     promises_dfs = []
+    original_portfolios = []
     activity_dfs = []
     all_dfs = []
 
@@ -11077,6 +11123,8 @@ def process_page_data(
                         None, 0, 0, 0, 0, 0, 0
                     )
 
+            if raw_portfolio is not None and source_type == "promises":
+                original_portfolios.append(temp_df.copy())
             if PIVOT_NOTE in temp_df.columns:
                 temp_df[PIVOT_NOTE] = temp_df[PIVOT_NOTE].apply(_normalize_note_bucket)
             all_dfs.append(temp_df)
@@ -11095,6 +11143,8 @@ def process_page_data(
 
     df_all = pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
     df_promises = pd.concat(promises_dfs, ignore_index=True) if promises_dfs else pd.DataFrame()
+    if raw_portfolio is not None and original_portfolios:
+        raw_portfolio["frame"] = pd.concat(original_portfolios, ignore_index=True)
     # Retain the raw portfolio for the interactive, sequential neglect diagnostics.
     st.session_state.setdefault("neglect_source_df", {})[bank] = df_promises
     if activity_dfs:
@@ -11696,6 +11746,134 @@ def _render_snb_overview():
                                    file_name="SNB_Daily_Promises_Report.xlsx",
                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
+
+def _snb_promises_export(summary, types, active, broken, collectors):
+    stream = io.BytesIO()
+    overview = pd.DataFrame(summary, columns=["المؤشر", "القيمة"])
+    type_table = types.rename_axis("نوع الوعد").reset_index(name="العدد")
+    collector_table = pd.DataFrame(
+        [(name, current, missed, missed / (current + missed))
+         for (_, name), (current, missed) in collectors],
+        columns=["اسم المحصل", "قائمة", "مكسورة", "نسبة الكسر"],
+    )
+    with pd.ExcelWriter(stream, engine="openpyxl") as writer:
+        overview.to_excel(writer, sheet_name="ملخص", index=False)
+        type_table.to_excel(writer, sheet_name="ملخص", index=False, startrow=len(overview) + 2)
+        active.to_excel(writer, sheet_name="الوعود القائمة", index=False)
+        broken.to_excel(writer, sheet_name="الوعود المكسورة", index=False)
+        collector_table.to_excel(writer, sheet_name="لكل محصل", index=False)
+        writer.sheets["ملخص"]["B5"].number_format = "0.0%"
+        for row in writer.sheets["لكل محصل"].iter_rows(min_row=2, min_col=4):
+            for cell in row:
+                cell.number_format = "0.0%"
+        for sheet in writer.sheets.values():
+            sheet.sheet_view.rightToLeft = True
+            for column in sheet.columns:
+                width = 10
+                for cell in column:
+                    if cell.data_type == "f":
+                        cell.data_type = "s"
+                    if cell.value is not None:
+                        width = max(width, max(map(len, str(cell.value).splitlines() or [""])) + 3)
+                sheet.column_dimensions[column[0].column_letter].width = min(width, 72)
+    return stream.getvalue()
+
+
+def _render_snb_promises(files):
+    source = {}
+    active, broken, _, _, _, _, _, _, _, _, _ = process_page_data(
+        bank="SNB", promises_files=files or [], include_report=False, raw_portfolio=source
+    )
+    raw = source.get("frame", pd.DataFrame())
+    required = {"Follow up Due Date", "Follow up Last Date", "حالة المعالجة - التمويل",
+                "تحديث فئة العميل - التمويل", "Classification"}
+    ready = required.issubset(raw.columns)
+    account_col = _snb_find_column(raw, "Account Number", "رقم الحساب", "Customer Account Number",
+                                   "Debitor", "Debtor", "ID Numer", "ID Number")
+    accounts = None
+    if account_col:
+        identifiers = raw[account_col].dropna().astype(str).str.strip()
+        accounts = identifiers[identifiers.ne("")].nunique()
+    counts = (len(active), len(broken)) if ready else (None, None)
+    total = sum(counts) if ready else 0
+    ratio = counts[1] / total if total else None
+    summary = [("إجمالي الحسابات", accounts), ("الوعود القائمة", counts[0]),
+               ("الوعود المكسورة", counts[1]), ("نسبة الكسر (محسوبة)", ratio)]
+    colors = ("#5be39a", "#7fd6e0", "#2fb5a6", "#b9f5d8")
+    types = pd.Series(dtype=int)
+    collectors = {}
+    if ready:
+        active, broken = raw.loc[active.index], raw.loc[broken.index]
+        type_col = _snb_find_column(raw, "نوع الوعد", "نوع الوعد-التمويل", "نوع وعد السداد",
+                                    "Promise Type", "Promise_Type", "Promise Category",
+                                    "Promise to Pay Type", "Claim/نوع الوعد-التمويل")
+        if type_col:
+            labels = raw.loc[active.index.union(broken.index), type_col].dropna().astype(str).str.strip()
+            types = labels[labels.ne("")].value_counts()
+        for position, group in enumerate((active, broken)):
+            identities = _snb_overview_collectors(group)
+            for key, count in identities[identities.map(lambda key: bool(key[1]))].value_counts().items():
+                collectors.setdefault(key, [0, 0])[position] = count
+    ordered = sorted(collectors.items(), key=lambda item: -sum(item[1]))
+    export = _snb_promises_export(summary, types, active, broken, ordered) if ready else b""
+
+    with st.container(key="snb_glass_promises"):
+        with st.container(key="snb_pr_titlebar", horizontal=True, vertical_alignment="center"):
+            st.markdown('<h1 class="snb-ov-title">الوعود القائمة والمكسورة</h1>',
+                        unsafe_allow_html=True, width="stretch")
+            with st.container(key="snb_ov_upload_promises_page", horizontal=True, vertical_alignment="center",
+                              width="content"):
+                st.markdown("ارفعي المحفظة", width="content")
+                version = st.session_state.report_uploader_versions["SNB"]["Promises"]
+                key = f"report_uploader_SNB_Promises_{version}"
+                if files:
+                    uploaded_chip(files, "small_clear_report_SNB_Promises", clear_report_page_file, ("SNB", "Promises"))
+                else:
+                    st.file_uploader("رفع ملف الوعود", type=["xlsx", "csv"], accept_multiple_files=True,
+                                     label_visibility="collapsed", key=key, on_change=save_uploaded_files,
+                                     args=("page_files", "SNB", "Promises", key))
+            st.download_button(
+                "تنزيل ملف الوعود القائمة والمكسورة", export,
+                file_name=f"promises_{datetime.now(ZoneInfo('Africa/Cairo')):%Y-%m-%d}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                disabled=not export, help="ارفعي المحفظة أولًا" if not files else (
+                    "ملف المحفظة لا يحتوي على أعمدة الوعود المطلوبة" if not ready else None
+                ), key="snb_pr_download",
+            )
+        metrics = []
+        for index, ((title, value), color) in enumerate(zip(summary, colors)):
+            display = "—" if value is None else (f"{value:.1%}" if index == len(summary) - 1 else f"{value:,}")
+            metrics.append(f'<div><span>{title}</span><strong>{display}</strong><i style="background:{color}"></i></div>')
+        pills = [
+            f'<span><i style="background:{colors[index % len(colors)]}"></i>{_xml_escape(name)} <b>{count:,}</b></span>'
+            for index, (name, count) in enumerate(types.items())
+        ]
+        cards = []
+        for (_, name), (current, missed) in ordered[:10]:
+            active_share = current / (current + missed)
+            broken_share = missed / (current + missed)
+            cards.append(
+                f'<article class="snb-ov-card snb-pr-card"><header><b>{_xml_escape(name)}</b>'
+                f'<span>{broken_share:.1%} كسر</span></header>'
+                f'<div class="snb-pr-bar" style="--active:{active_share:.5%}"></div>'
+                f'<div class="snb-pr-counts"><span><b>{current:,}</b> قائمة</span>'
+                f'<span><b>{missed:,}</b> مكسورة</span></div></article>'
+            )
+        empty = '<div class="snb-ov-empty">—</div>'
+        notice = ( '<p class="snb-pr-message">مفيش ملف لسه مرفوع يا رنا، ارفعي الملف من الخانة اللي فوق</p>'
+                   if not files else '')
+        st.markdown(
+            '<div class="snb-ov-stack"><section class="snb-ov-card snb-pr-metrics">'
+            + "".join(metrics) + '</section>'
+            + '<section class="snb-ov-card"><h3>أنواع الوعود</h3><div class="snb-pr-pills">'
+            + ("".join(pills) or empty) + '</div></section>'
+            + '<section><h2 class="snb-ov-title">الوعود لكل محصل · أعلى 10 محصلين</h2>'
+            + (f'<div class="snb-pr-grid">{"".join(cards)}</div>' if cards else
+               f'<div class="snb-ov-card">{empty}{notice}</div>')
+            + '</section></div>', unsafe_allow_html=True,
+        )
+
+
 if _snb_overview_page:
     _render_snb_overview()
 elif curr_page == 'Overview':
@@ -11744,7 +11922,7 @@ elif curr_page == 'Overview':
 # Reuse the same result below; no duplicate parsing or filtering.
 _promise_header_result = None
 _neglect_header_result = None
-if curr_page == 'Promises' and bank_files.get('Promises'):
+if curr_page == 'Promises' and not _snb_promises_page and bank_files.get('Promises'):
     _promise_header_result = process_page_data(
         bank_files['Promises'], bank=selected_bank
     )
@@ -11754,7 +11932,7 @@ if curr_page == 'Neglect' and bank_files.get('Neglect'):
         bank_files['Neglect'], bank=selected_bank, include_report=False
     )
 
-if curr_page in ('Promises', 'Neglect'):
+if curr_page in ('Promises', 'Neglect') and not _snb_promises_page:
     _promise_metrics = None
     _neglect_export_df = pd.DataFrame()
     if curr_page == 'Promises' and _promise_header_result is not None:
@@ -11782,7 +11960,9 @@ if curr_page in ('Promises', 'Neglect'):
 # Keep other pages and their upload state completely unchanged.
 page_uploaded = None if _snb_overview_page or curr_page in ('Activity', 'ModelManagement', 'Performance', 'Comprehensive') else bank_files[curr_page]
 
-if _snb_overview_page:
+if _snb_promises_page:
+    _render_snb_promises(bank_files.get('Promises'))
+elif _snb_overview_page:
     pass  # The SNB overview above owns its rendering and file inputs.
 elif page_uploaded is None:
     if curr_page == 'Home':
