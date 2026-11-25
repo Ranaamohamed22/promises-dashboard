@@ -1784,7 +1784,7 @@ st.markdown(f"""
         font-family:"Cairo",Tahoma,sans-serif;
     }}
     .st-key-ejada_home_header {{
-        padding:8px clamp(8px,3vw,44px) 14px;
+        padding:12px clamp(8px,3vw,44px);
         border-bottom:1px solid #ffffff26;
     }}
     .ejada-home-header,.ejada-home-brand,.ejada-home-actions {{
@@ -1808,6 +1808,7 @@ st.markdown(f"""
         display:grid;place-items:center;border-radius:50%;width:36px;height:36px;
         background:white;color:#0A7A3F;font-weight:900;
     }}
+    .stApp .st-key-ejada_home_bank_picker {{gap:14px !important;margin-top:8px;}}
     .stApp .st-key-home_portfolio_switch {{
         display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr));
         direction:rtl;width:min(100%,420px) !important;margin-inline:auto;
@@ -1826,32 +1827,35 @@ st.markdown(f"""
     html body .stApp .st-key-home_portfolio_switch button[kind="primary"] p {{
         color:#0A7A3F !important;-webkit-text-fill-color:#0A7A3F !important;font-weight:900 !important;
     }}
-    .ejada-home-intro {{text-align:center;padding:6px 8px 12px;}}
-    .ejada-home-intro h1 {{font-size:clamp(30px,4vw,48px);font-weight:900;color:white;margin:0 0 6px;}}
+    .ejada-home-intro {{text-align:center;padding:0 8px;}}
+    .ejada-home-intro h1 {{font-size:30px;font-weight:900;color:white;margin:0 0 6px;}}
+    .ejada-home-intro p {{font-size:15px;}}
     .ejada-home-intro p,.ejada-home-footer {{color:#ffffffbb !important;margin:0;}}
     .stApp :is(.st-key-home_reports_SNB,.st-key-home_reports_STC) {{
         display:grid !important;grid-template-columns:repeat(3,minmax(0,1fr));
-        direction:rtl;gap:18px !important;width:min(100%,900px) !important;margin-inline:auto;
+        direction:rtl;gap:14px !important;width:min(100%,700px) !important;margin-inline:auto;
         --report-accent:#5be39a;--report-icon:#0A7A3F;
     }}
     .stApp .st-key-home_reports_STC {{--report-accent:#4F008C;--report-icon:#4F008C;}}
     .stApp [class*="st-key-home_report_card_"] {{
         position:relative;overflow:hidden;gap:0 !important;
         background:#ffffff1c;border:1px solid #ffffff40;
-        border-top:5px solid var(--report-accent);border-radius:24px;
+        border-top:4px solid var(--report-accent);border-radius:18px;
         box-shadow:0 10px 24px #041b3366;
         transition:transform .25s,background .25s,border-color .25s;
     }}
     .stApp [class*="st-key-home_report_card_"]:is(:hover,:focus-within) {{
-        transform:translateY(-8px);background:#ffffff2e;border-color:var(--report-accent);
+        transform:translateY(-6px);background:#ffffff2e;border-color:var(--report-accent);
     }}
     .ejada-report-card {{
-        min-height:148px;padding:16px 10px;display:grid;justify-items:center;align-content:center;
-        gap:9px;text-align:center;color:white;font-size:21px;font-weight:900;
+        box-sizing:border-box;min-height:105px;padding:16px 12px;display:grid;
+        justify-items:center;align-content:center;gap:8px;
+        text-align:center;color:white;font-size:16px;line-height:1.4;font-weight:900;
     }}
+    .st-key-home_report_card_Promises .ejada-report-card > span:last-child {{white-space:nowrap;}}
     .ejada-report-icon {{
-        display:grid;place-items:center;width:56px;height:56px;border-radius:15px;
-        background:white;color:var(--report-icon);font-size:27px;line-height:1;
+        display:grid;place-items:center;width:42px;height:42px;border-radius:12px;
+        background:white;color:var(--report-icon);font-size:19px;line-height:1;
     }}
     .stApp [class*="st-key-home_report_card_"] [data-testid="stElementContainer"]:has([data-testid="stButton"]) {{
         position:absolute;inset:0;z-index:2;
@@ -1860,12 +1864,11 @@ st.markdown(f"""
         width:100% !important;height:100% !important;
     }}
     .stApp [class*="st-key-home_report_card_"] button {{opacity:0;cursor:pointer;}}
-    .ejada-home-footer {{text-align:center;font-size:13px;margin:12px 0 0;}}
+    .ejada-home-footer {{text-align:center;font-size:13px;margin:0;}}
     @media (max-width:720px) {{
         .stApp :is(.st-key-home_reports_SNB,.st-key-home_reports_STC) {{grid-template-columns:repeat(2,minmax(0,1fr));}}
-        .ejada-report-card {{font-size:17px;}}
     }}
-    @media (max-width:420px) {{
+    @media (max-width:500px) {{
         .stApp :is(.st-key-home_reports_SNB,.st-key-home_reports_STC) {{grid-template-columns:minmax(0,1fr);}}
         .ejada-home-brand small {{display:none;}}
     }}
