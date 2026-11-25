@@ -323,10 +323,6 @@ def render_snb_comprehensive_page():
                 else:
                     st.error(f"تعذر معالجة التقرير الشامل: {error}")
 
-    st.markdown("### 📋 التقرير الشامل — البنك الأهلي السعودي")
-    st.caption(
-        "تظهر المؤشرات فور رفع الملف، ويمكن تحميل التقرير بنفس خطوات BUCKET المعتمدة."
-    )
     with st.expander("عرض خطوات المعالجة", expanded=False):
         st.markdown(
             "1. BN: أول خانتين من آخر BUCKET، مع تحويل 29 - 999 إلى Writeoff  \n"
