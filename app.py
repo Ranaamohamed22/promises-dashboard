@@ -1776,95 +1776,102 @@ st.markdown(f"""
 
     .stApp:has(.st-key-ejada_home_header),
     .stApp:has(.st-key-ejada_home_header) [data-testid="stMain"] {{
-        direction:rtl;
-        background:radial-gradient(ellipse at top right,#4F008C0c,transparent 44%),
-                   radial-gradient(ellipse at bottom left,#0A7A3F12,transparent 40%),#F6F4FB !important;
+        direction:rtl;color:white;
+        background:radial-gradient(circle at 80% 20%, #0A7A3F 0, #0E2A47 55%) !important;
     }}
     .stApp :is(.st-key-ejada_home_header,.st-key-ejada_home_bank_picker),
     .stApp :is(.st-key-ejada_home_header,.st-key-ejada_home_bank_picker) * {{
         font-family:"Cairo",Tahoma,sans-serif;
     }}
-    .stApp .st-key-ejada_home_header {{
-        position:sticky;top:0;z-index:20;
-        background:#ffffffd9;backdrop-filter:blur(14px);
-        border-bottom:1px solid #E9E4F3;
-        padding:12px clamp(14px,3vw,48px);
+    .st-key-ejada_home_header {{
+        padding:8px clamp(8px,3vw,44px) 14px;
+        border-bottom:1px solid #ffffff26;
     }}
     .ejada-home-header,.ejada-home-brand,.ejada-home-actions {{
-        display:flex;align-items:center;gap:14px;
+        display:flex;align-items:center;gap:14px;color:white;
     }}
-    .ejada-home-header {{justify-content:space-between;color:#0E2A47;}}
-    .ejada-home-brand strong {{display:block;font-size:32px;line-height:1.02;}}
+    .ejada-home-header {{justify-content:space-between;}}
+    .ejada-home-brand strong {{display:block;font-size:32px;line-height:1.05;}}
     .ejada-home-brand b {{display:block;font-size:11px;letter-spacing:4px;text-align:center;}}
-    .ejada-home-brand small {{border-inline-start:1px solid #E9E4F3;padding-inline-start:12px;color:#7C86A0;}}
-    .ejada-home-help {{position:relative;}}
-    .ejada-home-help summary,.ejada-welcome-chip {{
-        list-style:none;display:inline-block;background:white;color:#0E2A47;
-        border:1px solid #E9E4F3;border-radius:999px;padding:7px 15px;font-size:13px;
+    .ejada-home-brand small {{border-inline-start:1px solid #ffffff40;padding-inline-start:12px;color:#ffffffbb;}}
+    .ejada-home-help {{position:relative;z-index:3;}}
+    .ejada-home-help summary {{
+        list-style:none;cursor:pointer;background:#ffffff21;color:white;
+        border:1px solid #ffffff40;border-radius:999px;padding:6px 14px;font-size:13px;
     }}
-    .ejada-home-help summary {{cursor:pointer;}}
     .ejada-home-help summary::-webkit-details-marker {{display:none;}}
     .ejada-home-help p {{
         position:absolute;inset-inline-end:0;top:100%;width:225px;
-        padding:12px;background:#fff;border:1px solid #E9E4F3;border-radius:12px;
+        padding:12px;color:white;background:#0E2A47;border:1px solid #ffffff40;border-radius:12px;
     }}
     .ejada-home-avatar {{
         display:grid;place-items:center;border-radius:50%;width:36px;height:36px;
-        background:#4F008C;color:white;
+        background:white;color:#0A7A3F;font-weight:900;
     }}
-    .ejada-home-intro {{text-align:center;padding:clamp(6px,1vw,12px) 12px 14px;}}
-    .ejada-home-intro h1 {{font-size:clamp(34px,4vw,54px);font-weight:900;color:#0E2A47;margin:10px 0;}}
-    .ejada-home-intro p,.ejada-home-footer {{color:#7C86A0;}}
-    .stApp .st-key-ejada_home_bank_cards {{
+    .stApp .st-key-home_portfolio_switch {{
         display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr));
-        gap:24px !important;width:min(100%,1000px) !important;margin-inline:auto;
+        direction:rtl;width:min(100%,420px) !important;margin-inline:auto;
+        gap:4px !important;padding:5px;border:1px solid #ffffff40;
+        border-radius:999px;background:#ffffff1c;
     }}
-    .st-key-bank_card_STC {{--bank:#4F008C;--bank-soft:#f3eafa;}}
-    .st-key-bank_card_SNB {{--bank:#0A7A3F;--bank-soft:#eaf6ee;}}
-    .stApp .st-key-ejada_home_bank_cards [class*="st-key-bank_card_"] {{
-        position:relative;display:flex;overflow:hidden;
-        gap:0 !important;background:#fff;color:#0E2A47;
-        border:1.5px solid #E9E4F3;border-radius:24px;
-        transition:transform .25s,border-color .25s,box-shadow .25s;
+    html body .stApp .st-key-home_portfolio_switch button {{
+        background:transparent !important;border:0 !important;border-radius:999px !important;
+        box-shadow:none !important;min-height:40px;
     }}
-    .stApp .st-key-ejada_home_bank_cards [class*="st-key-bank_card_"]:is(:hover,:focus-within) {{
-        transform:translateY(-8px);border-color:var(--bank);box-shadow:0 20px 42px #0E2A4722;
+    html body .stApp .st-key-home_portfolio_switch button p {{
+        color:#ffffffc9 !important;-webkit-text-fill-color:#ffffffc9 !important;
+        font-weight:700 !important;text-align:center;
     }}
-    .ejada-bank-card {{
-        border-top:6px solid var(--bank);padding:26px clamp(15px,3vw,34px);
-        min-height:278px;display:flex;flex-direction:column;gap:12px;
+    html body .stApp .st-key-home_portfolio_switch button[kind="primary"] {{background:white !important;}}
+    html body .stApp .st-key-home_portfolio_switch button[kind="primary"] p {{
+        color:#0A7A3F !important;-webkit-text-fill-color:#0A7A3F !important;font-weight:900 !important;
     }}
-    .ejada-bank-card-top {{display:flex;justify-content:space-between;align-items:center;}}
-    .ejada-bank-badge,.ejada-bank-arrow {{display:grid;place-items:center;}}
-    .ejada-bank-badge {{
-        width:68px;height:68px;border-radius:20px;background:var(--bank-soft);
-        color:var(--bank);font-size:23px;font-weight:900;
+    .ejada-home-intro {{text-align:center;padding:6px 8px 12px;}}
+    .ejada-home-intro h1 {{font-size:clamp(30px,4vw,48px);font-weight:900;color:white;margin:0 0 6px;}}
+    .ejada-home-intro p,.ejada-home-footer {{color:#ffffffbb !important;margin:0;}}
+    .stApp :is(.st-key-home_reports_SNB,.st-key-home_reports_STC) {{
+        display:grid !important;grid-template-columns:repeat(3,minmax(0,1fr));
+        direction:rtl;gap:18px !important;width:min(100%,900px) !important;margin-inline:auto;
+        --report-accent:#5be39a;--report-icon:#0A7A3F;
     }}
-    .ejada-bank-arrow {{
-        width:42px;height:42px;border-radius:50%;border:1px solid #E9E4F3;
-        transition:transform .25s,background .25s,color .25s;
+    .stApp .st-key-home_reports_STC {{--report-accent:#4F008C;--report-icon:#4F008C;}}
+    .stApp [class*="st-key-home_report_card_"] {{
+        position:relative;overflow:hidden;gap:0 !important;
+        background:#ffffff1c;border:1px solid #ffffff40;
+        border-top:5px solid var(--report-accent);border-radius:24px;
+        box-shadow:0 10px 24px #041b3366;
+        transition:transform .25s,background .25s,border-color .25s;
     }}
-    [class*="st-key-bank_card_"]:is(:hover,:focus-within) .ejada-bank-arrow {{
-        background:var(--bank);color:white;transform:translateX(-4px);
+    .stApp [class*="st-key-home_report_card_"]:is(:hover,:focus-within) {{
+        transform:translateY(-8px);background:#ffffff2e;border-color:var(--report-accent);
     }}
-    .ejada-bank-card h2 {{color:#0E2A47;font-size:clamp(20px,2.3vw,28px);font-weight:900;margin:0;}}
-    .ejada-bank-card p {{color:#7C86A0;line-height:1.75;margin:0;}}
-    .ejada-bank-chips {{display:flex;gap:7px;flex-wrap:wrap;margin-top:auto;}}
-    .ejada-bank-chips span {{
-        display:inline-flex;align-items:center;gap:6px;border-radius:999px;
-        background:var(--bank-soft);color:var(--bank);padding:5px 10px;font-size:12px;font-weight:800;
+    .ejada-report-card {{
+        min-height:148px;padding:16px 10px;display:grid;justify-items:center;align-content:center;
+        gap:9px;text-align:center;color:white;font-size:21px;font-weight:900;
     }}
-    .ejada-bank-chips span::before {{content:"";width:6px;height:6px;border-radius:50%;background:var(--bank);}}
-    .stApp .st-key-ejada_home_bank_cards [data-testid="stElementContainer"]:has([data-testid="stButton"]) {{
+    .ejada-report-icon {{
+        display:grid;place-items:center;width:56px;height:56px;border-radius:15px;
+        background:white;color:var(--report-icon);font-size:27px;line-height:1;
+    }}
+    .stApp [class*="st-key-home_report_card_"] [data-testid="stElementContainer"]:has([data-testid="stButton"]) {{
         position:absolute;inset:0;z-index:2;
     }}
-    .stApp .st-key-ejada_home_bank_cards [data-testid="stButton"],
-    .stApp .st-key-ejada_home_bank_cards button {{width:100% !important;height:100% !important;}}
-    .stApp .st-key-ejada_home_bank_cards button {{opacity:0;cursor:pointer;}}
-    .ejada-home-footer {{text-align:center;font-size:12px;margin:44px 0 24px;}}
-    @media (max-width:690px) {{
-        .stApp .st-key-ejada_home_bank_cards {{grid-template-columns:minmax(0,1fr);max-width:490px;}}
+    .stApp [class*="st-key-home_report_card_"] :is([data-testid="stButton"],button) {{
+        width:100% !important;height:100% !important;
+    }}
+    .stApp [class*="st-key-home_report_card_"] button {{opacity:0;cursor:pointer;}}
+    .ejada-home-footer {{text-align:center;font-size:13px;margin:12px 0 0;}}
+    @media (max-width:720px) {{
+        .stApp :is(.st-key-home_reports_SNB,.st-key-home_reports_STC) {{grid-template-columns:repeat(2,minmax(0,1fr));}}
+        .ejada-report-card {{font-size:17px;}}
+    }}
+    @media (max-width:420px) {{
+        .stApp :is(.st-key-home_reports_SNB,.st-key-home_reports_STC) {{grid-template-columns:minmax(0,1fr);}}
         .ejada-home-brand small {{display:none;}}
+    }}
+    @media (prefers-reduced-motion:reduce) {{
+        .stApp [class*="st-key-home_report_card_"] {{transition:none;}}
+        .stApp [class*="st-key-home_report_card_"]:is(:hover,:focus-within) {{transform:none;}}
     }}
     /* Limit white diagnostic expander to the size of its steps table. */
     div[class*="st-key-promise_diagnostic_SNB_"] {{
@@ -2485,7 +2492,7 @@ if st.session_state.current_page == "Home":
             <div class="ejada-home-brand"><div><strong>إجادة</strong><b dir="ltr">EJADA</b></div>
             <small>منظومة تحصيل الديون<br>وتقارير الأداء</small></div>
             <div class="ejada-home-actions"><details class="ejada-home-help">
-            <summary>المساعدة ؟</summary><p>اضغطي على كارت البنك لفتح تقاريره. للرجوع استخدمي زر «تغيير البنك».</p>
+            <summary>المساعدة ؟</summary><p>اختاري البنك من زر التبديل واضغطي على كارت التقرير لفتحه.</p>
             </details><span class="ejada-home-avatar" aria-label="رنا">ر</span></div></div>""",
             unsafe_allow_html=True,
         )
@@ -2506,16 +2513,21 @@ else:
     """, unsafe_allow_html=True)
 
 # Keep report navigation in the SAME row as SNB/STC, aligned to the top right.
-def _render_ejada_main_navigation():
+def _ejada_report_pages(bank):
     pages = [
         ("Overview", "نظرة عامة", "top_overview_btn"),
         ("Promises", "الوعود القائمة والمكسورة", "nav_prom_btn"),
         ("Neglect", "الإهمال", "nav_neg_btn"),
         ("Activity", "النشاط", "nav_act_btn"),
     ]
-    if st.session_state.selected_bank == "SNB":
+    if bank == "SNB":
         pages.append(("Performance", "تقرير الأداء", "nav_perf_btn"))
         pages.append(("Comprehensive", "التقرير الشامل", "nav_comprehensive_btn"))
+    return pages
+
+
+def _render_ejada_main_navigation():
+    pages = _ejada_report_pages(st.session_state.selected_bank)
     with st.container(key="report_pills", horizontal=True, width="content", gap=None):
         for page, label, key in pages:
             if page == "Neglect":
@@ -11369,38 +11381,42 @@ page_uploaded = None if curr_page in ('Activity', 'ModelManagement', 'Performanc
 if page_uploaded is None:
     if curr_page == 'Home':
         with st.container(key="ejada_home_bank_picker"):
+            bank = st.session_state.selected_bank
+            with st.container(key="home_portfolio_switch"):
+                for option, name in BANKS.items():
+                    st.button(
+                        name, key=f"home_switch_{option}", width="stretch",
+                        type="primary" if bank == option else "secondary",
+                        on_click=set_bank, args=(option,),
+                    )
+            bank_name = "SNB" if bank == "SNB" else "بنك STC"
             st.markdown(
-                """<div class="ejada-home-intro" dir="rtl">
-                <span class="ejada-welcome-chip">أهلاً بيكي في إجادة</span>
-                <h1>اختاري البنك</h1>
-                <p>اختاري المحفظة اللي عايزة تشتغلي عليها النهاردة، وكل تقاريرها هتظهرلك فورًا</p>
-                </div>""",
+                f"""<div class="ejada-home-intro" dir="rtl">
+                <h1>أهلاً بيكي في محفظة {bank_name}</h1>
+                <p>اختاري التقرير اللي عايزاه مباشرة</p></div>""",
                 unsafe_allow_html=True,
             )
-            banks = (
-                ("STC", "بنك STC", "محفظة تحصيل بنك STC لمتابعة أداء المحصلين، الوعود، المتابعات، والمعالجات.",
-                 ("تقارير الأداء", "المحصلين", "المتابعات")),
-                ("SNB", "البنك الأهلي السعودي", "محفظة تحصيل البنك الأهلي السعودي لمتابعة الأداء، جودة التواصل، القانونية، وPayroll.",
-                 ("تقارير الأداء", "القانونية", "Payroll")),
-            )
-            with st.container(key="ejada_home_bank_cards"):
-                for bank, name, description, reports in banks:
-                    with st.container(key=f"bank_card_{bank}"):
-                        chips = "".join(f"<span>{report}</span>" for report in reports)
+            icons = {
+                "Overview": "◉", "Promises": "⚑", "Neglect": "⚠",
+                "Activity": "⟳", "Performance": "▥", "Comprehensive": "▤",
+            }
+            with st.container(key=f"home_reports_{bank}"):
+                for page, label, _ in _ejada_report_pages(bank):
+                    with st.container(key=f"home_report_card_{page}"):
                         st.markdown(
-                            f"""<div class="ejada-bank-card" dir="rtl">
-                            <div class="ejada-bank-card-top"><span class="ejada-bank-badge">{bank}</span>
-                            <span class="ejada-bank-arrow" aria-hidden="true">←</span></div>
-                            <h2>{name}</h2><p>{description}</p><div class="ejada-bank-chips">{chips}</div>
-                            </div>""",
+                            f'<div class="ejada-report-card" aria-hidden="true">'
+                            f'<span class="ejada-report-icon">{icons[page]}</span>'
+                            f'<span>{label}</span></div>',
                             unsafe_allow_html=True,
                         )
                         st.button(
-                            f"فتح تقارير {name}", key=f"home_open_bank_{bank}", width="stretch",
-                            on_click=open_bank_reports, args=(bank,),
+                            label, key=f"home_report_open_{page}", width="stretch",
+                            on_click=open_neglect_page if page == "Neglect" else set_page,
+                            args=() if page == "Neglect" else (page,),
                         )
+            other_bank = "بنك STC" if bank == "SNB" else "البنك الأهلي السعودي"
             st.markdown(
-                '<footer class="ejada-home-footer">منصة إجادة لتحصيل الديون © 2026</footer>',
+                f'<p class="ejada-home-footer">محفظة {other_bank}؟ بدّلي من الزر اللي فوق</p>',
                 unsafe_allow_html=True,
             )
     elif curr_page == 'Overview':
