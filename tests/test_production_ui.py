@@ -11,7 +11,10 @@ class TestProductionUi(unittest.TestCase):
         app_path = Path(__file__).resolve().parents[1] / "app.py"
         ui = AppTest.from_file(str(app_path), default_timeout=60).run()
         self.assertEqual(len(ui.exception), 0)
-        self.assertEqual(ui.session_state["theme_choice"], "حسب البنك (تلقائي)")
+        self.assertEqual(ui.session_state["theme"], "navy")
+        ui.button(key="ejada_theme_dark").click().run()
+        self.assertEqual(len(ui.exception), 0)
+        self.assertEqual(ui.session_state["theme"], "dark")
 
         ui.button(key="home_report_open_Overview").click().run()
         self.assertEqual(len(ui.exception), 0)
@@ -23,9 +26,7 @@ class TestProductionUi(unittest.TestCase):
         self.assertEqual(len(ui.exception), 0)
         self.assertEqual(ui.session_state["current_page"], "Performance")
 
-        ui.selectbox(key="theme_choice").set_value("أسود هادي (Charcoal)").run()
-        self.assertEqual(len(ui.exception), 0)
-        self.assertEqual(ui.session_state["theme_choice"], "أسود هادي (Charcoal)")
+        self.assertEqual(ui.session_state["theme"], "dark")
         self.assertEqual(ui.session_state["selected_bank"], "SNB")
 
         # Keep native upload controls and tabs, without the custom reset button.
@@ -46,10 +47,8 @@ class TestProductionUi(unittest.TestCase):
         ui.button(key="home_report_open_Overview").click().run()
         self.assertEqual(len(ui.exception), 0)
         self.assertEqual(ui.session_state["selected_bank"], "STC")
-        ui.selectbox(key="theme_choice").set_value("حسب البنك (تلقائي)").run()
-        self.assertEqual(len(ui.exception), 0)
-        self.assertEqual(ui.session_state["theme_choice"], "حسب البنك (تلقائي)")
         self.assertEqual(ui.session_state["selected_bank"], "STC")
+        self.assertEqual(ui.session_state["theme"], "dark")
 
 if __name__ == "__main__":
     unittest.main()
