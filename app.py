@@ -539,7 +539,6 @@ st.markdown(f"""
     .bank-logo-home img {{max-width:96%;max-height:176px;object-fit:contain;}}
     .bank-logo-nav {{width:fit-content;max-width:100%;margin-right:auto;margin-left:0;padding:0 7px;}}
     .bank-logo-nav img {{height:68px;max-width:100%;object-fit:contain;}}
-    .st-key-ejada_home_bank_picker [data-testid="stButton"] button p {{font-size:20px !important;}}
     .stApp {{ background-color: {bg_color} !important; }}
     /* Hide any stale/raw markdown artifact from older bank-label markup after redeploy. */
     div[data-testid="stMarkdownContainer"] > p:has(code) {{
@@ -1774,28 +1773,81 @@ st.markdown(f"""
     }}
 
 
-    /* Home: two bank logos INSIDE the white welcome card. */
-    div.st-key-ejada_home_bank_picker {{
-        background: #FFFFFF !important;
-        border: 1px solid #D7E3EE !important;
-        border-radius: 20px !important;
-        padding: 24px 22px 18px !important;
-        margin-top: 12px !important;
-        margin-bottom: 20px !important;
-        box-shadow: 0 4px 14px rgba(0,0,0,0.06) !important;
+    .stApp .st-key-ejada_home_bank_picker {{
+        background:#f8fbff !important;
+        border:1px solid #D7E3EE !important;
+        border-radius:18px !important;
+        padding:22px 18px 26px !important;
     }}
-    div.st-key-ejada_home_bank_picker [data-testid="stButton"] button {{
-        min-height: 48px !important;
-        font-size: 18px !important;
-        font-weight: 900 !important;
-        border-radius: 12px !important;
-        background: #1F4373 !important;
-        color: #FFFFFF !important;
-        border: 1px solid #1F4373 !important;
+    .stApp .bank-picker-heading {{
+        margin:0 0 10px;
+        text-align:center;
+        color:#153754;
     }}
-    div.st-key-ejada_home_bank_picker [data-testid="stButton"] button:hover {{
-        background: #304D73 !important;
-        border-color: #304D73 !important;
+    .stApp .st-key-ejada_home_bank_cards {{
+        display:grid !important;
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        direction:rtl;
+        gap:14px !important;
+        width:min(100%,660px) !important;
+        margin-inline:auto;
+    }}
+    .stApp .st-key-home_open_bank_SNB {{
+        --bank-card-logo:url("{BANK_LOGOS['SNB']}");
+        --bank-card-border:#178049;
+        --bank-card-background:#edf8f1;
+    }}
+    .stApp .st-key-home_open_bank_STC {{
+        --bank-card-logo:url("{BANK_LOGOS['STC']}");
+        --bank-card-border:#702cc0;
+        --bank-card-background:#f5effc;
+    }}
+    html body .stApp .st-key-ejada_home_bank_cards button {{
+        position:relative;
+        min-height:136px !important;
+        padding:78px 36px 14px !important;
+        background:var(--bank-card-background) !important;
+        border:1px solid var(--bank-card-border) !important;
+        border-radius:14px !important;
+        box-shadow:none !important;
+    }}
+    html body .stApp .st-key-ejada_home_bank_cards button p {{
+        color:#153754 !important;
+        -webkit-text-fill-color:#153754 !important;
+        font-size:17px !important;
+        font-weight:800 !important;
+    }}
+    .stApp .st-key-ejada_home_bank_cards button::before {{
+        content:"";
+        position:absolute;
+        inset:16px 0 auto;
+        height:60px;
+        background:var(--bank-card-logo) center / contain no-repeat;
+        width:86px;
+        margin-inline:auto;
+        mix-blend-mode:multiply;
+        pointer-events:none;
+    }}
+    .stApp .st-key-home_open_bank_STC button::before {{width:145px;}}
+    .stApp .st-key-ejada_home_bank_cards button::after {{
+        content:"←" / "";
+        position:absolute;
+        left:14px;
+        top:calc(50% - 14px);
+        font-size:20px;
+        color:#153754;
+        pointer-events:none;
+    }}
+    html body .stApp .st-key-ejada_home_bank_cards button:hover,
+    html body .stApp .st-key-ejada_home_bank_cards button:focus-visible {{
+        outline:2px solid var(--bank-card-border);
+        outline-offset:2px;
+    }}
+    @media (max-width:640px) {{
+        .stApp .st-key-ejada_home_bank_cards {{
+            grid-template-columns:minmax(0,1fr);
+            max-width:340px;
+        }}
     }}
     /* Limit white diagnostic expander to the size of its steps table. */
     div[class*="st-key-promise_diagnostic_SNB_"] {{
@@ -11320,37 +11372,15 @@ if page_uploaded is None:
     if curr_page == 'Home':
         with st.container(border=True, key="ejada_home_bank_picker"):
             st.markdown(
-                """
-                <div style="text-align:center;direction:rtl;padding:18px 8px 12px;">
-                  <h2 style="color:#1F4373;font-weight:900;font-size:30px;">
-                    أهلاً بيكي يا رنا في تقارير شركة إجادة لتحصيل الديون
-                  </h2>
-                  <p style="color:#304D73;font-weight:800;font-size:17px;">
-                    اختاري البنك من شعاره لفتح تقاريره الخاصة
-                  </p>
-                </div>
-                """, unsafe_allow_html=True
+                '<h2 class="bank-picker-heading" dir="rtl">اختاري البنك</h2>',
+                unsafe_allow_html=True,
             )
-            spacer_right, snb_home_col, stc_home_col, spacer_left = st.columns(
-                [1, 2.2, 2.2, 1], gap="large"
-            )
-            with snb_home_col:
-                st.markdown(bank_logo("SNB", "home"), unsafe_allow_html=True)
-                st.button(
-                    "فتح تقارير البنك الأهلي SNB", key="home_open_bank_SNB",
-                    use_container_width=True, type="primary",
-                    on_click=open_bank_reports, args=("SNB",),
-                )
-            with stc_home_col:
-                st.markdown(bank_logo("STC", "home"), unsafe_allow_html=True)
-                st.button(
-                    "فتح تقارير بنك STC", key="home_open_bank_STC",
-                    use_container_width=True, type="primary",
-                    on_click=open_bank_reports, args=("STC",),
-                )
-            st.markdown(
-                '<div style="height:14px;"></div>', unsafe_allow_html=True
-            )
+            with st.container(key="ejada_home_bank_cards"):
+                for bank, name in (("SNB", "البنك الأهلي السعودي"), ("STC", "بنك STC")):
+                    st.button(
+                        name, key=f"home_open_bank_{bank}", width="stretch",
+                        on_click=open_bank_reports, args=(bank,),
+                    )
     elif curr_page == 'Overview':
         st.markdown(f"""
         <div style="background-color:{card_color};border:1px solid {border_color};border-radius:15px;padding:22px 18px;margin:8px 0 18px;text-align:center;direction:rtl;">
