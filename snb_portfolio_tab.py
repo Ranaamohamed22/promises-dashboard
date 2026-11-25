@@ -7,6 +7,7 @@ Existing build_snb_performance and its exported workbooks are not modified.
 from html import escape as html_escape
 from io import BytesIO
 import re
+import unicodedata
 
 import pandas as pd
 import streamlit as st
@@ -34,10 +35,27 @@ COLUMNS = (
 )
 
 
+def _header_key(value):
+    text = unicodedata.normalize("NFKC", str(value)).casefold()
+    return "".join(
+        char for char in text
+        if unicodedata.category(char) not in {"Cf", "Mn", "Pd"}
+        and not char.isspace() and char not in "_ـ−"
+    )
+
+
 def _required_column(frame, candidates, label):
-    lookup = {str(col).strip().casefold(): col for col in frame.columns}
+    exact = {str(col).strip().casefold(): col for col in frame.columns}
+    normalized = {}
+    for col in frame.columns:
+        normalized.setdefault(_header_key(col), []).append(col)
     for candidate in candidates:
-        match = lookup.get(candidate.strip().casefold())
+        match = exact.get(candidate.casefold())
+        if match is not None:
+            return match
+    for candidate in candidates:
+        matches = normalized.get(_header_key(candidate), ())
+        match = matches[0] if len(matches) == 1 else None
         if match is not None:
             return match
     raise ValueError(
