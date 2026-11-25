@@ -9598,12 +9598,12 @@ def _stc_daily_note_times(result, collector, notes, stamps, include_after_break=
     columns = [
         collector,
         "ميعاد أول إفادة", "حالة أول إفادة",
-        "ميعاد آخر إفادة", "حالة آخر إفادة",
     ]
     if include_after_break:
         columns += ["ميعاد أول إفادة بعد البريك", "حالة أول إفادة بعد البريك"]
+    columns += ["ميعاد آخر إفادة", "حالة آخر إفادة"]
     if result.empty:
-        return pd.DataFrame(columns=columns)
+        return pd.DataFrame(columns=["اسم المحصل", *columns[1:]])
 
     # Stable chronological ordering preserves the source order on ties.
     ordered_stamps = stamps.loc[result.index].sort_values(kind="stable")
@@ -9626,7 +9626,9 @@ def _stc_daily_note_times(result, collector, notes, stamps, include_after_break=
         post = after.drop_duplicates(subset=[collector], keep="first").set_index(collector)
         output["ميعاد أول إفادة بعد البريك"] = post["الوقت"].reindex(output.index)
         output["حالة أول إفادة بعد البريك"] = post["تقييم المكالمات"].reindex(output.index)
-    return output.fillna("").reset_index().loc[:, columns]
+    return output.fillna("").reset_index().loc[:, columns].rename(
+        columns={collector: "اسم المحصل"}
+    )
 
 def _format_duty_span(span):
     seconds = int(round(span.total_seconds()))
@@ -9694,13 +9696,19 @@ def _stc_download(sheets, title, filename, summary_title=None):
 
         if summary_title is None and filename.startswith("STC_Weekly"):
             summary_title = "STC Bank تقرير النشاط الأسبوعي"
-        if summary_title and "ملخص المحصلين" in writer.book:
-            sheet = writer.book["ملخص المحصلين"]
+        sheet_titles = {
+            "ملخص المحصلين": summary_title,
+            "أول وآخر إفادة": "موعد الإفادات",
+        }
+        for name, heading in sheet_titles.items():
+            if not heading or name not in writer.book:
+                continue
+            sheet = writer.book[name]
             last_column = get_column_letter(sheet.max_column)
             sheet.insert_rows(1)
             sheet.merge_cells(f"A1:{last_column}1")
             title_cell = sheet["A1"]
-            title_cell.value = summary_title
+            title_cell.value = heading
             title_cell.fill = PatternFill(fill_type="solid", fgColor="17375E")
             title_cell.font = Font(name="Calibri", size=15, bold=True, color="FFFFFF")
             title_cell.alignment = Alignment(horizontal="center", vertical="center")
@@ -9709,6 +9717,8 @@ def _stc_download(sheets, title, filename, summary_title=None):
             sheet.auto_filter.ref = f"A2:{last_column}{sheet.max_row}"
             sheet.sheet_view.showGridLines = True
             sheet.sheet_view.rightToLeft = False
+            if sheet.freeze_panes == "A2":
+                sheet.freeze_panes = "A3"
     st.download_button(title, buf.getvalue(), file_name=filename,
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
@@ -9908,8 +9918,8 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
         summary["نسبة تحقيق المكالمات الناجحة"] = (
             successful.div(covered.where(covered.ne(0))).fillna(0)
         )
-        period_label = "الفترة الأولى" if first else "في اليوم الكامل"
-        report_title = f"تقرير نشاط الفترة — {period_label} — STC Bank"
+        period_label = "الفترة الأولى" if first else "اليوم الكامل"
+        report_title = f"تقرير نشاط {period_label} STC Bank"
         sheets = {
             "المكالمات": display_result,
             "ملخص المحصلين": summary.rename(columns={collector: "اسم المحصل"}),
@@ -9919,11 +9929,7 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
         sheets["أول وآخر إفادة"] = _stc_daily_note_times(
             result, collector, notes, stamps, include_after_break=not first
         )
-        note_title = (
-            "أول وآخر إفادة لكل محصل"
-            if first else "أول وآخر إفادة لكل محصل وحالة أول إفادة بعد البريك"
-        )
-        with st.expander(note_title):
+        with st.expander("موعد الإفادات"):
             st.dataframe(sheets["أول وآخر إفادة"], hide_index=True)
         st.markdown(f"### {report_title}")
         _stc_download(
