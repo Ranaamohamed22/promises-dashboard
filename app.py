@@ -1794,16 +1794,6 @@ st.markdown(f"""
     .ejada-home-brand strong {{display:block;font-size:32px;line-height:1.05;}}
     .ejada-home-brand b {{display:block;font-size:11px;letter-spacing:4px;text-align:center;}}
     .ejada-home-brand small {{border-inline-start:1px solid #ffffff40;padding-inline-start:12px;color:#ffffffbb;}}
-    .ejada-home-help {{position:relative;z-index:3;}}
-    .ejada-home-help summary {{
-        list-style:none;cursor:pointer;background:#ffffff21;color:white;
-        border:1px solid #ffffff40;border-radius:999px;padding:6px 14px;font-size:13px;
-    }}
-    .ejada-home-help summary::-webkit-details-marker {{display:none;}}
-    .ejada-home-help p {{
-        position:absolute;inset-inline-end:0;top:100%;width:225px;
-        padding:12px;color:white;background:#0E2A47;border:1px solid #ffffff40;border-radius:12px;
-    }}
     .ejada-home-avatar {{
         display:grid;place-items:center;border-radius:50%;width:36px;height:36px;
         background:white;color:#0A7A3F;font-weight:900;
@@ -1828,10 +1818,8 @@ st.markdown(f"""
         color:#0A7A3F !important;-webkit-text-fill-color:#0A7A3F !important;font-weight:900 !important;
     }}
     .ejada-home-intro {{text-align:center;padding:0 8px;}}
-    .stApp .st-key-ejada_home_bank_picker > [data-testid="stElementContainer"]:has(.ejada-home-intro) {{min-height:64px !important;}}
+    .stApp .st-key-ejada_home_bank_picker > [data-testid="stElementContainer"]:has(.ejada-home-intro) {{min-height:42px !important;}}
     .ejada-home-intro h1 {{font-size:30px;font-weight:900;color:white;margin:0 0 6px;padding:0 !important;}}
-    .ejada-home-intro p {{font-size:15px;}}
-    .ejada-home-intro p,.ejada-home-footer {{color:#ffffffbb !important;margin:0;}}
     .stApp :is(.st-key-home_reports_SNB,.st-key-home_reports_STC) {{
         display:grid !important;grid-template-columns:repeat(3,minmax(0,1fr));
         direction:rtl;gap:14px !important;width:min(100%,700px) !important;margin-inline:auto;
@@ -1865,7 +1853,6 @@ st.markdown(f"""
         width:100% !important;height:100% !important;
     }}
     .stApp [class*="st-key-home_report_card_"] button {{opacity:0;cursor:pointer;}}
-    .ejada-home-footer {{text-align:center;font-size:13px;margin:0;}}
     @media (max-width:720px) {{
         .stApp :is(.st-key-home_reports_SNB,.st-key-home_reports_STC) {{grid-template-columns:repeat(2,minmax(0,1fr));}}
     }}
@@ -2495,9 +2482,7 @@ if st.session_state.current_page == "Home":
             """<div class="ejada-home-header" dir="rtl">
             <div class="ejada-home-brand"><div><strong>إجادة</strong><b dir="ltr">EJADA</b></div>
             <small>منظومة تحصيل الديون<br>وتقارير الأداء</small></div>
-            <div class="ejada-home-actions"><details class="ejada-home-help">
-            <summary>المساعدة ؟</summary><p>اختاري البنك من زر التبديل واضغطي على كارت التقرير لفتحه.</p>
-            </details><span class="ejada-home-avatar" aria-label="رنا">ر</span></div></div>""",
+            <div class="ejada-home-actions"><span class="ejada-home-avatar" aria-label="رنا">ر</span></div></div>""",
             unsafe_allow_html=True,
         )
 else:
@@ -11396,8 +11381,7 @@ if page_uploaded is None:
             bank_name = "SNB" if bank == "SNB" else "بنك STC"
             st.markdown(
                 f"""<div class="ejada-home-intro" dir="rtl">
-                <h1>أهلاً بيكي في محفظة {bank_name}</h1>
-                <p>اختاري التقرير اللي عايزاه مباشرة</p></div>""",
+                <h1>أهلاً بيكي في محفظة {bank_name}</h1></div>""",
                 unsafe_allow_html=True,
             )
             icons = {
@@ -11418,11 +11402,6 @@ if page_uploaded is None:
                             on_click=open_neglect_page if page == "Neglect" else set_page,
                             args=() if page == "Neglect" else (page,),
                         )
-            other_bank = "بنك STC" if bank == "SNB" else "البنك الأهلي السعودي"
-            st.markdown(
-                f'<p class="ejada-home-footer">محفظة {other_bank}؟ بدّلي من الزر اللي فوق</p>',
-                unsafe_allow_html=True,
-            )
     elif curr_page == 'Overview':
         st.markdown(f"""
         <div style="background-color:{card_color};border:1px solid {border_color};border-radius:15px;padding:22px 18px;margin:8px 0 18px;text-align:center;direction:rtl;">
