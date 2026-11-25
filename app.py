@@ -2554,8 +2554,9 @@ else:
     pass
 
 if st.session_state.current_page not in ("Home", "Activity", "Performance", "Neglect"):
+    divider_bottom = "3px" if st.session_state.current_page == "Comprehensive" else "20px"
     st.markdown(
-        f"<hr style='margin: 10px 0 20px 0; border-color: {border_color}; clear: both;'>",
+        f"<hr style='margin: 10px 0 {divider_bottom} 0; border-color: {border_color}; clear: both;'>",
         unsafe_allow_html=True
     )
 
