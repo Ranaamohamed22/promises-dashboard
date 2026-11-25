@@ -1812,7 +1812,7 @@ st.markdown(f"""
         display:grid;place-items:center;border-radius:50%;width:36px;height:36px;
         background:#4F008C;color:white;
     }}
-    .ejada-home-intro {{text-align:center;padding:clamp(12px,2vw,24px) 12px 18px;}}
+    .ejada-home-intro {{text-align:center;padding:clamp(6px,1vw,12px) 12px 14px;}}
     .ejada-home-intro h1 {{font-size:clamp(34px,4vw,54px);font-weight:900;color:#0E2A47;margin:10px 0;}}
     .ejada-home-intro p,.ejada-home-footer {{color:#7C86A0;}}
     .stApp .st-key-ejada_home_bank_cards {{
