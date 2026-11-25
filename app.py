@@ -5,6 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
+from pathlib import Path
 import io
 import base64
 import os
@@ -2011,14 +2012,82 @@ st.markdown(f"""
     }}
     @media(max-width:530px) {{.snb-ov-metrics {{grid-template-columns:minmax(0,1fr);}}}}
     .st-key-snb_glass_promises {{direction:rtl;color:white;}}
-    .st-key-snb_pr_titlebar {{gap:12px !important;}}
+    body:has(.st-key-snb_pr_header) :is(header[data-testid="stHeader"],[data-testid="stToolbar"],#MainMenu,footer) {{
+        display:none !important;
+    }}
+    .stApp:has(.st-key-snb_pr_header) .block-container {{padding-top:0 !important;}}
+    .stApp :is(.st-key-snb_pr_header,.st-key-snb_pr_navigation,.st-key-snb_pr_titlebar),
+    .stApp :is(.st-key-snb_pr_header,.st-key-snb_pr_navigation,.st-key-snb_pr_titlebar) * {{
+        font-family:'Cairo',sans-serif !important;
+    }}
+    .stApp :is(.st-key-snb_pr_header,.st-key-snb_pr_navigation,.st-key-snb_pr_titlebar) {{
+        direction:rtl !important;padding-inline:36px;box-sizing:border-box;
+    }}
+    .stApp .st-key-snb_pr_header {{min-height:130px;gap:12px !important;}}
+    .snb-pr-brand {{display:flex;align-items:center;gap:16px;color:white;}}
+    .snb-pr-brand strong {{
+        background:white;color:#0A7A3F;border-radius:12px;padding:9px 13px;font-size:22px;font-weight:800;
+    }}
+    .snb-pr-brand i {{height:56px;width:1px;background:#ffffff40;}}
+    .snb-pr-brand img {{height:64px;width:auto;object-fit:contain;}}
+    .snb-pr-update {{
+        display:inline-flex;align-items:center;gap:8px;min-height:48px;padding:0 12px;
+        border:1px solid #ffffff33;border-radius:14px;background:#ffffff14;
+        backdrop-filter:blur(14px);color:white;font-size:16px;white-space:nowrap;
+    }}
+    html body .stApp .st-key-snb_pr_change_bank button {{
+        min-height:46px !important;padding:0 20px !important;border-radius:12px !important;
+        background:white !important;white-space:nowrap;
+    }}
+    html body .stApp .st-key-snb_pr_change_bank button p {{
+        color:#0A7A3F !important;-webkit-text-fill-color:#0A7A3F !important;font-size:16px !important;font-weight:700 !important;
+    }}
+    .stApp .st-key-snb_pr_navigation {{padding-bottom:14px;border-bottom:1px solid #ffffff40;}}
+    html body .stApp .st-key-snb_pr_navigation .st-key-report_pills {{
+        direction:rtl !important;background:transparent !important;gap:10px !important;
+        flex-wrap:nowrap !important;width:100% !important;overflow-x:auto;padding:0 0 2px !important;
+    }}
+    html body .stApp .st-key-snb_pr_navigation .st-key-report_pills button[kind] {{
+        min-height:42px !important;height:42px !important;padding:0 24px !important;
+        border-radius:14px !important;white-space:nowrap;background:#ffffff14 !important;
+        backdrop-filter:blur(14px);border:1px solid #ffffff33 !important;
+    }}
+    html body .stApp .st-key-snb_pr_navigation .st-key-report_pills button[kind] p {{
+        color:white !important;-webkit-text-fill-color:white !important;font-size:15px !important;font-weight:600 !important;
+    }}
+    html body .stApp .st-key-snb_pr_navigation .st-key-report_pills button[kind="primary"] {{
+        background:white !important;box-shadow:0 6px 18px #0004 !important;
+    }}
+    html body .stApp .st-key-snb_pr_navigation .st-key-report_pills button[kind="primary"] p {{
+        color:#0E2A47 !important;-webkit-text-fill-color:#0E2A47 !important;font-weight:800 !important;
+    }}
+    .stApp .st-key-snb_pr_titlebar {{
+        justify-content:space-between !important;gap:12px !important;margin:4px 0 24px;
+    }}
+    .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page {{
+        min-height:60px;padding:6px 14px;border-radius:16px;background:#ffffff14;
+        border-color:#ffffff33;backdrop-filter:blur(14px);
+    }}
+    .stApp .st-key-snb_ov_upload_promises_page p {{font-size:16px;font-weight:600;white-space:nowrap;}}
+    .stApp .st-key-snb_pr_titlebar [data-testid="stFileUploader"] {{width:114px !important;min-width:114px !important;}}
+    html body .stApp .st-key-snb_pr_titlebar [data-testid="stFileUploaderDropzone"] button {{
+        width:114px !important;min-height:38px !important;height:38px !important;
+        padding:0 16px !important;border-radius:12px !important;
+    }}
+    html body .stApp .st-key-snb_pr_titlebar [data-testid="stFileUploaderDropzone"] button::after {{
+        content:"↑ Upload" !important;direction:ltr;font-size:15px;font-weight:700;
+    }}
+    @media(max-width:720px) {{
+        .stApp :is(.st-key-snb_pr_header,.st-key-snb_pr_navigation,.st-key-snb_pr_titlebar) {{padding-inline:12px;}}
+    }}
     html body .stApp .st-key-snb_pr_download button {{
         background:#fff !important;border:1px solid #ffffff40 !important;border-radius:10px;
-        color:#0A7A3F !important;white-space:nowrap;
+        color:#0A7A3F !important;white-space:nowrap;min-height:50px !important;padding:0 24px !important;
     }}
     html body .stApp .st-key-snb_pr_download button p {{
         color:#0A7A3F !important;-webkit-text-fill-color:#0A7A3F !important;
     }}
+    .st-key-snb_pr_download button p {{font-size:16px !important;font-weight:700 !important;}}
     .st-key-snb_pr_download button:disabled {{opacity:.55;}}
     .snb-pr-metrics {{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));text-align:center;}}
     .snb-pr-metrics > div {{display:grid;justify-items:center;gap:4px;padding:4px 8px;}}
@@ -2664,7 +2733,31 @@ _snb_overview_page = (st.session_state.current_page == "Overview"
                       and st.session_state.selected_bank == "SNB")
 _snb_promises_page = (st.session_state.current_page == "Promises"
                       and st.session_state.selected_bank == "SNB")
-if _snb_overview_page or _snb_promises_page:
+if _snb_promises_page:
+    with st.container(key="snb_pr_header", horizontal=True, vertical_alignment="center"):
+        asset_dir = Path(__file__).resolve().parent / "assets"
+        logo_path = next((asset for asset in sorted(asset_dir.rglob("*"))
+                          if asset.is_file() and asset.suffix.lower() in (".png", ".svg")
+                          and any(name in asset.stem.casefold() for name in ("ejada", "إجادة"))), None)
+        logo = '<span>ملف اللوجو غير موجود</span>'
+        if logo_path:
+            media_type = "image/svg+xml" if logo_path.suffix.lower() == ".svg" else "image/png"
+            encoded = base64.b64encode(logo_path.read_bytes()).decode("ascii")
+            logo = f'<img src="data:{media_type};base64,{encoded}" alt="إجادة EJADA">'
+        st.markdown(
+            f'<div class="snb-pr-brand"><strong>SNB</strong><i aria-hidden="true"></i>{logo}</div>',
+            unsafe_allow_html=True, width="stretch",
+        )
+        files = st.session_state.get("page_files", {}).get("SNB", {}).get("Promises")
+        latest = st.session_state.get("snb_promises_upload_time") if files else None
+        date_text = latest.strftime("%Y-%m-%d %H:%M") if latest else "—"
+        st.markdown(
+            f'<span class="snb-pr-update"><span aria-hidden="true">▦</span> آخر تحديث للملفات'
+            f' <b dir="ltr">{date_text}</b></span>', unsafe_allow_html=True, width="content",
+        )
+        st.button("تغيير البنك ⌄", key="snb_pr_change_bank", width="content",
+                  on_click=set_page, args=("Home",))
+elif _snb_overview_page:
     with st.container(key="snb_ov_header", horizontal=True, vertical_alignment="center"):
         st.markdown(
             '<div class="snb-ov-brand"><span><b>إجادة</b><small dir="ltr">EJADA</small></span>'
@@ -2673,9 +2766,6 @@ if _snb_overview_page or _snb_promises_page:
         current_uploads = st.session_state.get("overview_uploads", {}).get("SNB", {})
         upload_times = st.session_state.get("snb_overview_upload_times", {})
         latest = max((value for key, value in upload_times.items() if current_uploads.get(key)), default=None)
-        if _snb_promises_page:
-            files = st.session_state.get("page_files", {}).get("SNB", {}).get("Promises")
-            latest = st.session_state.get("snb_promises_upload_time") if files else None
         date_text = latest.strftime("%Y-%m-%d %H:%M") if latest else "—"
         st.markdown(
             f'<span class="snb-ov-update">آخر تحديث للملفات <b dir="ltr">{date_text}</b></span>',
@@ -2740,7 +2830,7 @@ def _render_ejada_main_navigation():
                 )
 
 if _snb_overview_page or _snb_promises_page:
-    with st.container(key="snb_ov_navigation"):
+    with st.container(key="snb_pr_navigation" if _snb_promises_page else "snb_ov_navigation"):
         _render_ejada_main_navigation()
 elif st.session_state.current_page != 'Home':
     # A bank is selected on Home; its reports stay grouped behind that choice.
@@ -11819,8 +11909,6 @@ def _render_snb_promises(files):
 
     with st.container(key="snb_glass_promises"):
         with st.container(key="snb_pr_titlebar", horizontal=True, vertical_alignment="center"):
-            st.markdown('<h1 class="snb-ov-title">الوعود القائمة والمكسورة</h1>',
-                        unsafe_allow_html=True, width="stretch")
             with st.container(key="snb_ov_upload_promises_page", horizontal=True, vertical_alignment="center",
                               width="content"):
                 st.markdown("ارفعي المحفظة", width="content")
@@ -11833,7 +11921,7 @@ def _render_snb_promises(files):
                                      label_visibility="collapsed", key=key, on_change=save_uploaded_files,
                                      args=("page_files", "SNB", "Promises", key))
             st.download_button(
-                "تنزيل ملف الوعود القائمة والمكسورة", export,
+                "تنزيل ملف الوعود", export, icon="⬇️",
                 file_name=f"promises_{datetime.now(ZoneInfo('Africa/Cairo')):%Y-%m-%d}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 disabled=not export, help="ارفعي المحفظة أولًا" if not files else (
