@@ -219,13 +219,10 @@ def build_snb_performance(portfolio_bytes, payments_bytes):
 
 
 def render_snb_performance_page():
-    # Resetting the uploader generation forces Streamlit to discard the
-    # previously selected files, even if the replacement has the same name.
+    # Keep existing uploader keys stable; files can be cleared or replaced
+    # directly using Streamlit's built-in uploader controls.
     if "snb_perf_upload_generation" not in st.session_state:
         st.session_state["snb_perf_upload_generation"] = 0
-    if st.button("🔄 مسح الملفين ورفع ملفات جديدة", key="snb_perf_reset_uploads"):
-        st.session_state["snb_perf_upload_generation"] += 1
-        st.rerun()
     generation = st.session_state["snb_perf_upload_generation"]
 
     # Presentation-only upload layout. The source identifiers and all business
@@ -287,9 +284,6 @@ def render_snb_performance_page():
             label_visibility="collapsed",
             key=f"snb_perf_payments_{generation}",
         )
-    with heading_col:
-        st.markdown("**📊 تقرير الأداء — SNB**")
-        st.caption("ارفعي المحفظة والسدادات معًا لتحديث التقرير تلقائيًا.")
     # The existing "المعالج" output and business logic are kept in a separate
     # render helper below, entirely unchanged. Portfolio loads independently.
     processed_tab, portfolio_tab = st.tabs(["المعالج", "المحفظة"])

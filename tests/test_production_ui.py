@@ -27,9 +27,12 @@ class TestProductionUi(unittest.TestCase):
         ui.button(key="nav_perf_btn").click().run()
         self.assertEqual(len(ui.exception), 0)
         self.assertEqual(ui.session_state["current_page"], "Performance")
-        # File uploaders are not exposed by Streamlit AppTest. Verify that
-        # the Performance page's own reset control rendered successfully.
-        self.assertIsNotNone(ui.button(key="snb_perf_reset_uploads"))
+        # Keep native upload controls and tabs, without the custom reset button.
+        # Streamlit's AppTest does not expose file_uploader directly.
+        self.assertNotIn(
+            "snb_perf_reset_uploads",
+            [widget.key for widget in ui.button],
+        )
         self.assertEqual(
             [tab.label for tab in ui.tabs],
             ["المعالج", "المحفظة"],
