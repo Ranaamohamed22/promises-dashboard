@@ -55,8 +55,12 @@ theme_keys = ("bg", "card", "border", "shadow", "text", "muted", "accent", "acce
               "broken", "btn", "btn-text", "tab-on", "tab-on-text", "blur", "base", "snb-start", "snb-end")
 theme_values = dict(zip(theme_keys, THEMES[theme]))
 theme_css = ";".join(f"--{key}:{value}" for key, value in theme_values.items())
-theme_css += (";--icon-bg:var(--btn);--icon-text:var(--btn-text)" if theme == "navy"
-              else ";--icon-bg:var(--accent);--icon-text:var(--accent-text)")
+icon_bg, icon_fg = {
+    "navy": ("#ffffff", "#0A7A3F"),
+    "light": ("#0A7A3F", "#ffffff"),
+    "dark": ("#5be39a", "#12301f"),
+}[theme]
+theme_css += f";--icon-bg:{icon_bg};--icon-fg:{icon_fg}"
 
 
 def change_theme(value):
@@ -1718,7 +1722,7 @@ st.markdown(f"""
     .stApp :is(.st-key-home_reports_SNB,.st-key-home_reports_STC) {{
         display:grid !important;grid-template-columns:repeat(3,minmax(0,1fr));
         direction:rtl;gap:14px !important;width:min(100%,700px) !important;margin-inline:auto;
-        --report-accent:var(--accent);--report-icon:var(--icon-text);
+        --report-accent:var(--accent);
     }}
     .stApp [class*="st-key-home_report_card_"] {{
         position:relative;overflow:hidden;gap:0 !important;min-height:110px;
@@ -1736,9 +1740,12 @@ st.markdown(f"""
         text-align:center;color:var(--text);font-size:16px;line-height:1.4;font-weight:900;
     }}
     .st-key-home_report_card_Promises .ejada-report-card > span:last-child {{white-space:nowrap;}}
-    .ejada-report-icon {{
-        display:grid;place-items:center;width:42px;height:42px;border-radius:12px;
-        background:var(--icon-bg);color:var(--report-icon);font-size:19px;line-height:1;
+    .stApp .ejada-report-card > .ejada-report-icon {{
+        display:grid;place-items:center;width:40px;height:40px;border-radius:12px;
+        background:var(--icon-bg) !important;color:var(--icon-fg) !important;
+        -webkit-text-fill-color:var(--icon-fg) !important;
+        font-family:Cairo,"DejaVu Sans","Segoe UI Symbol",sans-serif !important;
+        font-size:18px;font-weight:400;line-height:1;opacity:1;overflow:visible;
     }}
     .stApp [class*="st-key-home_report_card_"] [data-testid="stElementContainer"]:has([data-testid="stButton"]) {{
         position:absolute;inset:0;z-index:2;
@@ -12041,7 +12048,7 @@ elif page_uploaded is None:
             )
             icons = {
                 "Overview": "◉", "Promises": "⚑", "Neglect": "⚠︎",
-                "Activity": "⟳", "Performance": "▥", "Comprehensive": "▤",
+                "Activity": "↻", "Performance": "▥", "Comprehensive": "▤",
             }
             with st.container(key=f"home_reports_{bank}"):
                 for page, label, _ in _ejada_report_pages(bank):
