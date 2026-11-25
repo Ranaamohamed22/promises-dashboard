@@ -2553,7 +2553,7 @@ else:
     # The Home screen exposes bank logos only, not report navigation.
     pass
 
-if st.session_state.current_page not in ("Home", "Activity", "Performance"):
+if st.session_state.current_page not in ("Home", "Activity", "Performance", "Neglect"):
     st.markdown(
         f"<hr style='margin: 10px 0 20px 0; border-color: {border_color}; clear: both;'>",
         unsafe_allow_html=True
