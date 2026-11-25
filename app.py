@@ -2296,6 +2296,10 @@ st.markdown(f"""
     .stApp .selected-bank.SNB {{color:#075D32 !important;}}
     .stApp .selected-bank.STC {{color:#56279E !important;}}
     .stApp .upload-field-label {{color:{label_color} !important;}}
+    html body .stApp [class*="st-key-upload_field_"] .upload-field-label {{
+        color:{'#153754' if st.session_state.theme_choice == 'حسب البنك (تلقائي)' else label_color} !important;
+        -webkit-text-fill-color:{'#153754' if st.session_state.theme_choice == 'حسب البنك (تلقائي)' else label_color} !important;
+    }}
     .stApp [class*="st-key-upload_box_"] {{
         max-width:265px !important;padding:5px !important;background:transparent !important;
     }}
@@ -2472,10 +2476,11 @@ else:
 if st.session_state.current_page == "Activity" and st.session_state.selected_bank == "SNB":
     shift_notice = st.empty()
 
-st.markdown(
-    f"<hr style='margin: 10px 0 20px 0; border-color: {border_color}; clear: both;'>",
-    unsafe_allow_html=True
-)
+if st.session_state.current_page != "Performance":
+    st.markdown(
+        f"<hr style='margin: 10px 0 20px 0; border-color: {border_color}; clear: both;'>",
+        unsafe_allow_html=True
+    )
 
 # Click on empty canvas to close the current report and return Home.
 # All controls, file uploads, charts and actual report content are excluded.
@@ -10208,10 +10213,6 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
         if final.empty:
             st.warning("لا توجد بيانات صالحة للفترة المكتشفة.")
             return
-        st.dataframe(
-            final, use_container_width=True, hide_index=True,
-            height=460
-        )
         show_break = activity_kind == "يومي" and period in ("second", "full")
         time_notes = _snb_first_last_notes(result, stats["collector"], stats["notes"],
                                            activity_kind, period)
@@ -10553,54 +10554,12 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
                     min-width:0 !important;
                     align-self:center !important;
                 }}
-                .st-key-report_upload_bar_{selected_bank}_Neglect .upload-field-label {{
-                    color:#FFFFFF !important;
-                    font-size:11px !important;
-                    line-height:14px !important;
-                    font-weight:900 !important;
-                    text-align:center !important;
-                    margin:0 0 2px !important;
-                }}
-                .st-key-report_upload_bar_{selected_bank}_Neglect [class*="st-key-upload_field_"] {{
-                    width:100% !important;
+                .stApp .st-key-neglect_upload_header {{
+                    background:{bg_color} !important;
+                    border-radius:10px !important;
+                    padding:6px 8px !important;
+                    width:fit-content !important;
                     max-width:100% !important;
-                    gap:0 !important;
-                    margin:0 !important;
-                }}
-                .st-key-report_upload_bar_{selected_bank}_Neglect [class*="st-key-upload_box_"] {{
-                    background:#FFFFFF !important;
-                    border:0 !important;
-                    border-radius:8px !important;
-                    padding:2px !important;
-                    height:36px !important;
-                    min-height:36px !important;
-                    overflow:hidden !important;
-                }}
-                .st-key-report_upload_bar_{selected_bank}_Neglect div[class*="st-key-uploaded_chip_"] {{
-                    background:#FFFFFF !important;
-                    border:0 !important;
-                    min-height:31px !important;
-                    height:31px !important;
-                    padding:2px 4px !important;
-                    gap:4px !important;
-                }}
-                .st-key-report_upload_bar_{selected_bank}_Neglect .uploaded-filename {{
-                    color:#5E6D7E !important;
-                    font-size:11px !important;
-                    line-height:24px !important;
-                    text-align:center !important;
-                }}
-                .st-key-report_upload_bar_{selected_bank}_Neglect div[class*="st-key-small_clear_report_"] button {{
-                    width:17px !important;
-                    min-width:17px !important;
-                    height:17px !important;
-                    min-height:17px !important;
-                    border-radius:5px !important;
-                    font-size:13px !important;
-                }}
-                .st-key-report_upload_bar_{selected_bank}_Neglect div[class*="st-key-small_clear_report_"] button p {{
-                    font-size:13px !important;
-                    line-height:1 !important;
                 }}
                 .st-key-neglect_mode_controls {{
                     width:100% !important;
