@@ -350,7 +350,7 @@ def render_portfolio_summary(portfolio_bytes):
     if len(table) > 100:
         st.caption(
             "المعاينة أعلى الصفحة تعرض أول 100 صف لحماية سرعة التطبيق. "
-            "كل الصفوف موجودة في الجدول القابل للنسخ وفي ملف Excel."
+            "كل الصفوف موجودة في ملف Excel للتحميل والنسخ."
         )
 
     st.download_button(
