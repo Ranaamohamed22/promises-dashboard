@@ -34,21 +34,35 @@ st.set_page_config(page_title="EJADA | SNB & STC Dashboard", layout="wide", init
 # ==========================================
 # ثيم Streamlit الفاتح: بيخلّي كل الحقول والمربعات بيضاء
 # ==========================================
-_LIGHT_THEME = {
-    "base": "light",
-    "primaryColor": "#2CA549",
-    "backgroundColor": "#FFFFFF",
-    "secondaryBackgroundColor": "#FFFFFF",
-    "textColor": "#1F4373",
-    "borderColor": "#99AABF",
+THEMES = {
+    "navy": ("linear-gradient(115deg,#0E2A47 0%,#0b4a5c 50%,#0A7A3F 100%)",
+             "rgba(255,255,255,.08)", "rgba(255,255,255,.2)", "none", "#fff",
+             "rgba(255,255,255,.7)", "#5be39a", "#0E2A47", "#7fd6e0", "#fff",
+             "#0A7A3F", "#fff", "#0E2A47", "blur(14px)", "#0E2A47", "#fff", "#9ff0c6"),
+    "light": ("linear-gradient(115deg,#F4F8F6 0%,#EAF3EF 60%,#DDEFE6 100%)",
+              "#fff", "#d6e4dd", "0 6px 18px rgba(14,42,71,.08)", "#0E2A47",
+              "#5b6f80", "#0A7A3F", "#fff", "#2aa3b5", "#0A7A3F",
+              "#fff", "#0A7A3F", "#fff", "none", "#F4F8F6", "#0A7A3F", "#2fb5a6"),
+    "dark": ("linear-gradient(115deg,#1d2226 0%,#232a2f 60%,#1f2b27 100%)",
+             "#2a3137", "rgba(255,255,255,.1)", "0 6px 18px rgba(0,0,0,.25)", "#eef3f1",
+             "#9aa8ad", "#5be39a", "#12301f", "#7fd6e0", "#5be39a",
+             "#12301f", "#5be39a", "#12301f", "none", "#232a2f", "#fff", "#9ff0c6"),
 }
-for _k, _v in _LIGHT_THEME.items():
-    try:
-        st._config.set_option(f"theme.{_k}", _v)
-    except Exception:
-        pass
-if not st.session_state.get('_light_theme_applied'):
-    st.session_state['_light_theme_applied'] = True
+requested_theme = st.query_params.get("theme", st.session_state.get("theme", "navy"))
+st.session_state["theme"] = requested_theme if requested_theme in THEMES else "navy"
+theme = st.session_state["theme"]
+theme_keys = ("bg", "card", "border", "shadow", "text", "muted", "accent", "accent-text",
+              "broken", "btn", "btn-text", "tab-on", "tab-on-text", "blur", "base", "snb-start", "snb-end")
+theme_values = dict(zip(theme_keys, THEMES[theme]))
+theme_css = ";".join(f"--{key}:{value}" for key, value in theme_values.items())
+theme_css += (";--icon-bg:var(--btn);--icon-text:var(--btn-text)" if theme == "navy"
+              else ";--icon-bg:var(--accent);--icon-text:var(--accent-text)")
+
+
+def change_theme(value):
+    st.session_state["theme"] = value
+    st.query_params["theme"] = value
+
 
 BANKS = {'SNB': 'البنك الأهلي السعودي', 'STC': 'بنك STC'}
 if 'selected_bank' not in st.session_state:
@@ -72,13 +86,6 @@ if 'current_page' not in st.session_state:
 if not st.session_state.get('_separate_home_overview_v1', False):
     st.session_state.current_page = 'Home'
     st.session_state['_separate_home_overview_v1'] = True
-if 'theme_choice' not in st.session_state:
-    st.session_state.theme_choice = 'حسب البنك (تلقائي)'
-# Migrate only the old default; preserve user-chosen dark/light variants.
-if not st.session_state.get('_bank_theme_migration_v1', False):
-    if st.session_state.theme_choice == 'ثيم إجادة (Navy)':
-        st.session_state.theme_choice = 'حسب البنك (تلقائي)'
-    st.session_state['_bank_theme_migration_v1'] = True
 if 'act_uploader_ver' not in st.session_state:
     st.session_state.act_uploader_ver = {'SNB': 0, 'STC': 0}
 
@@ -132,27 +139,11 @@ BANK_LOGOS = {
     "SNB": "https://roshem.sa/photos/partners/1723882007.png",
     "STC": "https://mma.prnewswire.com/media/2379425/4631613/STC_Bank_Logo_Logo.jpg?p=publish",
 }
-NAVY_BACKGROUNDS = {
-    "ثيم إجادة (Navy)": "#1F4373",
-    "كحلي فاتح": "#49678B",
-    "كحلي غامق": "#102541",
-}
-
 def bank_logo(bank, placement):
     return (
         f'<div class="bank-logo-{placement}"><img alt="{BANKS[bank]}" '
         f'src="{BANK_LOGOS[bank]}"></div>'
     )
-
-THEMES = [
-    'حسب البنك (تلقائي)', 'أسود هادي (Charcoal)',
-    'ثيم إجادة (Navy)', 'الوضع الداكن (Black)',
-    'التصميم الفاتح (Light)', 'كحلي فاتح', 'كحلي غامق',
-]
-
-def toggle_theme():
-    current = st.session_state.theme_choice
-    st.session_state.theme_choice = THEMES[(THEMES.index(current) + 1) % len(THEMES)] if current in THEMES else THEMES[0]
 
 def set_page(page_name):
     st.session_state.current_page = page_name
@@ -425,110 +416,17 @@ BANK_BRAND_UI = {
         "accent_text": "#56279E", "background": "#F8F5FC",
     },
 }
-_brand_style = BANK_BRAND_UI[st.session_state.get("selected_bank", "SNB")]
-brand_accent = _brand_style["accent"]
-brand_soft = _brand_style["accent_soft"]
-brand_accent_text = _brand_style["accent_text"]
-snb_green = brand_accent  
-
-CHART_PALETTE = ["#1F4373", "#304D73", "#586F8C", "#99AABF", "#F2F2F2"]
-
-if st.session_state.theme_choice == "حسب البنك (تلقائي)":
-    bg_color = _brand_style["background"]
-    card_color = white_bg
-    border_color = "#CCD8E8"
-    primary_color = brand_accent
-    primary_text = "#FFFFFF"
-    text_color = ejada_navy_dark
-    label_color = "#153754"
-    sub_text_color = "#536B80"
-    gauge_bg = "#E2E8F0"
-    nav_btn_bg = "#FFFFFF"
-    nav_btn_text = ejada_navy_dark
-    nav_btn_border = "#CCD8E8"
-    kpi_title_color = ejada_navy_dark
-    header_logo_color = "#153754"
-    input_bg = "#FFFFFF"
-    input_text = ejada_navy_dark
-elif st.session_state.theme_choice == "أسود هادي (Charcoal)":
-    bg_color = "#303741"
-    card_color = "#FFFFFF"
-    border_color = "#8594A8"
-    primary_color = brand_accent
-    primary_text = "#FFFFFF"
-    text_color = "#1F4373"
-    label_color = "#F4F7FB"
-    sub_text_color = "#D9E3EE"
-    gauge_bg = "#4E5A68"
-    nav_btn_bg = "#FFFFFF"
-    nav_btn_text = "#1F4373"
-    nav_btn_border = "#A6B3C2"
-    kpi_title_color = "#1F4373"
-    header_logo_color = "#F4F7FB"
-    input_bg = "#FFFFFF"
-    input_text = "#1F4373"
-elif st.session_state.theme_choice in NAVY_BACKGROUNDS:
-    bg_color = NAVY_BACKGROUNDS[st.session_state.theme_choice]
-    card_color = white_bg 
-    border_color = ejada_border_light
-    primary_color = ejada_navy_light 
-    primary_text = "#FFFFFF"
-    text_color = ejada_navy_dark
-    label_color = "#FFFFFF"
-    sub_text_color = "#E2E8F0"
-    gauge_bg = "#E2E8F0"
-    nav_btn_bg = "#FFFFFF"
-    nav_btn_text = ejada_navy_dark
-    nav_btn_border = ejada_border_light
-    kpi_title_color = "#1F4373"
-    header_logo_color = "#FFFFFF"
-    input_bg = "#FFFFFF"
-    input_text = "#1F4373"
-elif st.session_state.theme_choice == "الوضع الداكن (Black)":
-    bg_color = "#101216"
-    card_color = "#FFFFFF"
-    border_color = "#596474"
-    primary_color = "#1F4373"
-    primary_text = "#FFFFFF"
-    text_color = "#1F4373"
-    label_color = "#FFFFFF"
-    sub_text_color = "#D1D5DB"
-    gauge_bg = "#E2E8F0"
-    nav_btn_bg = "#FFFFFF"
-    nav_btn_text = "#1F4373"
-    nav_btn_border = "#596474"
-    kpi_title_color = "#1F4373"
-    header_logo_color = "#FFFFFF"
-    input_bg = "#FFFFFF"
-    input_text = "#1F4373"
-else:
-    bg_color = "#F4F6F9"
-    card_color = "#FFFFFF"
-    border_color = "#CBD5E1"
-    primary_color = ejada_navy_dark
-    primary_text = "#FFFFFF"
-    text_color = "#1F4373" 
-    label_color = "#1F4373"
-    sub_text_color = "#475569"
-    gauge_bg = "#E2E8F0"
-    nav_btn_bg = "#FFFFFF"
-    nav_btn_text = "#1F4373"
-    nav_btn_border = "#CBD5E1"
-    kpi_title_color = "#1F4373"
-    header_logo_color = "#1F4373"
-    input_bg = "#FFFFFF"
-    input_text = "#1F4373"
-
-_overview_upload_panel_bg = (
-    bg_color if st.session_state.theme_choice in NAVY_BACKGROUNDS
-    else "#39424D" if st.session_state.theme_choice == "أسود هادي (Charcoal)"
-    else "#222B39" if st.session_state.theme_choice == "الوضع الداكن (Black)"
-    else "#FFFFFF"
-)
-_overview_upload_caption_color = (
-    "#E7EEF8" if st.session_state.theme_choice != "التصميم الفاتح (Light)"
-    else "#64748B"
-)
+brand_accent = snb_green = "var(--accent)"
+brand_soft = card_color = input_bg = _overview_upload_panel_bg = "var(--card)"
+brand_accent_text = "var(--accent-text)"
+bg_color = "var(--bg)"
+border_color = nav_btn_border = "var(--border)"
+primary_color = nav_btn_bg = "var(--btn)"
+primary_text = nav_btn_text = "var(--btn-text)"
+text_color = label_color = input_text = header_logo_color = kpi_title_color = "var(--text)"
+sub_text_color = _overview_upload_caption_color = "var(--muted)"
+gauge_bg = "var(--border)"
+CHART_PALETTE = [theme_values[key] for key in ("accent", "broken", "muted")]
 
 st.markdown(f"""
 <style>
@@ -536,12 +434,12 @@ st.markdown(f"""
     [data-testid="collapsedControl"] {{display: none !important;}}
     [data-testid="stSidebar"] {{display: none !important;}}
     
-    .bank-logo-home, .bank-logo-nav {{display:flex;align-items:center;background:white;border-radius:10px;overflow:hidden;}}
+    .bank-logo-home, .bank-logo-nav {{display:flex;align-items:center;background:var(--card);border-radius:10px;overflow:hidden;}}
     .bank-logo-home {{height:180px;justify-content:center;}}
     .bank-logo-home img {{max-width:96%;max-height:176px;object-fit:contain;}}
     .bank-logo-nav {{width:fit-content;max-width:100%;margin-right:auto;margin-left:0;padding:0 7px;}}
     .bank-logo-nav img {{height:68px;max-width:100%;object-fit:contain;}}
-    .stApp {{ background-color: {bg_color} !important; }}
+    .stApp {{ background: {bg_color} !important; }}
     /* Hide any stale/raw markdown artifact from older bank-label markup after redeploy. */
     div[data-testid="stMarkdownContainer"] > p:has(code) {{
         display: none !important;
@@ -571,7 +469,7 @@ st.markdown(f"""
     
     div[data-testid="stButton"] > button[kind="primary"] {{
         background-color: {snb_green} !important; 
-        color: #FFFFFF !important; 
+        color: var(--text) !important; 
         border: none !important;
         border-radius: 8px !important;
         padding: 8px 16px !important;
@@ -579,7 +477,7 @@ st.markdown(f"""
         font-size: 15px !important;
         box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
     }}
-    div[data-testid="stButton"] > button[kind="primary"] p {{ color: #FFFFFF !important; font-weight: 800 !important; }}
+    div[data-testid="stButton"] > button[kind="primary"] p {{ color: var(--text) !important; font-weight: 800 !important; }}
 
     div.st-key-theme_toggle div[data-testid="stButton"] > button {{
         background: linear-gradient(90deg, {ejada_navy_dark} 50%, {ejada_grey_blue} 50%) !important;
@@ -708,7 +606,7 @@ st.markdown(f"""
         height: auto !important;
         padding: 5px 10px !important;
         margin: 0 !important;
-        background: #FFFFFF !important;
+        background: var(--card) !important;
         border: 1px solid #E2E8F0 !important;
         border-radius: 10px !important;
         box-shadow: 0 2px 7px rgba(0,0,0,0.12) !important;
@@ -809,7 +707,7 @@ st.markdown(f"""
         padding: 4px 6px !important;
         border-radius: 7px !important;
         border: 1px solid {border_color} !important;
-        background-color: #FFFFFF !important;
+        background-color: var(--card) !important;
     }}
     div[data-testid="stVerticalBlockBorderWrapper"] > div {{
         gap: 0.3rem !important;
@@ -885,7 +783,7 @@ st.markdown(f"""
 
     div.st-key-clear_act_files_btn div[data-testid="stButton"] > button {{
         background-color: #EF4444 !important;
-        color: #FFFFFF !important;
+        color: var(--text) !important;
         border: none !important;
         border-radius: 6px !important;
         padding: 2px 10px !important;
@@ -896,7 +794,7 @@ st.markdown(f"""
         line-height: 1 !important;
     }}
     div.st-key-clear_act_files_btn div[data-testid="stButton"] > button p {{
-        color: #FFFFFF !important;
+        color: var(--text) !important;
         font-size: 13px !important;
         font-weight: 900 !important;
     }}
@@ -906,8 +804,8 @@ st.markdown(f"""
     html body .stApp [data-testid="stMultiSelect"] div[data-baseweb="select"] > div,
     html body .stApp div[data-baseweb="base-input"],
     html body .stApp div[data-baseweb="input"] {{
-        background-color: #FFFFFF !important;
-        background: #FFFFFF !important;
+        background-color: var(--card) !important;
+        background: var(--card) !important;
         color: {input_text} !important;
         border: 1px solid {border_color} !important;
         border-radius: 8px !important;
@@ -935,8 +833,8 @@ st.markdown(f"""
     html body div[data-baseweb="menu"],
     html body ul[role="listbox"],
     html body li[role="option"] {{
-        background-color: #FFFFFF !important;
-        background: #FFFFFF !important;
+        background-color: var(--card) !important;
+        background: var(--card) !important;
         color: {input_text} !important;
         direction: rtl !important;
         text-align: right !important;
@@ -954,13 +852,13 @@ st.markdown(f"""
     html body .stApp span[data-baseweb="tag"] {{
         background-color: {ejada_navy_dark} !important;
         background: {ejada_navy_dark} !important;
-        color: #FFFFFF !important;
+        color: var(--text) !important;
         border-radius: 6px !important;
     }}
     html body .stApp span[data-baseweb="tag"] span,
     html body .stApp span[data-baseweb="tag"] svg {{
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
+        color: var(--text) !important;
+        -webkit-text-fill-color: var(--text) !important;
         fill: #FFFFFF !important;
     }}
 
@@ -968,8 +866,8 @@ st.markdown(f"""
     html body .stApp label[data-baseweb="checkbox"] > div:first-child,
     html body .stApp div[data-baseweb="checkbox"] > span:first-child,
     html body .stApp div[data-baseweb="checkbox"] > div:first-child {{
-        background-color: #FFFFFF !important;
-        background: #FFFFFF !important;
+        background-color: var(--card) !important;
+        background: var(--card) !important;
         border: 2px solid {ejada_grey_blue} !important;
         border-radius: 4px !important;
     }}
@@ -981,13 +879,13 @@ st.markdown(f"""
     }}
     html body .stApp label[data-baseweb="checkbox"] svg {{
         fill: #FFFFFF !important;
-        color: #FFFFFF !important;
+        color: var(--text) !important;
     }}
 
     html body .stApp [data-testid="stExpander"] details,
     html body .stApp [data-testid="stExpander"] summary {{
-        background-color: #FFFFFF !important;
-        background: #FFFFFF !important;
+        background-color: var(--card) !important;
+        background: var(--card) !important;
         color: {input_text} !important;
         border-color: {border_color} !important;
         border-radius: 10px !important;
@@ -1014,7 +912,7 @@ st.markdown(f"""
     }}
 
     [data-testid="stFileUploader"] > section {{
-        background-color: #FFFFFF !important;
+        background-color: var(--card) !important;
         border: 2px dashed {border_color} !important;
         border-radius: 8px !important;
         padding: 8px 12px !important;
@@ -1025,7 +923,7 @@ st.markdown(f"""
         color: {input_text} !important;
     }}
     [data-testid="stFileUploader"] button {{
-        background-color: #FFFFFF !important;
+        background-color: var(--card) !important;
         color: {input_text} !important;
         border: 2px solid {ejada_navy_dark} !important;
         border-radius: 8px !important;
@@ -1033,10 +931,10 @@ st.markdown(f"""
     }}
     [data-testid="stFileUploader"] button:hover {{
         background-color: {ejada_navy_dark} !important;
-        color: #FFFFFF !important;
+        color: var(--text) !important;
     }}
     [data-testid="stFileUploaderFile"] {{
-        background-color: #FFFFFF !important;
+        background-color: var(--card) !important;
         border: 1px solid {border_color} !important;
         border-radius: 6px !important;
         padding: 4px 8px !important;
@@ -1047,7 +945,7 @@ st.markdown(f"""
     }}
     [data-testid="stFileUploaderDeleteBtn"] button {{
         background-color: #EF4444 !important;
-        color: #FFFFFF !important;
+        color: var(--text) !important;
         border: none !important;
         border-radius: 50% !important;
         width: 22px !important;
@@ -1058,7 +956,7 @@ st.markdown(f"""
     }}
     [data-testid="stFileUploaderDeleteBtn"] svg {{
         fill: #FFFFFF !important;
-        color: #FFFFFF !important;
+        color: var(--text) !important;
     }}
 
     label[data-testid="stWidgetLabel"] p,
@@ -1162,7 +1060,7 @@ st.markdown(f"""
         width: 100% !important;
         padding: 8px 10px !important;
         border: 1px dashed {border_color} !important;
-        background-color: #FFFFFF !important;
+        background-color: var(--card) !important;
         border-radius: 9px !important;
         overflow: hidden !important;
     }}
@@ -1214,14 +1112,14 @@ st.markdown(f"""
         min-height: 36px !important;
         padding: 0 !important;
         border-radius: 8px !important;
-        color: #FFFFFF !important;
+        color: var(--text) !important;
         background: #C5393B !important;
         border: 0 !important;
         font-size: 19px !important;
         font-weight: 900 !important;
     }}
     div[class*="st-key-small_clear_report_"] button p {{
-        color: #FFFFFF !important;
+        color: var(--text) !important;
         font-size: 19px !important;
         font-weight: 900 !important;
     }}
@@ -1285,7 +1183,7 @@ st.markdown(f"""
         direction: rtl !important;
         line-height: 1.45 !important;
         white-space: normal !important;
-        color: #1F4373 !important;
+        color: var(--text) !important;
     }}
     div[class*="st-key-promise_diagnostic_"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] {{
         padding: 8px 10px !important;
@@ -1301,8 +1199,8 @@ st.markdown(f"""
         direction: rtl;
         font-size: 13px;
         font-weight: 800;
-        color: #1F4373;
-        background: #FFFFFF;
+        color: var(--text);
+        background: var(--card);
     }}
     table.ejada-diagnostic-table th,
     table.ejada-diagnostic-table td {{
@@ -1323,8 +1221,8 @@ st.markdown(f"""
     }}
     table.ejada-diagnostic-table thead th {{
         background: #2CA549 !important;
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
+        color: var(--text) !important;
+        -webkit-text-fill-color: var(--text) !important;
         font-weight: 900 !important;
     }}
     table.ejada-diagnostic-table th:first-child,
@@ -1392,7 +1290,7 @@ st.markdown(f"""
         height: 90px !important;
         min-height: 90px !important;
         max-height: 90px !important;
-        background: #FFFFFF !important;
+        background: var(--card) !important;
         border: 1px dashed {border_color} !important;
         border-radius: 9px !important;
         display: flex !important;
@@ -1402,7 +1300,7 @@ st.markdown(f"""
         padding: 8px 9px !important;
         margin: 0 !important;
         overflow: hidden !important;
-        color: #1F4373 !important;
+        color: var(--text) !important;
         direction: ltr !important;
         text-align: center !important;
     }}
@@ -1415,7 +1313,7 @@ st.markdown(f"""
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
-        color: #1F4373 !important;
+        color: var(--text) !important;
     }}
     [class*="st-key-report_upload_bar_"] .ejada-file-size {{
         font-size: 12px !important;
@@ -1425,7 +1323,7 @@ st.markdown(f"""
         line-height: 1.6 !important;
     }}
     [class*="st-key-report_upload_bar_"] .ejada-no-file {{
-        color: #1F4373 !important;
+        color: var(--text) !important;
         font-size: 14px !important;
         font-weight: 900 !important;
     }}
@@ -1468,7 +1366,7 @@ st.markdown(f"""
         margin: 0 !important;
         border: 1px solid #1F4373 !important;
         border-radius: 8px !important;
-        background: #FFFFFF !important;
+        background: var(--card) !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
@@ -1502,7 +1400,7 @@ st.markdown(f"""
         margin: 0 !important;
         font-size: 0 !important;
         color: transparent !important;
-        background: #FFFFFF !important;
+        background: var(--card) !important;
         border: 0 !important;
         box-shadow: none !important;
         cursor: pointer !important;
@@ -1517,7 +1415,7 @@ st.markdown(f"""
         font-size: 25px !important;
         font-weight: 500 !important;
         line-height: 1 !important;
-        color: #1F4373 !important;
+        color: var(--text) !important;
         visibility: visible !important;
     }}
     div[class*="st-key-small_clear_report_"] button {{
@@ -1529,13 +1427,13 @@ st.markdown(f"""
         border-radius: 8px !important;
         background: #C5393B !important;
         border: 0 !important;
-        color: #FFFFFF !important;
+        color: var(--text) !important;
         box-shadow: none !important;
         font-size: 20px !important;
         font-weight: 900 !important;
     }}
     div[class*="st-key-small_clear_report_"] button p {{
-        color: #FFFFFF !important;
+        color: var(--text) !important;
         font-size: 20px !important;
         font-weight: 900 !important;
     }}
@@ -1564,10 +1462,10 @@ st.markdown(f"""
         gap: 6px !important;
         text-align: center !important;
         padding: 7px 6px !important;
-        background: #FFFFFF !important;
+        background: var(--card) !important;
         border: 1px solid #99AABF !important;
         border-radius: 9px !important;
-        color: #1F4373 !important;
+        color: var(--text) !important;
         font-weight: 900 !important;
         overflow: hidden !important;
     }}
@@ -1584,7 +1482,7 @@ st.markdown(f"""
         font-size: clamp(20px, 1.6vw, 29px) !important;
         line-height: 1.1 !important;
         font-weight: 900 !important;
-        color: #1F4373 !important;
+        color: var(--text) !important;
     }}
     [class*="st-key-report_upload_bar_"] .ejada-mini-kpi-active strong {{
         color: #2CA549 !important;
@@ -1670,7 +1568,7 @@ st.markdown(f"""
     }}
     div[class*="st-key-promise_diagnostic_"] .ejada-diagnostic-small-caption {{
         text-align: center !important;
-        color: #1F4373 !important;
+        color: var(--text) !important;
         font-size: 12px !important;
         font-weight: 900 !important;
         margin-bottom: 6px !important;
@@ -1777,8 +1675,8 @@ st.markdown(f"""
 
     .stApp:has(.st-key-ejada_home_header),
     .stApp:has(.st-key-ejada_home_header) [data-testid="stMain"] {{
-        direction:rtl;color:white;
-        background:radial-gradient(circle at 80% 20%, #0A7A3F 0, #0E2A47 55%) !important;
+        direction:rtl;color:var(--text);
+        background:var(--bg) !important;
     }}
     .stApp :is(.st-key-ejada_home_header,.st-key-ejada_home_bank_picker),
     .stApp :is(.st-key-ejada_home_header,.st-key-ejada_home_bank_picker) * {{
@@ -1789,63 +1687,58 @@ st.markdown(f"""
         border-bottom:1px solid #ffffff26;
     }}
     .ejada-home-header,.ejada-home-brand,.ejada-home-actions {{
-        display:flex;align-items:center;gap:14px;color:white;
+        display:flex;align-items:center;gap:14px;color:var(--text);
     }}
     .ejada-home-header {{justify-content:space-between;}}
     .ejada-home-brand strong {{display:block;font-size:32px;line-height:1.05;}}
     .ejada-home-brand b {{display:block;font-size:11px;letter-spacing:4px;text-align:center;}}
-    .ejada-home-brand small {{border-inline-start:1px solid #ffffff40;padding-inline-start:12px;color:#ffffffbb;}}
-    .ejada-home-avatar {{
-        display:grid;place-items:center;border-radius:50%;width:36px;height:36px;
-        background:white;color:#0A7A3F;font-weight:900;
-    }}
+    .ejada-home-brand small {{border-inline-start:1px solid #ffffff40;padding-inline-start:12px;color:var(--muted);}}
     .stApp .st-key-ejada_home_bank_picker {{gap:14px !important;margin-top:-24px;}}
     .stApp .st-key-home_portfolio_switch {{
         display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr));
         direction:rtl;width:min(100%,420px) !important;margin-inline:auto;
         gap:4px !important;padding:5px;border:1px solid #ffffff40;
-        border-radius:999px;background:#ffffff1c;
+        border-radius:999px;background:var(--card);
     }}
     html body .stApp .st-key-home_portfolio_switch button {{
         background:transparent !important;border:0 !important;border-radius:999px !important;
         box-shadow:none !important;min-height:40px;
     }}
     html body .stApp .st-key-home_portfolio_switch button p {{
-        color:#ffffffc9 !important;-webkit-text-fill-color:#ffffffc9 !important;
+        color:var(--muted) !important;-webkit-text-fill-color:var(--muted) !important;
         font-weight:700 !important;text-align:center;
     }}
-    html body .stApp .st-key-home_portfolio_switch button[kind="primary"] {{background:white !important;}}
+    html body .stApp .st-key-home_portfolio_switch button[kind="primary"] {{background:var(--card) !important;}}
     html body .stApp .st-key-home_portfolio_switch button[kind="primary"] p {{
-        color:#0A7A3F !important;-webkit-text-fill-color:#0A7A3F !important;font-weight:900 !important;
+        color:var(--btn-text) !important;-webkit-text-fill-color:var(--btn-text) !important;font-weight:900 !important;
     }}
     .ejada-home-intro {{text-align:center;padding:0 8px;}}
     .stApp .st-key-ejada_home_bank_picker > [data-testid="stElementContainer"]:has(.ejada-home-intro) {{min-height:42px !important;}}
-    .ejada-home-intro h1 {{font-size:30px;font-weight:900;color:white;margin:0 0 6px;padding:0 !important;}}
+    .ejada-home-intro h1 {{font-size:30px;font-weight:900;color:var(--text);margin:0 0 6px;padding:0 !important;}}
     .stApp :is(.st-key-home_reports_SNB,.st-key-home_reports_STC) {{
         display:grid !important;grid-template-columns:repeat(3,minmax(0,1fr));
         direction:rtl;gap:14px !important;width:min(100%,700px) !important;margin-inline:auto;
-        --report-accent:#5be39a;--report-icon:#0A7A3F;
+        --report-accent:var(--accent);--report-icon:var(--icon-text);
     }}
-    .stApp .st-key-home_reports_STC {{--report-accent:#4F008C;--report-icon:#4F008C;}}
     .stApp [class*="st-key-home_report_card_"] {{
         position:relative;overflow:hidden;gap:0 !important;min-height:110px;
-        background:#ffffff1c;border:1px solid #ffffff40;
+        background:var(--card);border:1px solid #ffffff40;
         border-top:4px solid var(--report-accent);border-radius:18px;
         box-shadow:0 10px 24px #041b3366;
         transition:transform .25s,background .25s,border-color .25s;
     }}
     .stApp [class*="st-key-home_report_card_"]:is(:hover,:focus-within) {{
-        transform:translateY(-6px);background:#ffffff2e;border-color:var(--report-accent);
+        transform:translateY(-6px);background:var(--card);border-color:var(--report-accent);
     }}
     .ejada-report-card {{
         box-sizing:border-box;min-height:105px;padding:16px 12px;display:grid;
         justify-items:center;align-content:center;gap:8px;
-        text-align:center;color:white;font-size:16px;line-height:1.4;font-weight:900;
+        text-align:center;color:var(--text);font-size:16px;line-height:1.4;font-weight:900;
     }}
     .st-key-home_report_card_Promises .ejada-report-card > span:last-child {{white-space:nowrap;}}
     .ejada-report-icon {{
         display:grid;place-items:center;width:42px;height:42px;border-radius:12px;
-        background:white;color:var(--report-icon);font-size:19px;line-height:1;
+        background:var(--icon-bg);color:var(--report-icon);font-size:19px;line-height:1;
     }}
     .stApp [class*="st-key-home_report_card_"] [data-testid="stElementContainer"]:has([data-testid="stButton"]) {{
         position:absolute;inset:0;z-index:2;
@@ -1867,7 +1760,7 @@ st.markdown(f"""
     }}
     .stApp:has(:is(.st-key-snb_glass_overview,.st-key-snb_glass_promises)),
     .stApp:has(:is(.st-key-snb_glass_overview,.st-key-snb_glass_promises)) [data-testid="stMain"] {{
-        direction:rtl;color:white;background:radial-gradient(circle at 80% 20%,#0A7A3F 0,#0E2A47 55%) !important;
+        direction:rtl;color:var(--text);background:var(--bg) !important;
     }}
     html:has(.st-key-snb_ov_header),
     body:has(.st-key-snb_ov_header),
@@ -1894,26 +1787,26 @@ st.markdown(f"""
         background:transparent !important;border:1px solid transparent !important;
     }}
     html body .stApp .st-key-snb_ov_navigation .st-key-report_pills [data-testid="stButton"] button[kind] p {{
-        color:white !important;-webkit-text-fill-color:white !important;
+        color:var(--text) !important;-webkit-text-fill-color:var(--text) !important;
     }}
     html body .stApp .st-key-snb_ov_navigation .st-key-report_pills [data-testid="stButton"] button[kind="primary"] {{
-        background:white !important;
+        background:var(--card) !important;
     }}
     html body .stApp .st-key-snb_ov_navigation .st-key-report_pills [data-testid="stButton"] button[kind="primary"] p {{
-        color:#0A7A3F !important;-webkit-text-fill-color:#0A7A3F !important;
+        color:var(--btn-text) !important;-webkit-text-fill-color:var(--btn-text) !important;
     }}
     .stApp .st-key-snb_ov_header {{direction:rtl;padding:10px 0;border-bottom:1px solid #ffffff38;}}
-    .snb-ov-brand {{display:flex;align-items:center;gap:16px;color:white;}}
+    .snb-ov-brand {{display:flex;align-items:center;gap:16px;color:var(--text);}}
     .snb-ov-brand b {{display:block;font-size:32px;line-height:1;}}
     .snb-ov-brand small {{display:block;text-align:center;letter-spacing:4px;}}
     .snb-ov-brand strong,.snb-ov-update {{
-        display:inline-flex;gap:8px;align-items:center;background:#ffffff1c;color:white;border:1px solid #ffffff40;
+        display:inline-flex;gap:8px;align-items:center;background:var(--card);color:var(--text);border:1px solid #ffffff40;
         border-radius:999px;padding:6px 12px;font-size:13px;
     }}
     html body .stApp .st-key-snb_ov_header button {{
-        background:#fff !important;border:1px solid #ffffff40 !important;color:#0A7A3F !important;
+        background:var(--card) !important;border:1px solid #ffffff40 !important;color:var(--btn-text) !important;
     }}
-    html body .stApp .st-key-snb_ov_header button p {{color:#0A7A3F !important;-webkit-text-fill-color:#0A7A3F !important;}}
+    html body .stApp .st-key-snb_ov_header button p {{color:var(--btn-text) !important;-webkit-text-fill-color:var(--btn-text) !important;}}
     .stApp .st-key-snb_glass_overview > [data-testid="stHorizontalBlock"] {{direction:rtl !important;flex-direction:row !important;gap:18px !important;align-items:flex-start !important;}}
     @media(min-width:850px) {{
         .stApp .st-key-snb_glass_overview > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child {{
@@ -1926,8 +1819,8 @@ st.markdown(f"""
     .stApp [class*="st-key-snb_ov_upload_"] {{
         direction:rtl !important;display:flex !important;flex-wrap:nowrap !important;
         align-items:center !important;justify-content:space-between !important;
-        color:white;gap:8px !important;border:1px solid #ffffff2e;border-radius:12px;
-        min-height:44px;padding:5px 8px;background:#ffffff14;font-size:13px;box-sizing:border-box;
+        color:var(--text);gap:8px !important;border:1px solid #ffffff2e;border-radius:12px;
+        min-height:44px;padding:5px 8px;background:var(--card);font-size:13px;box-sizing:border-box;
     }}
     .stApp [class*="st-key-snb_ov_upload_"] [data-testid="stFileUploader"] {{
         width:90px !important;min-width:90px !important;flex:none;
@@ -1941,7 +1834,7 @@ st.markdown(f"""
         position:relative;display:grid !important;place-items:center;
         width:90px !important;min-width:90px !important;height:32px !important;min-height:32px !important;
         padding:0 14px !important;white-space:nowrap;overflow:visible !important;
-        border-radius:10px !important;background:white !important;color:#0A7A3F !important;
+        border-radius:10px !important;background:var(--card) !important;color:var(--btn-text) !important;
         font-size:0 !important;
     }}
     html body .stApp [class*="st-key-snb_ov_upload_"] [data-testid="stFileUploaderDropzone"] button * {{
@@ -1952,20 +1845,20 @@ st.markdown(f"""
     }}
     html body .stApp [class*="st-key-snb_ov_upload_"] [data-testid="stFileUploaderDropzone"] button::after {{
         content:"Upload" !important;position:static !important;
-        color:#0A7A3F !important;-webkit-text-fill-color:#0A7A3F !important;font:800 13px Cairo,sans-serif;
+        color:var(--btn-text) !important;-webkit-text-fill-color:var(--btn-text) !important;font:800 13px Cairo,sans-serif;
     }}
     html body .stApp [class*="st-key-snb_ov_upload_"] [data-testid="stButton"] button {{
-        background:#1f8f6a !important;border-color:#b9f5d8 !important;color:white !important;
+        background:#1f8f6a !important;border-color:#b9f5d8 !important;color:var(--text) !important;
     }}
-    .snb-ov-title,.snb-ov-card h3 {{color:white !important;margin:0 !important;padding:0 !important;}}
+    .snb-ov-title,.snb-ov-card h3 {{color:var(--text) !important;margin:0 !important;padding:0 !important;}}
     .snb-ov-title {{font-size:24px !important;font-weight:800 !important;text-align:right !important;}}
     .snb-ov-card h3 {{font-size:16px !important;margin-bottom:7px !important;}}
     .snb-ov-card {{
-        color:white;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);
-        border-radius:20px;backdrop-filter:blur(14px);padding:16px 18px;
+        color:var(--text);background:var(--card);border:1px solid rgba(255,255,255,.18);
+        border-radius:20px;backdrop-filter:var(--blur);padding:16px 18px;
         box-sizing:border-box;margin:0;box-shadow:0 7px 18px #041b3340;
     }}
-    .snb-ov-card small {{color:#ffffffcf;}}
+    .snb-ov-card small {{color:var(--muted);}}
     .snb-ov-stack {{display:grid;gap:14px;align-items:start;}}
     .snb-ov-metrics,.snb-ov-calls {{display:grid;gap:14px;}}
     .snb-ov-metrics {{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch;}}
@@ -1975,16 +1868,16 @@ st.markdown(f"""
         display:flex;flex-direction:column;align-items:center;text-align:center;
     }}
     .snb-ov-metric > span {{font-size:14px;font-weight:700;}}
-    .snb-ov-metric > strong {{flex:1;display:grid;place-items:center;font-size:40px;color:#fff;font-weight:800;line-height:1.15;}}
+    .snb-ov-metric > strong {{flex:1;display:grid;place-items:center;font-size:40px;color:var(--text);font-weight:800;line-height:1.15;}}
     .snb-ov-metric > small {{min-height:1.35em;font-size:12px;}}
-    .snb-ov-empty {{display:grid;place-items:center;min-height:42px;font-size:16px;color:white;}}
-    .snb-ov-call {{padding:8px;border-radius:11px;background:#ffffff13;min-width:0;overflow-wrap:anywhere;}}
+    .snb-ov-empty {{display:grid;place-items:center;min-height:42px;font-size:16px;color:var(--text);}}
+    .snb-ov-call {{padding:8px;border-radius:11px;background:var(--card);min-width:0;overflow-wrap:anywhere;}}
     .snb-ov-call > b {{display:block;color:#5be39a;}}
-    .snb-ov-bar {{height:5px;background:#ffffff27;border-radius:999px;margin:5px 0;overflow:hidden;}}
+    .snb-ov-bar {{height:5px;background:var(--card);border-radius:999px;margin:5px 0;overflow:hidden;}}
     .snb-ov-bar i {{display:block;height:100%;background:linear-gradient(90deg,#1f8f6a,#2fb5a6);}}
     .snb-ov-rank {{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:4px 7px;align-items:center;margin-top:9px;}}
-    .snb-ov-rank > i {{text-align:center;border-radius:50%;background:#ffffff27;font-style:normal;}}
-    .snb-ov-rank:first-of-type > i {{background:#5be39a;color:#0E2A47;}}
+    .snb-ov-rank > i {{text-align:center;border-radius:50%;background:var(--card);font-style:normal;}}
+    .snb-ov-rank:first-of-type > i {{background:#5be39a;color:var(--text);}}
     .snb-ov-rank > b {{color:#5be39a;}}
     .snb-ov-rank .snb-ov-bar {{grid-column:2/-1;}}
     .snb-ov-state {{display:flex;align-items:center;gap:8px;}}
@@ -2010,7 +1903,7 @@ st.markdown(f"""
         .snb-ov-calls {{grid-template-columns:repeat(2,minmax(0,1fr));}}
     }}
     @media(max-width:530px) {{.snb-ov-metrics {{grid-template-columns:minmax(0,1fr);}}}}
-    .st-key-snb_glass_promises {{direction:rtl;color:white;}}
+    .st-key-snb_glass_promises {{direction:rtl;color:var(--text);}}
     body:has(.st-key-snb_pr_header) :is(header[data-testid="stHeader"],[data-testid="stToolbar"],#MainMenu,footer) {{
         display:none !important;
     }}
@@ -2023,19 +1916,19 @@ st.markdown(f"""
         direction:rtl !important;padding-inline:36px;box-sizing:border-box;
     }}
     .stApp .st-key-snb_pr_header {{min-height:130px;gap:12px !important;}}
-    .snb-pr-brand {{display:flex;align-items:center;gap:16px;color:white;}}
+    .snb-pr-brand {{display:flex;align-items:center;gap:16px;color:var(--text);}}
     .snb-pr-brand i {{height:56px;width:1px;background:#ffffff40;}}
     .snb-pr-update {{
         display:inline-flex;align-items:center;gap:8px;min-height:48px;padding:0 12px;
-        border:1px solid #ffffff33;border-radius:14px;background:#ffffff14;
-        backdrop-filter:blur(14px);color:white;font-size:16px;white-space:nowrap;
+        border:1px solid #ffffff33;border-radius:14px;background:var(--card);
+        backdrop-filter:var(--blur);color:var(--text);font-size:16px;white-space:nowrap;
     }}
     html body .stApp .st-key-snb_pr_change_bank button {{
         min-height:46px !important;padding:0 20px !important;border-radius:12px !important;
-        background:white !important;white-space:nowrap;
+        background:var(--card) !important;white-space:nowrap;
     }}
     html body .stApp .st-key-snb_pr_change_bank button p {{
-        color:#0A7A3F !important;-webkit-text-fill-color:#0A7A3F !important;font-size:16px !important;font-weight:700 !important;
+        color:var(--btn-text) !important;-webkit-text-fill-color:var(--btn-text) !important;font-size:16px !important;font-weight:700 !important;
     }}
     .stApp .st-key-snb_pr_navigation {{padding-bottom:14px;border-bottom:1px solid #ffffff40;}}
     html body .stApp .st-key-snb_pr_navigation .st-key-report_pills {{
@@ -2044,24 +1937,24 @@ st.markdown(f"""
     }}
     html body .stApp .st-key-snb_pr_navigation .st-key-report_pills [data-testid="stButton"] button[kind] {{
         min-height:42px !important;height:42px !important;padding:0 24px !important;
-        border-radius:14px !important;white-space:nowrap;background:#ffffff14 !important;
-        backdrop-filter:blur(14px);border:1px solid #ffffff33 !important;
+        border-radius:14px !important;white-space:nowrap;background:var(--card) !important;
+        backdrop-filter:var(--blur);border:1px solid #ffffff33 !important;
     }}
     html body .stApp .st-key-snb_pr_navigation .st-key-report_pills [data-testid="stButton"] button[kind] p {{
-        color:white !important;-webkit-text-fill-color:white !important;font-size:15px !important;font-weight:600 !important;
+        color:var(--text) !important;-webkit-text-fill-color:var(--text) !important;font-size:15px !important;font-weight:600 !important;
     }}
     html body .stApp .st-key-snb_pr_navigation .st-key-report_pills [data-testid="stButton"] button[kind="primary"] {{
-        background:white !important;box-shadow:0 6px 18px #0004 !important;
+        background:var(--card) !important;box-shadow:0 6px 18px #0004 !important;
     }}
     html body .stApp .st-key-snb_pr_navigation .st-key-report_pills [data-testid="stButton"] button[kind="primary"] p {{
-        color:#0E2A47 !important;-webkit-text-fill-color:#0E2A47 !important;font-weight:800 !important;
+        color:var(--text) !important;-webkit-text-fill-color:var(--text) !important;font-weight:800 !important;
     }}
     .stApp .st-key-snb_pr_titlebar {{
         justify-content:space-between !important;gap:12px !important;margin:4px 0 24px;
     }}
     .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page {{
-        min-height:60px;padding:6px 14px;border-radius:16px;background:#ffffff14;
-        border-color:#ffffff33;backdrop-filter:blur(14px);
+        min-height:60px;padding:6px 14px;border-radius:16px;background:var(--card);
+        border-color:#ffffff33;backdrop-filter:var(--blur);
     }}
     .stApp .st-key-snb_ov_upload_promises_page p {{font-size:16px;font-weight:600;white-space:nowrap;}}
     .stApp .st-key-snb_pr_titlebar [data-testid="stFileUploader"] {{width:114px !important;min-width:114px !important;}}
@@ -2076,22 +1969,22 @@ st.markdown(f"""
         .stApp :is(.st-key-snb_pr_header,.st-key-snb_pr_navigation,.st-key-snb_pr_titlebar) {{padding-inline:12px;}}
     }}
     html body .stApp .st-key-snb_pr_download button {{
-        background:#fff !important;border:1px solid #ffffff40 !important;border-radius:10px;
-        color:#0A7A3F !important;white-space:nowrap;min-height:50px !important;padding:0 24px !important;
+        background:var(--card) !important;border:1px solid #ffffff40 !important;border-radius:10px;
+        color:var(--btn-text) !important;white-space:nowrap;min-height:50px !important;padding:0 24px !important;
     }}
     html body .stApp .st-key-snb_pr_download button p {{
-        color:#0A7A3F !important;-webkit-text-fill-color:#0A7A3F !important;
+        color:var(--btn-text) !important;-webkit-text-fill-color:var(--btn-text) !important;
     }}
     .st-key-snb_pr_download button p {{font-size:16px !important;font-weight:700 !important;}}
     .st-key-snb_pr_download button:disabled {{opacity:.55;}}
     .snb-pr-metrics {{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));text-align:center;}}
     .snb-pr-metrics > div {{display:grid;justify-items:center;gap:4px;padding:4px 8px;}}
     .snb-pr-metrics > div + div {{border-inline-start:1px solid #ffffff2e;}}
-    .snb-pr-metrics strong {{font-size:clamp(25px,4vw,44px);line-height:1.2;font-weight:800;color:white;}}
+    .snb-pr-metrics strong {{font-size:clamp(25px,4vw,44px);line-height:1.2;font-weight:800;color:var(--text);}}
     .snb-pr-metrics i {{width:28px;height:3px;border-radius:3px;}}
     .snb-pr-pills {{display:flex;gap:8px;flex-wrap:wrap;}}
     .snb-pr-pills > span,.snb-pr-card header > span {{
-        display:inline-flex;align-items:center;gap:6px;border-radius:999px;background:#ffffff14;
+        display:inline-flex;align-items:center;gap:6px;border-radius:999px;background:var(--card);
         border:1px solid #ffffff2e;padding:3px 9px;font-size:12px;color:#b9f5d8;white-space:nowrap;
     }}
     .snb-pr-pills i {{width:7px;height:7px;border-radius:50%;}}
@@ -2223,7 +2116,7 @@ st.markdown(f"""
     div[class*="st-key-activity_model_upload_card"] [data-testid="stFileUploaderDropzone"] button,
     div[class*="st-key-activity_file_upload_card"] [data-testid="stFileUploaderDropzone"] button {{
         font-size: inherit !important;
-        color: #1F4373 !important;
+        color: var(--text) !important;
         visibility: visible !important;
         text-indent: 0 !important;
     }}
@@ -2324,7 +2217,7 @@ st.markdown(f"""
         margin-right: 0 !important;
         padding: 9px 10px !important;
         overflow: visible !important;
-        background: #FFFFFF !important;
+        background: var(--card) !important;
         border: 1px solid {border_color} !important;
         border-radius: 10px !important;
     }}
@@ -2556,7 +2449,7 @@ st.markdown(f"""
 
 
     .st-key-bank_switch {{direction:ltr !important;gap:.5cm !important;justify-content:flex-start !important;}}
-    .selected-bank {{display:inline-flex;align-items:center;gap:7px;background:white;border-radius:6px;padding:4px 9px;font:900 22px Tahoma,sans-serif;}}
+    .selected-bank {{display:inline-flex;align-items:center;gap:7px;background:var(--card);border-radius:6px;padding:4px 9px;font:900 22px Tahoma,sans-serif;}}
     .selected-bank.SNB {{color:#005645;}}
     .selected-bank.STC {{color:#4f008c;}}
     .selected-bank::before {{content:"";width:10px;height:10px;background:{brand_accent};border-radius:50%;}}
@@ -2569,10 +2462,10 @@ st.markdown(f"""
         .st-key-promise_comparison [data-testid="stColumn"] {{width:100% !important;min-width:0 !important;}}
         .st-key-promise_comparison [data-testid="stHorizontalBlock"]::after {{content:"";position:absolute;left:50%;inset-block:0;border-left:1px solid {border_color};}}
     }}
-    div[class*="st-key-uploaded_chip_"] {{direction:ltr;background:white;border:1px dashed {border_color};border-radius:8px;padding:4px 8px;align-items:center;min-width:0;}}
-    .uploaded-filename {{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#1F4373;font-size:14px;}}
-    .stApp div[class*="st-key-uploaded_chip_"] [data-testid="stButton"] button {{width:25px !important;min-width:25px !important;height:25px !important;min-height:25px !important;padding:0 !important;background:#ae3034 !important;color:white !important;}}
-    .stApp div[class*="st-key-uploaded_chip_"] button p {{color:white !important;line-height:1 !important;}}
+    div[class*="st-key-uploaded_chip_"] {{direction:ltr;background:var(--card);border:1px dashed {border_color};border-radius:8px;padding:4px 8px;align-items:center;min-width:0;}}
+    .uploaded-filename {{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);font-size:14px;}}
+    .stApp div[class*="st-key-uploaded_chip_"] [data-testid="stButton"] button {{width:25px !important;min-width:25px !important;height:25px !important;min-height:25px !important;padding:0 !important;background:var(--btn) !important;color:var(--text) !important;}}
+    .stApp div[class*="st-key-uploaded_chip_"] button p {{color:var(--text) !important;line-height:1 !important;}}
     .stApp div[class*="_upload_card"], .stApp [data-testid="stVerticalBlockBorderWrapper"]:has([class*="st-key-uploaded_chip_"]) {{height:auto !important;min-height:0 !important;max-height:none !important;}}
     .st-key-promise_comparison {{margin-top:calc(16px + 0.5cm);}}
     .st-key-promise_comparison table.ejada-diagnostic-table th.step-heading {{text-align:center !important;}}
@@ -2583,17 +2476,17 @@ st.markdown(f"""
     .st-key-promise_comparison table.ejada-diagnostic-table :is(td, th) {{padding:9px 10px !important;line-height:1.4;}}
     .stApp div[class*="st-key-uploaded_chip_"] {{min-height:40px !important;padding:6px 8px !important;align-items:center !important;}}
     .stApp div[class*="st-key-uploaded_chip_"] .uploaded-filename {{line-height:1.5;direction:ltr;text-align:left;}}
-    .stApp .st-key-bank_report_bar {{background:#fff;border:1px solid {border_color};border-radius:18px;padding:12px 18px;}}
+    .stApp .st-key-bank_report_bar {{background:var(--card);border:1px solid {border_color};border-radius:18px;padding:12px 18px;}}
     .stApp .st-key-report_pills {{direction:rtl;background:{brand_soft};border-radius:28px;padding:4px;gap:3px !important;max-width:100%;}}
     html body .stApp .st-key-report_pills [data-testid="stButton"] button[kind] {{background:transparent !important;border:1px solid transparent !important;box-shadow:none !important;border-radius:22px !important;padding:5px 14px !important;min-height:36px !important;}}
-    html body .stApp .st-key-report_pills [data-testid="stButton"] button[kind="primary"] {{background:#fff !important;border-color:{brand_accent} !important;box-shadow:0 1px 3px #1f334518 !important;}}
-    html body .stApp .st-key-report_pills [data-testid="stButton"] button[kind] p {{color:#263745 !important;-webkit-text-fill-color:#263745 !important;font-size:15px !important;}}
+    html body .stApp .st-key-report_pills [data-testid="stButton"] button[kind="primary"] {{background:var(--card) !important;border-color:{brand_accent} !important;box-shadow:0 1px 3px #1f334518 !important;}}
+    html body .stApp .st-key-report_pills [data-testid="stButton"] button[kind] p {{color:var(--text) !important;-webkit-text-fill-color:var(--text) !important;font-size:15px !important;}}
     html body .stApp .st-key-report_pills [data-testid="stButton"] button[kind="secondary"] p {{font-weight:500 !important;}}
     .stApp [class*="st-key-upload_field_"] {{width:min(265px,100%) !important;min-width:0;gap:5px !important;margin-left:auto;}}
     .stApp [class*="st-key-upload_field_"] > [data-testid="stElementContainer"]:has(.upload-field-label) {{min-height:24px !important;margin:0 !important;display:flow-root !important;}}
     .stApp .upload-field-label {{direction:rtl;text-align:center;font-size:17px;font-weight:800;line-height:1.4;color:{label_color};}}
     .stApp [class*="st-key-upload_box_"] {{box-sizing:border-box;width:100% !important;padding:8px !important;border:1px solid {border_color} !important;border-radius:10px;background:transparent !important;}}
-    .stApp [class*="st-key-upload_box_"] [data-testid="stFileUploaderDropzone"] {{box-sizing:border-box;display:flex !important;align-items:center !important;justify-content:center !important;width:100%;min-height:54px !important;height:auto !important;padding:6px !important;background:white !important;border:1px dashed #a9bbd0 !important;border-radius:8px !important;}}
+    .stApp [class*="st-key-upload_box_"] [data-testid="stFileUploaderDropzone"] {{box-sizing:border-box;display:flex !important;align-items:center !important;justify-content:center !important;width:100%;min-height:54px !important;height:auto !important;padding:6px !important;background:var(--card) !important;border:1px dashed #a9bbd0 !important;border-radius:8px !important;}}
     .stApp [class*="st-key-upload_box_"] [data-testid="stFileUploaderDropzoneInstructions"] {{display:none !important;}}
     .stApp [class*="st-key-upload_box_"] [data-testid="stFileUploaderDropzone"] button {{height:36px !important;min-height:36px !important;margin:auto !important;padding:4px 12px !important;}}
     .stApp .st-key-snb_model_manager_panel {{gap:4px !important;padding-block:0 !important;}}
@@ -2611,8 +2504,8 @@ st.markdown(f"""
     .stApp .selected-bank.STC {{color:#56279E !important;}}
     .stApp .upload-field-label {{color:{label_color} !important;}}
     html body .stApp [class*="st-key-upload_field_"] .upload-field-label {{
-        color:{'#153754' if st.session_state.theme_choice == 'حسب البنك (تلقائي)' else label_color} !important;
-        -webkit-text-fill-color:{'#153754' if st.session_state.theme_choice == 'حسب البنك (تلقائي)' else label_color} !important;
+        color:{label_color} !important;
+        -webkit-text-fill-color:{label_color} !important;
     }}
     .stApp [class*="st-key-upload_box_"] {{
         max-width:265px !important;padding:5px !important;background:transparent !important;
@@ -2622,18 +2515,18 @@ st.markdown(f"""
         border:1px dashed {brand_accent} !important;background:{brand_soft} !important;
     }}
     .stApp [class*="st-key-upload_box_"] [data-testid="stFileUploaderDropzone"] button {{
-        background:{brand_accent} !important;color:#FFFFFF !important;
+        background:{brand_accent} !important;color:var(--text) !important;
         min-height:33px !important;height:33px !important;
     }}
     .stApp [class*="st-key-upload_box_"] [data-testid="stFileUploaderDropzone"] button p {{
-        color:#FFFFFF !important;
+        color:var(--text) !important;
     }}
     .st-key-theme_picker [data-baseweb="select"]>div {{
-        background:#FFFFFF !important;border:1px solid {border_color} !important;
+        background:var(--card) !important;border:1px solid {border_color} !important;
         border-radius:9px !important;
     }}
     .st-key-theme_picker [data-baseweb="select"] * {{
-        color:#1F4373 !important;-webkit-text-fill-color:#1F4373 !important;
+        color:var(--text) !important;-webkit-text-fill-color:var(--text) !important;
     }}
     .stApp [data-testid="stWidgetLabel"] p, .stApp [data-testid="stFileUploader"] label {{
         opacity:1 !important;
@@ -2669,10 +2562,10 @@ st.markdown(f"""
         padding:6px 15px !important;
         background:{brand_accent} !important;
         border:1px solid {brand_accent} !important;
-        color:#FFFFFF !important;
+        color:var(--text) !important;
     }}
     .stApp [data-testid="stFileUploaderDropzone"] button p {{
-        color:#FFFFFF !important;-webkit-text-fill-color:#FFFFFF !important;
+        color:var(--text) !important;-webkit-text-fill-color:var(--text) !important;
         font-weight:750 !important;
     }}
     .stApp div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-activity_model_upload_card),
@@ -2718,6 +2611,89 @@ st.markdown(f"""
             width:100% !important;max-width:100% !important;
         }}
     }}
+
+    :root {{{theme_css}}}
+    html body .stApp, html body .stApp [data-testid="stMain"] {{
+        background:var(--bg) !important;color:var(--text);
+    }}
+    .stApp .st-key-ejada_home_header {{direction:rtl;justify-content:space-between;}}
+    html body .stApp [data-testid="stMain"] :is([data-testid="stMarkdownContainer"],[data-testid="stWidgetLabel"],
+        [data-testid="stMetricValue"],[data-testid="stMetricLabel"],[data-testid="stExpander"] summary) {{
+        color:var(--text);
+    }}
+    html body .stApp :is([data-testid="stTabs"] [role="tab"][aria-selected="true"],
+        [data-testid="stDownloadButton"] button) {{
+        background:var(--btn) !important;color:var(--btn-text) !important;
+    }}
+    html body .stApp [data-testid="stDownloadButton"] button p {{
+        color:var(--btn-text) !important;-webkit-text-fill-color:var(--btn-text) !important;
+    }}
+    .stApp .st-key-ejada_theme_switch {{
+        padding:4px;min-height:42px;gap:4px !important;align-items:center;
+        border-radius:999px;background:var(--card);border:1px solid var(--border);
+        backdrop-filter:var(--blur);
+    }}
+    .st-key-ejada_theme_switch p {{font-size:13px;color:var(--muted);white-space:nowrap;}}
+    .st-key-ejada_theme_light {{--swatch:#F4F8F6;}}
+    .st-key-ejada_theme_dark {{--swatch:#262c32;}}
+    .st-key-ejada_theme_navy {{--swatch:#0E2A47;}}
+    html body .stApp .st-key-ejada_theme_switch button[kind] {{
+        display:flex;align-items:center;gap:5px;min-height:32px !important;
+        padding:2px 7px !important;border-radius:999px !important;
+        background:transparent !important;border:0 !important;box-shadow:none !important;
+    }}
+    .st-key-ejada_theme_switch button::before {{
+        content:"";width:16px;height:16px;flex:none;background:var(--swatch);
+        border:1px solid var(--border);border-radius:50%;
+    }}
+    html body .stApp .st-key-ejada_theme_switch button[kind="primary"] {{background:var(--accent) !important;}}
+    html body .stApp .st-key-ejada_theme_switch button[kind] p {{
+        font-family:Cairo,sans-serif;font-size:13px;color:var(--text) !important;-webkit-text-fill-color:var(--text) !important;
+    }}
+    html body .stApp .st-key-ejada_theme_switch button[kind="primary"] p {{
+        color:var(--accent-text) !important;-webkit-text-fill-color:var(--accent-text) !important;font-weight:700 !important;
+    }}
+    html body .stApp :is(.st-key-home_portfolio_switch,.st-key-report_pills) [data-testid="stButton"] button[kind="primary"] {{
+        background:var(--tab-on) !important;border-color:var(--border) !important;box-shadow:var(--shadow) !important;
+    }}
+    html body .stApp :is(.st-key-home_portfolio_switch,.st-key-report_pills) [data-testid="stButton"] button[kind="primary"] p {{
+        color:var(--tab-on-text) !important;-webkit-text-fill-color:var(--tab-on-text) !important;
+    }}
+    html body .stApp :is(.st-key-home_portfolio_switch,.st-key-report_pills) [data-testid="stButton"] button[kind="secondary"] p {{
+        color:var(--text) !important;-webkit-text-fill-color:var(--text) !important;
+    }}
+    .stApp :is(.snb-ov-card,.snb-ov-call,[class*="st-key-home_report_card_"],[data-testid="stVerticalBlockBorderWrapper"],
+        [data-testid="stFileUploaderDropzone"],[data-testid="stAlert"],[data-testid="stExpander"] details,
+        [data-testid="stFileUploaderFile"],[data-testid="stHeader"]) {{
+        background:var(--card) !important;border-color:var(--border) !important;
+        box-shadow:var(--shadow) !important;backdrop-filter:var(--blur);
+    }}
+    html body .stApp :is(.st-key-snb_ov_header,.st-key-snb_pr_change_bank,.st-key-snb_pr_download,
+        [class*="st-key-snb_ov_upload_"],[class*="st-key-uploaded_chip_"],[data-testid="stFileUploaderDropzone"],
+        .st-key-neglect_download_header,.st-key-neglect_mode_controls) button {{
+        background:var(--btn) !important;color:var(--btn-text) !important;border-color:var(--border) !important;
+    }}
+    html body .stApp :is(.st-key-snb_ov_header,.st-key-snb_pr_change_bank,.st-key-snb_pr_download,
+        [class*="st-key-snb_ov_upload_"],[class*="st-key-uploaded_chip_"],[data-testid="stFileUploaderDropzone"],
+        .st-key-neglect_download_header,.st-key-neglect_mode_controls) button :is(p,span,svg),
+    html body .stApp [class*="st-key-snb_ov_upload_"] [data-testid="stFileUploaderDropzone"] button::after {{
+        color:var(--btn-text) !important;-webkit-text-fill-color:var(--btn-text) !important;
+    }}
+    .stApp :is(.snb-ov-metric strong,.snb-pr-metrics strong,.snb-ov-title,.snb-ov-card h3,
+        .snb-pr-update,.snb-ov-update,.ejada-home-intro h1,.snb-pr-brand,.snb-ov-brand,
+        .ejada-report-card,.uploaded-filename,.selected-bank,[data-testid="stAlert"] p) {{
+        color:var(--text) !important;-webkit-text-fill-color:var(--text) !important;
+    }}
+    .stApp :is(.snb-ov-call>b,.snb-ov-rank>b,.snb-pr-counts>span:first-child,.snb-ov-legend span:first-child) {{color:var(--accent) !important;}}
+    .stApp :is(.snb-pr-counts>span:last-child,.snb-ov-legend span:last-child) {{color:var(--broken) !important;}}
+    .stApp :is(.snb-ov-card small,.ejada-home-brand small,.snb-pr-message) {{color:var(--muted) !important;}}
+    .stApp :is(.snb-pr-update,.snb-ov-update,.snb-pr-pills>span,.snb-pr-card header>span) {{
+        background:var(--card);border-color:var(--border);color:var(--text);
+    }}
+    .stApp :is([data-baseweb="input"],[data-baseweb="select"]>div,[data-testid="stDataFrame"],
+        [data-testid="stTable"] th,[data-testid="stTable"] td) {{
+        background:var(--card) !important;color:var(--text) !important;border-color:var(--border) !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -2731,12 +2707,12 @@ _snb_promises_page = (st.session_state.current_page == "Promises"
 if _snb_promises_page:
     with st.container(key="snb_pr_header", horizontal=True, vertical_alignment="center"):
         badge = """<div dir="ltr" style="position:relative;padding:4px 6px;line-height:1">
-    <div style="font-family:'Cairo',sans-serif;font-size:40px;font-weight:800;letter-spacing:2px;background:linear-gradient(180deg,#ffffff,#9ff0c6);-webkit-background-clip:text;background-clip:text;color:transparent">SNB</div>
+    <div style="font-family:'Cairo',sans-serif;font-size:40px;font-weight:800;letter-spacing:2px;background:linear-gradient(180deg,var(--snb-start),var(--snb-end));-webkit-background-clip:text;background-clip:text;color:transparent">SNB</div>
     <div style="height:4px;border-radius:2px;background:linear-gradient(90deg,#5be39a,#7fd6e0);margin-top:4px"></div>
   </div>"""
         logo = """<div style="text-align:center;width:112px">
-    <div style="font-family:'Cairo',sans-serif;font-size:46px;font-weight:800;line-height:1.05;color:#fff;padding-bottom:12px;margin-top:-6px">إجادة</div>
-    <div dir="ltr" style="font-family:'Cairo',sans-serif;font-size:14px;letter-spacing:9px;font-weight:600;color:#d3f5e2;line-height:1;margin-right:-9px;margin-top:-4px">EJADA</div>
+    <div style="font-family:'Cairo',sans-serif;font-size:46px;font-weight:800;line-height:1.05;color:var(--text);padding-bottom:12px;margin-top:-6px">إجادة</div>
+    <div dir="ltr" style="font-family:'Cairo',sans-serif;font-size:14px;letter-spacing:9px;font-weight:600;color:var(--text);line-height:1;margin-right:-9px;margin-top:-4px">EJADA</div>
   </div>"""
         st.markdown(
             f'<div class="snb-pr-brand">{badge}<i aria-hidden="true"></i>{logo}</div>',
@@ -2770,22 +2746,22 @@ elif _snb_overview_page:
         st.button("تغيير البنك", key="snb_ov_change_bank", width="content",
                   on_click=set_page, args=("Home",))
 elif st.session_state.current_page == "Home":
-    with st.container(key="ejada_home_header"):
+    with st.container(key="ejada_home_header", horizontal=True, vertical_alignment="center"):
         st.markdown(
             """<div class="ejada-home-header" dir="rtl">
             <div class="ejada-home-brand"><div><strong>إجادة</strong><b dir="ltr">EJADA</b></div>
             <small>منظومة تحصيل الديون<br>وتقارير الأداء</small></div>
-            <div class="ejada-home-actions"><span class="ejada-home-avatar" aria-label="رنا">ر</span></div></div>""",
+            </div>""",
             unsafe_allow_html=True,
         )
+        with st.container(key="ejada_theme_switch", horizontal=True, vertical_alignment="center"):
+            st.markdown("المظهر", width="content")
+            for option, label in (("light", "فاتح"), ("dark", "أسود"), ("navy", "كحلي")):
+                st.button(label, key=f"ejada_theme_{option}", width="content",
+                          type="primary" if theme == option else "secondary",
+                          on_click=change_theme, args=(option,))
 else:
     with st.container(key="brand_header"):
-        with st.container(key="theme_picker"):
-            st.selectbox(
-                "🎨 الثيم", options=THEMES, key="theme_choice",
-                label_visibility="visible",
-                help="اختاري ثيم البنك التلقائي أو الأسود الهادي أو الثيمات القديمة.",
-            )
         st.markdown(f"""
     <div class="ejada-header" style="text-align:center;direction:ltr;line-height:1.12;color:{header_logo_color};font-weight:900;">
       <div style="font-size:43px;font-family:Tahoma,sans-serif;">إجـــادة</div>
@@ -8782,7 +8758,7 @@ border-radius:16px;padding:22px;font-family:Tahoma,Arial,sans-serif;text-align:r
     fragment = f"<style>{css}</style>{body}"
     document = (f'<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">'
                 f'<meta name="viewport" content="width=device-width,initial-scale=1"><title>{title}</title>'
-                '<style>body{max-width:1050px;margin:24px auto;padding:0 12px;background:#fff}</style>'
+                '<style>body{max-width:1050px;margin:24px auto;padding:0 12px;background:var(--card)}</style>'
                 f'</head><body>{fragment}</body></html>')
     return fragment, document
 
@@ -10931,13 +10907,13 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
                 .stApp [class*="st-key-neglect_mode_controls"] button,
                 .stApp [class*="st-key-neglect_choice_regular_"] button,
                 .stApp [class*="st-key-neglect_choice_followup_"] button {{
-                    background:#FFFFFF !important;
-                    background-color:#FFFFFF !important;
+                    background:var(--card) !important;
+                    background-color:var(--card) !important;
                     border:1px solid #C8D7E6 !important;
                     outline:0 !important;
                     box-shadow:none !important;
-                    color:#1F4373 !important;
-                    -webkit-text-fill-color:#1F4373 !important;
+                    color:var(--text) !important;
+                    -webkit-text-fill-color:var(--text) !important;
                     padding:3px 5px !important;
                     min-height:36px !important;
                     height:36px !important;
@@ -10950,8 +10926,8 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
                 .stApp [class*="st-key-neglect_choice_regular_"] button span,
                 .stApp [class*="st-key-neglect_choice_followup_"] button p,
                 .stApp [class*="st-key-neglect_choice_followup_"] button span {{
-                    color:#1F4373 !important;
-                    -webkit-text-fill-color:#1F4373 !important;
+                    color:var(--text) !important;
+                    -webkit-text-fill-color:var(--text) !important;
                     font-size:14px !important;
                     font-weight:900 !important;
                     white-space:nowrap !important;
@@ -10960,8 +10936,8 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
                 }}
                 .stApp [class*="st-key-neglect_choice_regular_"] button:hover,
                 .stApp [class*="st-key-neglect_choice_followup_"] button:hover {{
-                    background:#EAF2FC !important;
-                    background-color:#EAF2FC !important;
+                    background:var(--card) !important;
+                    background-color:var(--card) !important;
                 }}
                 .st-key-neglect_choice_regular_{selected_bank} button p::after,
                 .st-key-neglect_choice_followup_{selected_bank} button p::after {{
@@ -10986,7 +10962,7 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
                 .st-key-neglect_download_header button {{
                     background:#08A52C !important;
                     border:1px solid #08A52C !important;
-                    color:#FFFFFF !important;
+                    color:var(--text) !important;
                     border-radius:8px !important;
                     font-weight:900 !important;
                     min-height:45px !important;
@@ -10995,8 +10971,8 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
                     box-shadow:none !important;
                 }}
                 .st-key-neglect_download_header button p {{
-                    color:#FFFFFF !important;
-                    -webkit-text-fill-color:#FFFFFF !important;
+                    color:var(--text) !important;
+                    -webkit-text-fill-color:var(--text) !important;
                     font-size:14px !important;
                     font-weight:900 !important;
                     white-space:nowrap !important;
@@ -11707,7 +11683,7 @@ def _render_snb_overview():
     if main_state:
         labels = portfolio[main_state].dropna().astype(str).str.strip()
         states = labels[labels.ne("")].value_counts()
-    palette = ("#5be39a", "#1f8f6a", "#b9f5d8", "#2fb5a6")
+    palette = ("var(--accent)", "var(--snb-start)", "var(--broken)", "var(--snb-end)")
 
     def number(value):
         return "—" if value is None else f"{value:,}"
@@ -11800,7 +11776,7 @@ def _render_snb_overview():
                     bars = "".join(
                         f'<div class="snb-ov-column" style="--value:{value / maximum:.2%};--bar:{color}">'
                         f'<span>{value:,}</span><i></i></div>'
-                        for value, color in ((current, "#5be39a"), (missed, "#7fd6e0"))
+                        for value, color in ((current, "var(--accent)"), (missed, "var(--broken)"))
                     )
                     columns.append(f'<div class="snb-ov-pair"><div>{bars}</div><small>{_xml_escape(name)}</small></div>')
                 chart = f'<div class="snb-ov-chart">{"".join(columns)}</div>'
@@ -11883,7 +11859,7 @@ def _render_snb_promises(files):
     ratio = counts[1] / total if total else None
     summary = [("إجمالي الحسابات", accounts), ("الوعود القائمة", counts[0]),
                ("الوعود المكسورة", counts[1]), ("نسبة الكسر (محسوبة)", ratio)]
-    colors = ("#5be39a", "#7fd6e0", "#2fb5a6", "#b9f5d8")
+    colors = ("var(--accent)", "var(--broken)", "var(--snb-end)", "var(--snb-start)")
     types = pd.Series(dtype=int)
     collectors = {}
     if ready:
@@ -11962,11 +11938,11 @@ elif curr_page == 'Overview':
     st.markdown("""<style>
 
 [data-testid="stMainBlockContainer"]{max-width:1460px;margin:auto}
-[data-testid="stVerticalBlockBorderWrapper"],[data-testid="stPlotlyChart"]{background:white;border-radius:22px;padding:10px}
+[data-testid="stVerticalBlockBorderWrapper"],[data-testid="stPlotlyChart"]{background:var(--card);border-radius:22px;padding:10px}
 .kpi-grid-4{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;direction:rtl}
-.kpi-grid-4 .kpi-card{padding:22px!important;border:0!important;border-radius:22px!important;background:white!important;box-shadow:0 3px 16px #17261f09!important;text-align:right}
+.kpi-grid-4 .kpi-card{padding:22px!important;border:0!important;border-radius:22px!important;background:var(--card)!important;box-shadow:0 3px 16px #17261f09!important;text-align:right}
 .kpi-grid-4 .kpi-card:first-child{background:#116044!important}
-.kpi-grid-4 .kpi-card:first-child *{color:white!important}
+.kpi-grid-4 .kpi-card:first-child *{color:var(--text)!important}
 .kpi-grid-4 .kpi-value{font-size:34px!important}
 .overview-title{direction:rtl;text-align:right;color:inherit;font-size:32px;font-weight:750;margin:10px 0 14px}
 </style><div class="overview-title" style="color:{label_color}">نظرة عامة على التحصيل</div>""".replace("{label_color}", label_color), unsafe_allow_html=True)
@@ -12271,16 +12247,16 @@ else:
                     call_labels = [_overview_clean_name(n) for n in top_calls.index]
                     fig_calls = go.Figure(go.Bar(
                         x=top_calls.values, y=call_labels, orientation='h',
-                        marker=dict(color='#304D73', line=dict(width=0)),
+                        marker=dict(color=theme_values['accent'], line=dict(width=0)),
                         text=[f'<b>{int(v):,}</b>' for v in top_calls.values],
                         textposition='outside', cliponaxis=False,
-                        textfont=dict(color='#1F4373', size=13, family='Tahoma')
+                        textfont=dict(color=theme_values['text'], size=13, family='Cairo')
                     ))
                     fig_calls.update_layout(
                         title=dict(text='<b>أكثر 10 محصلين حسب عدد المكالمات</b>', x=0.5, xanchor='center',
-                                   font=dict(color='#1F4373', size=18, family='Tahoma')),
-                        paper_bgcolor='white', plot_bgcolor='white',
-                        font=dict(color='#1F4373', family='Tahoma'),
+                                   font=dict(color=theme_values['text'], size=18, family='Cairo')),
+                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                        font=dict(color=theme_values['text'], family='Cairo'),
                         height=max(350, len(top_calls) * 34 + 115),
                         margin=dict(t=65, b=25, l=20, r=55), showlegend=False
                     )
@@ -12298,16 +12274,16 @@ else:
                         labels=['الوعود القائمة', 'الوعود المكسورة'],
                         values=[active_count, broken_count],
                         hole=0.62,
-                        marker=dict(colors=['#1F4373', '#586F8C'], line=dict(color='#FFFFFF', width=2)),
+                        marker=dict(colors=[theme_values['accent'], theme_values['broken']], line=dict(color='#FFFFFF', width=2)),
                         textinfo='label+percent',
                         textfont=dict(color='#FFFFFF', size=13, family='Tahoma'),
                         sort=False
                     ))
                     fig_promise_status.update_layout(
                         title=dict(text='<b>توزيع الوعود القائمة والمكسورة</b>', x=0.5, xanchor='center',
-                                   font=dict(color='#1F4373', size=18, family='Tahoma')),
-                        paper_bgcolor='white', plot_bgcolor='white',
-                        font=dict(color='#1F4373', family='Tahoma'),
+                                   font=dict(color=theme_values['text'], size=18, family='Cairo')),
+                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                        font=dict(color=theme_values['text'], family='Cairo'),
                         height=390, margin=dict(t=65, b=25, l=25, r=25), showlegend=False
                     )
                     st.plotly_chart(fig_promise_status, use_container_width=True, config={'displayModeBar': False})
@@ -12324,16 +12300,16 @@ else:
                     broken_labels = [_overview_clean_name(n) for n in top_broken.index]
                     fig_broken = go.Figure(go.Bar(
                         x=top_broken.values, y=broken_labels, orientation='h',
-                        marker=dict(color='#586F8C', line=dict(width=0)),
+                        marker=dict(color=theme_values['broken'], line=dict(width=0)),
                         text=[f'<b>{int(v):,}</b>' for v in top_broken.values],
                         textposition='outside', cliponaxis=False,
-                        textfont=dict(color='#1F4373', size=13, family='Tahoma')
+                        textfont=dict(color=theme_values['text'], size=13, family='Cairo')
                     ))
                     fig_broken.update_layout(
                         title=dict(text='<b>أكثر المحصلين في الوعود المكسورة</b>', x=0.5, xanchor='center',
-                                   font=dict(color='#1F4373', size=18, family='Tahoma')),
-                        paper_bgcolor='white', plot_bgcolor='white',
-                        font=dict(color='#1F4373', family='Tahoma'),
+                                   font=dict(color=theme_values['text'], size=18, family='Cairo')),
+                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                        font=dict(color=theme_values['text'], family='Cairo'),
                         height=max(350, len(top_broken) * 34 + 115),
                         margin=dict(t=65, b=25, l=20, r=55), showlegend=False
                     )
@@ -12353,16 +12329,16 @@ else:
                     neglect_labels = [_overview_clean_name(n) for n in top_neglect.index]
                     fig_neglect = go.Figure(go.Bar(
                         x=top_neglect.values, y=neglect_labels, orientation='h',
-                        marker=dict(color='#000000', line=dict(color='rgba(0,0,0,0)', width=0)),
+                        marker=dict(color=theme_values['accent'], line=dict(width=0)),
                         text=[f'<b>{int(v):,}</b>' for v in top_neglect.values],
                         textposition='outside', cliponaxis=False,
-                        textfont=dict(color='#1F4373', size=13, family='Tahoma')
+                        textfont=dict(color=theme_values['text'], size=13, family='Cairo')
                     ))
                     fig_neglect.update_layout(
                         title=dict(text=f'<b>توزيع الإهمال حسب {neglect_group_col}</b>', x=0.5, xanchor='center',
-                                   font=dict(color='#1F4373', size=18, family='Tahoma')),
-                        paper_bgcolor='white', plot_bgcolor='white',
-                        font=dict(color='#1F4373', family='Tahoma'),
+                                   font=dict(color=theme_values['text'], size=18, family='Cairo')),
+                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                        font=dict(color=theme_values['text'], family='Cairo'),
                         height=max(350, len(top_neglect) * 34 + 115),
                         margin=dict(t=65, b=25, l=20, r=55), showlegend=False
                     )
@@ -12500,7 +12476,7 @@ else:
                             max-height:430px !important;
                             overflow:hidden !important;
                             box-sizing:border-box !important;
-                            background:#FFFFFF !important;
+                            background:var(--card) !important;
                             border:1px solid #D4DFEA !important;
                             border-radius:12px !important;
                             padding:7px 9px !important;
@@ -12512,8 +12488,8 @@ else:
                         .st-key-neglect_filter_panel .neglect-filter-title {
                             position:relative;
                             direction:rtl;
-                            background:#082B62;
-                            color:#FFFFFF;
+                            background:var(--card);
+                            color:var(--text);
                             border-radius:7px;
                             padding:3px 13px 3px 28px;
                             min-height:28px;
@@ -12529,18 +12505,18 @@ else:
                             position:absolute;
                             right:10px;top:8px;
                             width:11px;height:11px;
-                            background:#FFFFFF;
+                            background:var(--card);
                             clip-path:polygon(0 0,100% 0,62% 52%,62% 100%,38% 100%,38% 52%);
                         }
                         .st-key-neglect_filter_panel .neglect-step-number {
                             width:25px;height:25px;border-radius:50%;
                             display:flex;align-items:center;justify-content:center;
-                            background:#20A63D;color:#FFFFFF;font-weight:900;
+                            background:#20A63D;color:var(--text);font-weight:900;
                             font-size:14px;margin:auto;
                         }
                         .st-key-neglect_filter_panel .neglect-step-label {
                             direction:rtl;text-align:right;background:#E9F7E9;
-                            color:#1F4373;border-radius:7px;padding:6px 8px;
+                            color:var(--text);border-radius:7px;padding:6px 8px;
                             min-height:30px;box-sizing:border-box;
                             display:flex;align-items:center;
                             font-size:12px;font-weight:900;white-space:normal;
@@ -12564,7 +12540,7 @@ else:
                         .st-key-neglect_filter_panel [data-testid="stRadio"] label {
                             border:1px solid #D7E0EA !important;
                             border-radius:8px !important;
-                            background:#FFFFFF !important;
+                            background:var(--card) !important;
                             padding:4px 9px !important;
                             margin:0 !important;
                             min-height:30px !important;
@@ -12574,11 +12550,11 @@ else:
                             gap:6px !important;
                         }
                         .st-key-neglect_filter_panel [data-testid="stRadio"] label:has(input:checked) {
-                            background:#E6F6E8 !important;
+                            background:var(--card) !important;
                             border-color:#8BCF9B !important;
                         }
                         .st-key-neglect_filter_panel [data-testid="stRadio"] label p {
-                            color:#1F4373 !important;
+                            color:var(--text) !important;
                             font-weight:900 !important;
                             font-size:11px !important;
                             white-space:nowrap !important;
@@ -12590,7 +12566,7 @@ else:
                             min-width:17px !important;
                             border:1px solid #AEBCCC !important;
                             border-radius:4px !important;
-                            background:#FFFFFF !important;
+                            background:var(--card) !important;
                             margin:0 0 0 5px !important;
                             position:relative !important;
                         }
@@ -12601,7 +12577,7 @@ else:
                         .st-key-neglect_filter_panel [data-testid="stRadio"] input:checked:after {
                             content:"✓";
                             display:block;
-                            color:#FFFFFF;
+                            color:var(--text);
                             font-size:12px;
                             font-weight:900;
                             line-height:15px;
@@ -12612,12 +12588,12 @@ else:
                             border-radius:7px !important;
                             padding:7px 10px !important;
                             margin:3px 0 !important;
-                            background:#FFFFFF !important;
+                            background:var(--card) !important;
                             min-height:36px !important;
                             box-sizing:border-box !important;
                         }
                         .st-key-neglect_filter_panel [data-testid="stCheckbox"]:has(input:checked) {
-                            background:#E6F6E8 !important;
+                            background:var(--card) !important;
                             border-color:#8BCF9B !important;
                         }
                         .st-key-neglect_filter_panel [data-testid="stCheckbox"] label {
@@ -12628,7 +12604,7 @@ else:
                             gap:5px !important;
                         }
                         .st-key-neglect_filter_panel [data-testid="stCheckbox"] label p {
-                            color:#1F4373 !important;
+                            color:var(--text) !important;
                             font-weight:800 !important;
                             font-size:13px !important;
                             line-height:1.25 !important;
@@ -12696,7 +12672,7 @@ else:
                             direction:rtl !important;
                             border-color:#D4DFEA !important;
                             border-radius:11px !important;
-                            background:#FFFFFF !important;
+                            background:var(--card) !important;
                         }
                         [class*="st-key-neglect_substate_grid_"] > div [data-testid="stHorizontalBlock"] {
                             direction:rtl !important;
@@ -12706,13 +12682,13 @@ else:
                             padding:8px 10px !important;
                             border:1px solid #D7E0EA !important;
                             border-radius:10px !important;
-                            background:#FFFFFF !important;
+                            background:var(--card) !important;
                             min-height:42px !important;
                             box-sizing:border-box !important;
                             margin:4px 0 !important;
                         }
                         [class*="st-key-neglect_substate_grid_"] [data-testid="stCheckbox"]:has(input:checked) {
-                            background:#EDF8EF !important;
+                            background:var(--card) !important;
                             border-color:#9ED9AE !important;
                         }
                         [class*="st-key-neglect_substate_grid_"] [data-testid="stCheckbox"] label {
@@ -12761,11 +12737,11 @@ else:
                             border:1px solid #D4DFEA !important;
                             border-radius:12px !important;
                             overflow:hidden !important;
-                            background:#FFFFFF !important;
+                            background:var(--card) !important;
                         }
                         [class*="st-key-promise_diagnostic_"][class*="_neglect"] [data-testid="stExpander"] summary {
                             min-height:43px !important;
-                            background:#FFFFFF !important;
+                            background:var(--card) !important;
                             border-bottom:1px solid #DCE4ED !important;
                         }
                         [class*="st-key-promise_diagnostic_"][class*="_neglect"] [data-testid="stExpanderDetails"] {
