@@ -189,7 +189,7 @@ def build_comprehensive_report(source_bytes):
 
 def render_snb_comprehensive_page():
     """Activity-sized uploader on the right and KPIs level with it on top."""
-    st.markdown(
+    st.html(
         """
         <style>
         /* Comprehensive page ONLY: reuse Activity's upload-field and dropzone
@@ -257,8 +257,7 @@ def render_snb_comprehensive_page():
             }
         }
         </style>
-        """,
-        unsafe_allow_html=True,
+        """
     )
     with st.container(key="snb_comprehensive_top_row"):
         upload_col, kpi_col = st.columns([1, 3.2], gap="small", vertical_alignment="top")
