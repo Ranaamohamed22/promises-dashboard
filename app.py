@@ -2587,8 +2587,6 @@ if _snb_overview_page:
                   on_click=set_page, args=("ModelManagement",))
         st.button("تغيير البنك", key="snb_ov_change_bank", width="content",
                   on_click=set_page, args=("Home",))
-        st.markdown('<span class="ejada-home-avatar" aria-label="رنا">ر</span>',
-                    unsafe_allow_html=True, width="content")
 elif st.session_state.current_page == "Home":
     with st.container(key="ejada_home_header"):
         st.markdown(
