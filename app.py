@@ -2047,18 +2047,18 @@ st.markdown(f"""
         direction:rtl !important;background:transparent !important;gap:10px !important;
         flex-wrap:nowrap !important;width:100% !important;overflow-x:auto;padding:0 0 2px !important;
     }}
-    html body .stApp .st-key-snb_pr_navigation .st-key-report_pills button[kind] {{
+    html body .stApp .st-key-snb_pr_navigation .st-key-report_pills [data-testid="stButton"] button[kind] {{
         min-height:42px !important;height:42px !important;padding:0 24px !important;
         border-radius:14px !important;white-space:nowrap;background:#ffffff14 !important;
         backdrop-filter:blur(14px);border:1px solid #ffffff33 !important;
     }}
-    html body .stApp .st-key-snb_pr_navigation .st-key-report_pills button[kind] p {{
+    html body .stApp .st-key-snb_pr_navigation .st-key-report_pills [data-testid="stButton"] button[kind] p {{
         color:white !important;-webkit-text-fill-color:white !important;font-size:15px !important;font-weight:600 !important;
     }}
-    html body .stApp .st-key-snb_pr_navigation .st-key-report_pills button[kind="primary"] {{
+    html body .stApp .st-key-snb_pr_navigation .st-key-report_pills [data-testid="stButton"] button[kind="primary"] {{
         background:white !important;box-shadow:0 6px 18px #0004 !important;
     }}
-    html body .stApp .st-key-snb_pr_navigation .st-key-report_pills button[kind="primary"] p {{
+    html body .stApp .st-key-snb_pr_navigation .st-key-report_pills [data-testid="stButton"] button[kind="primary"] p {{
         color:#0E2A47 !important;-webkit-text-fill-color:#0E2A47 !important;font-weight:800 !important;
     }}
     .stApp .st-key-snb_pr_titlebar {{
