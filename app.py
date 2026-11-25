@@ -6777,6 +6777,8 @@ def save_activity_page_upload(bank, kind, widget_key):
     st.session_state.activity_page_uploads[bank][kind] = st.session_state.get(
         widget_key
     )
+    if kind == "activity":
+        st.session_state.pop(f"activity_model_pending_{bank}", None)
     if bank == 'SNB' and kind == "activity":
         # A different upload should not silently keep its predecessor's shift.
         st.session_state.pop("snb_activity_daily_shift", None)
@@ -6808,6 +6810,8 @@ else:
 def clear_activity_page_upload(bank, kind):
     st.session_state.activity_page_uploads[bank][kind] = None
     st.session_state.activity_upload_versions[bank][kind] += 1
+    if kind == "activity":
+        st.session_state.pop(f"activity_model_pending_{bank}", None)
     if bank == "SNB":
         st.session_state.snb_activity_screen = "upload"
 
@@ -7064,7 +7068,7 @@ def _snb_save_model_notes(settings, additions, allow_special=False):
 
 
 def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
-    """Visible INSIDE Activity only after all required note ratings are approved."""
+    """Review approved notes from the latest completed SNB activity report."""
     settings = _snb_model_git_settings()
     st.markdown("### إدارة موديل النشاط")
     st.caption(
@@ -7086,24 +7090,6 @@ def _snb_render_model_management(notes, base_mapping, manual, row_decisions):
     if not _snb_secret("MODEL_ENCRYPTION_KEY"):
         st.warning("أضيفي MODEL_ENCRYPTION_KEY إلى Streamlit Secrets لتشفير الإفادات قبل حفظها.")
         return
-
-    if not st.session_state.get("snb_model_manager_is_admin", False):
-        with st.form("snb_model_manager_admin_login"):
-            password = st.text_input(
-                "كلمة مرور إدارة موديل النشاط", type="password"
-            )
-            login = st.form_submit_button("فتح إدارة موديل النشاط")
-        if login:
-            if hmac.compare_digest(password, settings["admin_password"]):
-                st.session_state.snb_model_manager_is_admin = True
-                st.rerun()
-            else:
-                st.error("كلمة مرور الإدارة غير صحيحة.")
-        return
-
-    if st.button("قفل إدارة موديل النشاط", key="snb_model_manager_logout"):
-        st.session_state.snb_model_manager_is_admin = False
-        st.rerun()
 
     try:
         persisted, _, _, saved_special_keys = _snb_load_saved_model_notes(settings)
@@ -7502,11 +7488,8 @@ def _stc_save_activity_model(additions, allow_overwrite=False):
 
 def _render_bank_activity_model_manager(bank):
     """Independent, password-protected editor for the selected bank's encrypted model."""
-    st.markdown(f"## إدارة موديل النشاط — {bank}")
-    st.caption(
-        "إدارة إفادات البنك المختار فقط. الموديلان منفصلان، "
-        "ولا يتم حفظ أي ملف نشاط أو بيانات عملاء هنا."
-    )
+    if bank == "SNB":
+        st.markdown("## إدارة موديل النشاط — SNB")
     settings = _snb_model_git_settings()
     missing = [
         name for name, enabled in (
@@ -7549,8 +7532,16 @@ def _render_bank_activity_model_manager(bank):
         st.error(f"تعذّر تحميل موديل {bank}: {exc}")
         return
 
-    st.metric("الإفادات المحفوظة في الموديل الدائم", len(saved))
+    pending = st.session_state.get(f"activity_model_pending_{bank}")
+    if bank == "STC":
+        _stc_render_saved_model(saved)
+        if pending is not None:
+            _stc_offer_model_save(*pending, mapping=saved)
+    elif pending is not None:
+        _snb_render_model_management(*pending)
+
     if bank == "SNB":
+        st.metric("الإفادات المحفوظة في الموديل الدائم", len(saved))
         coverage = st.session_state.get("ejada_snb_model_coverage")
         if coverage:
             matched, total = coverage["matched"], coverage["total"]
@@ -7636,87 +7627,6 @@ def _render_bank_activity_model_manager(bank):
         st.session_state.pop("ejada_snb_model_coverage", None)
     st.session_state[f"ejada_model_saved_{bank}"] = "تم حفظ الإفادة في موديل " + bank
     st.rerun()
-
-
-def _stc_render_manual_note_entry():
-    """Manually add a rated STC note from Activity without an uploaded report."""
-    notice = st.session_state.pop("stc_manual_note_saved_notice", None)
-    if notice:
-        st.success(notice)
-    with st.expander("➕ إضافة إفادة يدويًا لموديل STC", expanded=False):
-        st.caption(
-            "اكتبي الإفادة زي ما بتظهر في Notes، وحددي ناجحة أو غير ناجحة. "
-            "التقييم يتحفظ في موديل STC المشفّر ويُستخدم تلقائيًا للمكالمات "
-            "اللي إفادتها مطابقة. مش بيغيّر بيانات ملف النشاط الأصلي."
-        )
-        with st.form("stc_activity_manual_note_form", clear_on_submit=False):
-            note = st.text_area(
-                "الإفادة (Notes)", placeholder="اكتبي نص الإفادة هنا",
-                key="stc_activity_manual_note_text",
-            )
-            rating = st.radio(
-                "تقييم الإفادة", ["ناجحة", "غير ناجحة"],
-                horizontal=True, key="stc_activity_manual_note_rating",
-            )
-            admin_password = st.text_input(
-                "كلمة مرور إدارة الموديل", type="password",
-                key="stc_activity_manual_note_password",
-            )
-            overwrite = st.checkbox(
-                "أوافق على استبدال التقييم القديم إذا كان مختلفًا",
-                value=False, key="stc_activity_manual_note_overwrite",
-            )
-            submitted = st.form_submit_button(
-                "💾 حفظ الإفادة في موديل STC", type="primary",
-            )
-        if not submitted:
-            return
-
-        note = note.strip()
-        normalized = _snb_normalize_note(note)
-        if not normalized:
-            st.error("اكتبي الإفادة الأول.")
-            return
-        settings = _snb_model_git_settings()
-        if not settings["token"] or not _snb_secret("MODEL_ENCRYPTION_KEY"):
-            st.error("الحفظ يحتاج إعداد GITHUB_TOKEN وMODEL_ENCRYPTION_KEY في Streamlit Secrets.")
-            return
-        if not settings["admin_password"] or not hmac.compare_digest(
-            admin_password.encode("utf-8"),
-            settings["admin_password"].encode("utf-8"),
-        ):
-            st.error("كلمة مرور إدارة الموديل غير صحيحة.")
-            return
-        value = 1 if rating == "ناجحة" else 0
-        try:
-            saved, _, _ = _stc_load_saved_activity_model()
-            current = saved.get(normalized)
-            if current == -1:
-                st.warning(
-                    "الإفادة دي محفوظة للمراجعة اليدوية كل مرة؛ "
-                    "مش ممكن تغيير تصنيفها من النموذج ده."
-                )
-                return
-            if current == value:
-                st.info("الإفادة موجودة بالفعل في موديل STC بنفس التقييم.")
-                return
-            if current is not None and current != value and not overwrite:
-                st.warning(
-                    "الإفادة موجودة بتقييم مختلف. راجعي الاختيار وفعّلي "
-                    "موافقة استبدال التقييم القديم لو متأكدة."
-                )
-                return
-            _stc_save_activity_model(
-                [(note, value)], allow_overwrite=bool(overwrite),
-            )
-        except (RuntimeError, ValueError, OSError) as exc:
-            st.error(f"تعذّر حفظ الإفادة في موديل STC: {exc}")
-            return
-        st.session_state["stc_manual_note_saved_notice"] = (
-            "تم حفظ الإفادة في موديل STC كتقييم "
-            + rating + "، وهتتطبق تلقائيًا على الإفادات المطابقة."
-        )
-        st.rerun()
 
 
 def _stc_render_saved_model(saved_ratings):
@@ -8597,7 +8507,8 @@ def _style_snb_activity_workbook(workbook):
             "Weekly_First_Last_Notes"
         ):
             sheet.sheet_view.rightToLeft = True
-        sheet.freeze_panes = "A2"
+        if sheet.title != "ملخص المحصلين":
+            sheet.freeze_panes = "A2"
         sheet.auto_filter.ref = f"A1:{get_column_letter(last_col)}{last_row}"
         sheet.row_dimensions[1].height = 34
 
@@ -9591,7 +9502,7 @@ def _stc_model_choices(frame, notes, collector, identity, stamps, mapping, label
                      index=frame.index, dtype=int)
 
 
-def _stc_offer_model_save(source, notes, manual, mapping, prefix):
+def _stc_offer_model_save(source, notes, manual, prefix, mapping):
     by_note = {}
     for i, value in manual.items():
         note = _snb_normalize_note(source.at[i, notes])
@@ -9627,24 +9538,19 @@ def _stc_offer_model_save(source, notes, manual, mapping, prefix):
         with st.form("stc_save_" + scope):
             selected = st.data_editor(items, hide_index=True, disabled=["الإفادة", "قرار الموديل"],
                                       key=f"stc_add_{scope}_{select_all}")
-            password = st.text_input("كلمة مرور إدارة موديل STC", type="password")
             if st.form_submit_button("حفظ في موديل STC"):
-                secret = _snb_model_git_settings()["admin_password"]
-                if not secret or not hmac.compare_digest(password.encode(), secret.encode()):
-                    st.error("راجعي كلمة مرور إدارة الموديل.")
+                additions = [(note, candidates[note]) for note in
+                             selected.loc[selected["إضافة للموديل"], "الإفادة"]]
+                if not additions:
+                    st.info("اختاري الإفادات المراد حفظها أولًا.")
+                    return
+                try:
+                    _stc_save_activity_model(additions)
+                except (ValueError, RuntimeError) as exc:
+                    st.error(str(exc))
                 else:
-                    additions = [(note, candidates[note]) for note in
-                                 selected.loc[selected["إضافة للموديل"], "الإفادة"]]
-                    if not additions:
-                        st.info("اختاري الإفادات المراد حفظها أولًا.")
-                    if additions:
-                        try:
-                            _stc_save_activity_model(additions)
-                        except (ValueError, RuntimeError) as exc:
-                            st.error(str(exc))
-                        else:
-                            st.session_state["stc_model_last_save_notice"] = "تم حفظ تحديث موديل STC."
-                            st.rerun()
+                    st.session_state["ejada_model_saved_STC"] = "تم حفظ تحديث موديل STC."
+                    st.rerun()
 
 
 def _stc_metrics(frame, collector, stamps, ratings):
@@ -9767,7 +9673,7 @@ def _stc_summary(result, groups, stamps=None):
     return agg.reset_index()
 
 
-def _stc_download(sheets, title, filename):
+def _stc_download(sheets, title, filename, summary_title=None):
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
         for name, data in sheets.items():
@@ -9786,21 +9692,21 @@ def _stc_download(sheets, title, filename):
                     for cell in column[1:]:
                         cell.number_format = "0.00%"
 
-        if filename.startswith("STC_Weekly") and "ملخص المحصلين" in writer.book:
-            # Match the supplied weekly summary reference: a single navy title
-            # bar, six columns, filterable navy headings and percentage values.
+        if summary_title is None and filename.startswith("STC_Weekly"):
+            summary_title = "STC Bank تقرير النشاط الأسبوعي"
+        if summary_title and "ملخص المحصلين" in writer.book:
             sheet = writer.book["ملخص المحصلين"]
+            last_column = get_column_letter(sheet.max_column)
             sheet.insert_rows(1)
-            sheet.merge_cells("A1:F1")
+            sheet.merge_cells(f"A1:{last_column}1")
             title_cell = sheet["A1"]
-            title_cell.value = "STC Bank تقرير النشاط الأسبوعي"
+            title_cell.value = summary_title
             title_cell.fill = PatternFill(fill_type="solid", fgColor="17375E")
             title_cell.font = Font(name="Calibri", size=15, bold=True, color="FFFFFF")
             title_cell.alignment = Alignment(horizontal="center", vertical="center")
             sheet.row_dimensions[1].height = 34
             sheet.row_dimensions[2].height = 34
-            sheet.auto_filter.ref = f"A2:F{sheet.max_row}"
-            sheet.freeze_panes = "A3"
+            sheet.auto_filter.ref = f"A2:{last_column}{sheet.max_row}"
             sheet.sheet_view.showGridLines = True
             sheet.sheet_view.rightToLeft = False
     st.download_button(title, buf.getvalue(), file_name=filename,
@@ -9832,54 +9738,52 @@ def _stc_dashboard(summary, collector, scope):
 
 def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
                                error_slot=None, shift_selector=None, duplicate_slot=None):
-    if activity_upload is not None:
-        try:
-            source, notes, collector, identity, stamps = _stc_prepare_activity_data(activity_upload)
-        except Exception as exc:
-            st.error(f"تعذر تجهيز ملف STC: {exc}")
-            return
-        digest = hashlib.sha256(activity_upload.getvalue()).hexdigest()[:20]
-        version = st.session_state.activity_upload_versions["STC"]["activity"]
-        key = f"stc_{digest}_{version}"
-        kind = _activity_period(stamps)[0] if activity_kind == "تلقائي" else activity_kind
-        # Daily duplicate key: debtor ID + Notes + collector + calendar date.
-        # Never use Debitor Name for duplicate matching.
-        dedup_identity = _snb_find_column(
-            source, "Debitor", "Debtor", "رقم هوية العميل", "رقم الهوية",
-            "هوية العميل", "National ID", "National ID Number",
-            "Identity Number", "ID Number", "ID Numer", "ID"
+    if activity_upload is None:
+        return
+    try:
+        source, notes, collector, identity, stamps = _stc_prepare_activity_data(activity_upload)
+    except Exception as exc:
+        st.error(f"تعذر تجهيز ملف STC: {exc}")
+        return
+    digest = hashlib.sha256(activity_upload.getvalue()).hexdigest()[:20]
+    version = st.session_state.activity_upload_versions["STC"]["activity"]
+    key = f"stc_{digest}_{version}"
+    kind = _activity_period(stamps)[0] if activity_kind == "تلقائي" else activity_kind
+    # Daily duplicate key: debtor ID + Notes + collector + calendar date.
+    # Never use Debitor Name for duplicate matching.
+    dedup_identity = _snb_find_column(
+        source, "Debitor", "Debtor", "رقم هوية العميل", "رقم الهوية",
+        "هوية العميل", "National ID", "National ID Number",
+        "Identity Number", "ID Number", "ID Numer", "ID"
+    )
+    if dedup_identity is None:
+        st.error("ملف النشاط لازم يحتوي على Debitor ID لحساب التكرارات، مش Debitor Name.")
+        return
+    dates = stamps.dt.normalize()
+    duplicates = _stc_duplicate_mask(
+        source, collector, dedup_identity, notes, dates
+    )
+    count = int(duplicates.sum())
+    if count:
+        choice = duplicate_slot.radio(
+            f"فيه {count:,} صف متكرر داخل نفس اليوم حسب {collector} و{dedup_identity} و{notes}.",
+            ["تأكيد حذف التكرارات والاحتفاظ بأول صف", "الاحتفاظ بكل الصفوف"],
+            index=None, horizontal=True, key=f"stc_duplicate_choice_{kind}_{key}",
+            help="الاختيار بيطبّق على التقرير فقط. ملفك الأصلي بيفضل زي ما هو."
         )
-        if dedup_identity is None:
-            st.error("ملف النشاط لازم يحتوي على Debitor ID لحساب التكرارات، مش Debitor Name.")
+        if choice is None:
             return
-        dates = stamps.dt.normalize()
-        duplicates = _stc_duplicate_mask(
-            source, collector, dedup_identity, notes, dates
-        )
-        count = int(duplicates.sum())
-        if count:
-            choice = duplicate_slot.radio(
-                f"فيه {count:,} صف متكرر داخل نفس اليوم حسب {collector} و{dedup_identity} و{notes}.",
-                ["تأكيد حذف التكرارات والاحتفاظ بأول صف", "الاحتفاظ بكل الصفوف"],
-                index=None, horizontal=True, key=f"stc_duplicate_choice_{kind}_{key}",
-                help="الاختيار بيطبّق على التقرير فقط. ملفك الأصلي بيفضل زي ما هو."
-            )
-            if choice is None:
-                return
-            if choice == "تأكيد حذف التكرارات والاحتفاظ بأول صف":
-                source = source.loc[~duplicates]
-                stamps = stamps.loc[source.index]
-                key += "_deduplicated"
+        if choice == "تأكيد حذف التكرارات والاحتفاظ بأول صف":
+            source = source.loc[~duplicates]
+            stamps = stamps.loc[source.index]
+            key += "_deduplicated"
     try:
         mapping, labels, _ = _stc_load_saved_activity_model()
     except (RuntimeError, ValueError, OSError) as exc:
         st.error(f"تعذر تحميل موديل STC: {exc}")
         return
-    notice = st.session_state.pop("stc_model_last_save_notice", None)
-    if notice:
-        st.success(notice)
-    _stc_render_saved_model(mapping)
-    if activity_upload is None or not mapping:
+    if not mapping:
+        st.error("تعذر العثور على موديل STC. راجعي صفحة إدارة موديل النشاط.")
         return
     day = stamps.dt.normalize()
     first = False
@@ -9933,7 +9837,11 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
     ratings = _stc_model_choices(frame, notes, collector, identity, stamps, mapping, labels, review_key)
     if ratings is None:
         return
-    _stc_offer_model_save(source, notes, st.session_state["stc_ratings_"+review_key], mapping, review_key)
+    manual = st.session_state["stc_ratings_" + review_key]
+    reviewed = {i: manual[i] for i in frame.index if i in manual}
+    st.session_state["activity_model_pending_STC"] = (
+        frame.loc[list(reviewed), [notes]].copy(), notes, reviewed, review_key
+    )
     result = _stc_metrics(frame, collector, stamps, ratings)
     duty_stamps = None if first else stamps
     summary = _stc_summary(result, [collector], duty_stamps)
@@ -9943,7 +9851,7 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
         _stc_order_activity_columns(result, collector, identity, notes, stamps)
         if kind == "يومي" else result
     )
-    st.dataframe(display_result, hide_index=True)
+    display_result = display_result.rename(columns={collector: "اسم المحصل"})
     # WhatsApp-related notes: only the rows already included in this report.
     # "واتس" also matches "واتساب" and longer phrases containing it.
     whatsapp_mask = (
@@ -10000,7 +9908,12 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
         summary["نسبة تحقيق المكالمات الناجحة"] = (
             successful.div(covered.where(covered.ne(0))).fillna(0)
         )
-        sheets = {"المكالمات": display_result, "ملخص المحصلين": summary}
+        period_label = "الفترة الأولى" if first else "في اليوم الكامل"
+        report_title = f"تقرير نشاط الفترة — {period_label} — STC Bank"
+        sheets = {
+            "المكالمات": display_result,
+            "ملخص المحصلين": summary.rename(columns={collector: "اسم المحصل"}),
+        }
         if not whatsapp_notes.empty:
             sheets["إفادات واتس"] = whatsapp_notes
         sheets["أول وآخر إفادة"] = _stc_daily_note_times(
@@ -10012,7 +9925,11 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
         )
         with st.expander(note_title):
             st.dataframe(sheets["أول وآخر إفادة"], hide_index=True)
-        _stc_download(sheets, "تحميل تقرير النشاط اليومي", "STC_Daily.xlsx")
+        st.markdown(f"### {report_title}")
+        _stc_download(
+            sheets, "تحميل تقرير النشاط اليومي", "STC_Daily.xlsx",
+            summary_title=report_title,
+        )
     elif kind == "أسبوعي":
         # Exact six-column collector summary requested for the weekly export.
         # Daily duty and wasted-time details remain in the separate sheets.
@@ -10047,7 +9964,7 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
             )
     else:
         _stc_download(
-            {"ملخص المحصلين": summary},
+            {"ملخص المحصلين": summary.rename(columns={collector: "اسم المحصل"})},
             "تحميل ملخص النشاط · شهري",
             "STC_Monthly_Summary.xlsx",
         )
@@ -10387,29 +10304,11 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                     )
                     _expander_table(weekly_collectors, "weekly_collectors")
 
-        with st.container(key="snb_activity_approval_panel"):
-            approval_choice = st.radio(
-                "طريقة الاعتماد",
-                [
-                    "اعتماد التقرير وتحميله مباشرة",
-                    "فتح إدارة موديل النشاط (اختياري)",
-                ],
-                index=0,
-                horizontal=True,
-                key="snb_activity_approval_choice",
-            )
-        if approval_choice == "فتح إدارة موديل النشاط (اختياري)":
-            with st.container(key="snb_model_manager_panel", gap="small"):
-                _snb_render_model_management(
-                    selected[stats["notes"]], model_mapping,
-                    manual_decisions, slash_row_decisions,
-                )
-        else:
-            st.caption(
-                "✅ التقرير جاهز للتحميل بالتقييمات المعتمدة بالفعل. "
-                "مش لازم تفتحي إدارة موديل النشاط أو تحفظي الإفادات فيه. "
-                "مراجعة الإفادات الجديدة أو الخاصة تظل مطلوبة قبل اعتماد أي تقرير."
-            )
+        st.session_state["activity_model_pending_SNB"] = (
+            selected[stats["notes"]].copy(), model_mapping,
+            manual_decisions.copy(), slash_row_decisions.copy(),
+        )
+        st.caption("✅ التقرير جاهز للتحميل بالتقييمات المعتمدة.")
         weekly_report = activity_kind == "أسبوعي"
         details_sheet = (
             "Wasted_Time_Details_Weekly" if weekly_report
@@ -11561,9 +11460,6 @@ if page_uploaded is None:
 
         # STC has its OWN model, review and encrypted file — never SNB.
         if selected_bank == "STC":
-            # Keep manual note entry available even before an activity upload or
-            # duplicate-selection decision, just like SNB's note management.
-            _stc_render_manual_note_entry()
             _stc_uploaded = st.session_state.activity_page_uploads["STC"]
             render_stc_activity_report(
                 _stc_uploaded.get("activity"),
