@@ -202,10 +202,8 @@ def build_portfolio_summary(portfolio_bytes):
     }
 
 
-def portfolio_summary_to_excel(table):
-    """Export the exact grouped two-row headings shown in the reference."""
-    book = Workbook()
-    sheet = book.active
+def write_portfolio_sheet(sheet, table):
+    """Write the existing portfolio grid unchanged into any Excel worksheet."""
     sheet.title = "المحفظة"
     sheet.sheet_view.rightToLeft = True
     sheet.sheet_view.showGridLines = False
@@ -265,6 +263,12 @@ def portfolio_summary_to_excel(table):
                        "E": 18, "F": 22, "G": 18, "H": 22}.items():
         sheet.column_dimensions[col].width = width
 
+
+
+def portfolio_summary_to_excel(table):
+    """Export the same original standalone portfolio workbook and its styles."""
+    book = Workbook()
+    write_portfolio_sheet(book.active, table)
     output = BytesIO()
     book.save(output)
     return output.getvalue()
@@ -349,11 +353,6 @@ def render_portfolio_summary(portfolio_bytes):
             "كل الصفوف موجودة في الجدول القابل للنسخ وفي ملف Excel."
         )
 
-    with st.expander("📋 جدول المحفظة كامل — تحديد ونسخ للخلايا", expanded=False):
-        st.dataframe(
-            table, hide_index=True, use_container_width=True,
-            height=min(500, 55 + len(table) * 36),
-        )
     st.download_button(
         "📥 تحميل جدول المحفظة Excel بنفس شكل الأعمدة",
         data=portfolio_summary_to_excel(table),
@@ -362,3 +361,4 @@ def render_portfolio_summary(portfolio_bytes):
         key="snb_perf_portfolio_export",
         use_container_width=False,
     )
+    return table
