@@ -21,7 +21,8 @@ COLLECTOR_CANDIDATES = ("Salesperson", "Collector", "Collecter", "Collector Name
                         "COLLECTOR_NAME", "اسم المحصل", "المحصل")
 PRODUCT_CANDIDATES = ("PRODUCT_CATEGORY", "Product Category", "Product", "PRODUCT",
                       "Product_Type", "المنتج", "نوع المنتج",
-                      "نوع المنتج-التمويل", "نوع المنتج التمويل")
+                      "نوع المنتج-التمويل", "نوع المنتج التمويل",
+                      "نوع المتنج-التمويل")  # Header in current SNB CRM export
 STAGE_CANDIDATES = ("ملاحظات-التمويل", "ملاحظات التمويل", "DPD_BUCKET", "Stage", "المرحلة")
 DEBT_CANDIDATES = ("Net Amount", "NET_AMOUNT", "Net_Amount",
                    "Total Debt", "Outstanding Amount", "إجمالي المديونية")
