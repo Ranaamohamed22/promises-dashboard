@@ -2024,9 +2024,6 @@ st.markdown(f"""
     }}
     .stApp .st-key-snb_pr_header {{min-height:130px;gap:12px !important;}}
     .snb-pr-brand {{display:flex;align-items:center;gap:16px;color:white;}}
-    .snb-pr-brand strong {{
-        background:white;color:#0A7A3F;border-radius:12px;padding:9px 13px;font-size:22px;font-weight:800;
-    }}
     .snb-pr-brand i {{height:56px;width:1px;background:#ffffff40;}}
     .snb-pr-update {{
         display:inline-flex;align-items:center;gap:8px;min-height:48px;padding:0 12px;
@@ -2733,12 +2730,16 @@ _snb_promises_page = (st.session_state.current_page == "Promises"
                       and st.session_state.selected_bank == "SNB")
 if _snb_promises_page:
     with st.container(key="snb_pr_header", horizontal=True, vertical_alignment="center"):
+        badge = """<div dir="ltr" style="position:relative;padding:4px 6px;line-height:1">
+    <div style="font-family:'Cairo',sans-serif;font-size:40px;font-weight:800;letter-spacing:2px;background:linear-gradient(180deg,#ffffff,#9ff0c6);-webkit-background-clip:text;background-clip:text;color:transparent">SNB</div>
+    <div style="height:4px;border-radius:2px;background:linear-gradient(90deg,#5be39a,#7fd6e0);margin-top:4px"></div>
+  </div>"""
         logo = """<div style="text-align:center;width:112px">
     <div style="font-family:'Cairo',sans-serif;font-size:46px;font-weight:800;line-height:1.05;color:#fff;padding-bottom:12px;margin-top:-6px">إجادة</div>
     <div dir="ltr" style="font-family:'Cairo',sans-serif;font-size:14px;letter-spacing:9px;font-weight:600;color:#d3f5e2;line-height:1;margin-right:-9px;margin-top:-4px">EJADA</div>
   </div>"""
         st.markdown(
-            f'<div class="snb-pr-brand"><strong>SNB</strong><i aria-hidden="true"></i>{logo}</div>',
+            f'<div class="snb-pr-brand">{badge}<i aria-hidden="true"></i>{logo}</div>',
             unsafe_allow_html=True, width="stretch",
         )
         files = st.session_state.get("page_files", {}).get("SNB", {}).get("Promises")
