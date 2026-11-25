@@ -531,6 +531,7 @@ _overview_upload_caption_color = (
 
 st.markdown(f"""
 <style>
+@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap");
     [data-testid="collapsedControl"] {{display: none !important;}}
     [data-testid="stSidebar"] {{display: none !important;}}
     
@@ -1773,81 +1774,97 @@ st.markdown(f"""
     }}
 
 
-    .stApp .st-key-ejada_home_bank_picker {{
-        background:#f8fbff !important;
-        border:1px solid #D7E3EE !important;
-        border-radius:18px !important;
-        padding:22px 18px 26px !important;
-    }}
-    .stApp .bank-picker-heading {{
-        margin:0 0 10px;
-        text-align:center;
-        color:#153754;
-    }}
-    .stApp .st-key-ejada_home_bank_cards {{
-        display:grid !important;
-        grid-template-columns:repeat(2,minmax(0,1fr));
+    .stApp:has(.st-key-ejada_home_header),
+    .stApp:has(.st-key-ejada_home_header) [data-testid="stMain"] {{
         direction:rtl;
-        gap:14px !important;
-        width:min(100%,660px) !important;
-        margin-inline:auto;
+        background:radial-gradient(ellipse at top right,#4F008C0c,transparent 44%),
+                   radial-gradient(ellipse at bottom left,#0A7A3F12,transparent 40%),#F6F4FB !important;
     }}
-    .stApp .st-key-home_open_bank_SNB {{
-        --bank-card-logo:url("{BANK_LOGOS['SNB']}");
-        --bank-card-border:#178049;
-        --bank-card-background:#edf8f1;
+    .stApp :is(.st-key-ejada_home_header,.st-key-ejada_home_bank_picker),
+    .stApp :is(.st-key-ejada_home_header,.st-key-ejada_home_bank_picker) * {{
+        font-family:"Cairo",Tahoma,sans-serif;
     }}
-    .stApp .st-key-home_open_bank_STC {{
-        --bank-card-logo:url("{BANK_LOGOS['STC']}");
-        --bank-card-border:#702cc0;
-        --bank-card-background:#f5effc;
+    .stApp .st-key-ejada_home_header {{
+        position:sticky;top:0;z-index:20;
+        background:#ffffffd9;backdrop-filter:blur(14px);
+        border-bottom:1px solid #E9E4F3;
+        padding:12px clamp(14px,3vw,48px);
     }}
-    html body .stApp .st-key-ejada_home_bank_cards button {{
-        position:relative;
-        min-height:136px !important;
-        padding:78px 36px 14px !important;
-        background:var(--bank-card-background) !important;
-        border:1px solid var(--bank-card-border) !important;
-        border-radius:14px !important;
-        box-shadow:none !important;
+    .ejada-home-header,.ejada-home-brand,.ejada-home-actions {{
+        display:flex;align-items:center;gap:14px;
     }}
-    html body .stApp .st-key-ejada_home_bank_cards button p {{
-        color:#153754 !important;
-        -webkit-text-fill-color:#153754 !important;
-        font-size:17px !important;
-        font-weight:800 !important;
+    .ejada-home-header {{justify-content:space-between;color:#0E2A47;}}
+    .ejada-home-brand strong {{display:block;font-size:32px;line-height:1.02;}}
+    .ejada-home-brand b {{display:block;font-size:11px;letter-spacing:4px;text-align:center;}}
+    .ejada-home-brand small {{border-inline-start:1px solid #E9E4F3;padding-inline-start:12px;color:#7C86A0;}}
+    .ejada-home-help {{position:relative;}}
+    .ejada-home-help summary,.ejada-welcome-chip {{
+        list-style:none;display:inline-block;background:white;color:#0E2A47;
+        border:1px solid #E9E4F3;border-radius:999px;padding:7px 15px;font-size:13px;
     }}
-    .stApp .st-key-ejada_home_bank_cards button::before {{
-        content:"";
-        position:absolute;
-        inset:16px 0 auto;
-        height:60px;
-        background:var(--bank-card-logo) center / contain no-repeat;
-        width:86px;
-        margin-inline:auto;
-        mix-blend-mode:multiply;
-        pointer-events:none;
+    .ejada-home-help summary {{cursor:pointer;}}
+    .ejada-home-help summary::-webkit-details-marker {{display:none;}}
+    .ejada-home-help p {{
+        position:absolute;inset-inline-end:0;top:100%;width:225px;
+        padding:12px;background:#fff;border:1px solid #E9E4F3;border-radius:12px;
     }}
-    .stApp .st-key-home_open_bank_STC button::before {{width:145px;}}
-    .stApp .st-key-ejada_home_bank_cards button::after {{
-        content:"←" / "";
-        position:absolute;
-        left:14px;
-        top:calc(50% - 14px);
-        font-size:20px;
-        color:#153754;
-        pointer-events:none;
+    .ejada-home-avatar {{
+        display:grid;place-items:center;border-radius:50%;width:36px;height:36px;
+        background:#4F008C;color:white;
     }}
-    html body .stApp .st-key-ejada_home_bank_cards button:hover,
-    html body .stApp .st-key-ejada_home_bank_cards button:focus-visible {{
-        outline:2px solid var(--bank-card-border);
-        outline-offset:2px;
+    .ejada-home-intro {{text-align:center;padding:clamp(28px,5vw,64px) 12px 24px;}}
+    .ejada-home-intro h1 {{font-size:clamp(34px,4vw,54px);font-weight:900;color:#0E2A47;margin:10px 0;}}
+    .ejada-home-intro p,.ejada-home-footer {{color:#7C86A0;}}
+    .stApp .st-key-ejada_home_bank_cards {{
+        display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:24px !important;width:min(100%,1000px) !important;margin-inline:auto;
     }}
-    @media (max-width:640px) {{
-        .stApp .st-key-ejada_home_bank_cards {{
-            grid-template-columns:minmax(0,1fr);
-            max-width:340px;
-        }}
+    .st-key-bank_card_STC {{--bank:#4F008C;--bank-soft:#f3eafa;}}
+    .st-key-bank_card_SNB {{--bank:#0A7A3F;--bank-soft:#eaf6ee;}}
+    .stApp .st-key-ejada_home_bank_cards [class*="st-key-bank_card_"] {{
+        position:relative;display:flex;overflow:hidden;
+        gap:0 !important;background:#fff;color:#0E2A47;
+        border:1.5px solid #E9E4F3;border-radius:24px;
+        transition:transform .25s,border-color .25s,box-shadow .25s;
+    }}
+    .stApp .st-key-ejada_home_bank_cards [class*="st-key-bank_card_"]:is(:hover,:focus-within) {{
+        transform:translateY(-8px);border-color:var(--bank);box-shadow:0 20px 42px #0E2A4722;
+    }}
+    .ejada-bank-card {{
+        border-top:6px solid var(--bank);padding:26px clamp(15px,3vw,34px);
+        min-height:278px;display:flex;flex-direction:column;gap:12px;
+    }}
+    .ejada-bank-card-top {{display:flex;justify-content:space-between;align-items:center;}}
+    .ejada-bank-badge,.ejada-bank-arrow {{display:grid;place-items:center;}}
+    .ejada-bank-badge {{
+        width:68px;height:68px;border-radius:20px;background:var(--bank-soft);
+        color:var(--bank);font-size:23px;font-weight:900;
+    }}
+    .ejada-bank-arrow {{
+        width:42px;height:42px;border-radius:50%;border:1px solid #E9E4F3;
+        transition:transform .25s,background .25s,color .25s;
+    }}
+    [class*="st-key-bank_card_"]:is(:hover,:focus-within) .ejada-bank-arrow {{
+        background:var(--bank);color:white;transform:translateX(-4px);
+    }}
+    .ejada-bank-card h2 {{color:#0E2A47;font-size:clamp(20px,2.3vw,28px);font-weight:900;margin:0;}}
+    .ejada-bank-card p {{color:#7C86A0;line-height:1.75;margin:0;}}
+    .ejada-bank-chips {{display:flex;gap:7px;flex-wrap:wrap;margin-top:auto;}}
+    .ejada-bank-chips span {{
+        display:inline-flex;align-items:center;gap:6px;border-radius:999px;
+        background:var(--bank-soft);color:var(--bank);padding:5px 10px;font-size:12px;font-weight:800;
+    }}
+    .ejada-bank-chips span::before {{content:"";width:6px;height:6px;border-radius:50%;background:var(--bank);}}
+    .stApp .st-key-ejada_home_bank_cards [data-testid="stElementContainer"]:has([data-testid="stButton"]) {{
+        position:absolute;inset:0;z-index:2;
+    }}
+    .stApp .st-key-ejada_home_bank_cards [data-testid="stButton"],
+    .stApp .st-key-ejada_home_bank_cards button {{width:100% !important;height:100% !important;}}
+    .stApp .st-key-ejada_home_bank_cards button {{opacity:0;cursor:pointer;}}
+    .ejada-home-footer {{text-align:center;font-size:12px;margin:44px 0 24px;}}
+    @media (max-width:690px) {{
+        .stApp .st-key-ejada_home_bank_cards {{grid-template-columns:minmax(0,1fr);max-width:490px;}}
+        .ejada-home-brand small {{display:none;}}
     }}
     /* Limit white diagnostic expander to the size of its steps table. */
     div[class*="st-key-promise_diagnostic_SNB_"] {{
@@ -2335,7 +2352,6 @@ st.markdown(f"""
     .stApp [class*="st-key-upload_box_"] [data-testid="stFileUploaderDropzone"] button {{height:36px !important;min-height:36px !important;margin:auto !important;padding:4px 12px !important;}}
     .stApp .st-key-snb_model_manager_panel {{gap:4px !important;padding-block:0 !important;}}
     .stApp .st-key-snb_model_manager_panel h3 {{margin:0;padding-block:2px;}}
-    .ejada-shift-notice {{direction:rtl;text-align:center;width:fit-content;max-width:100%;margin:3px auto;padding:7px 14px;background:#edf5ff;color:#1f4373;border-radius:10px;font-weight:700;}}
     .st-key-activity_toggle_align {{direction:ltr !important;justify-content:flex-start !important;}}
     .stApp .st-key-activity_toggle_align button {{width:max-content !important;max-width:100% !important;padding:5px 10px !important;}}
     .stApp .st-key-snb_activity_work_area [data-testid="stCaptionContainer"],
@@ -2462,20 +2478,32 @@ st.markdown(f"""
 # ==========================================
 # 0. الصف العلوي: Overview وبجواره زر القمر
 # ==========================================
-with st.container(key="brand_header"):
-    with st.container(key="theme_picker"):
-        st.selectbox(
-            "🎨 الثيم", options=THEMES, key="theme_choice",
-            label_visibility="visible",
-            help="اختاري ثيم البنك التلقائي أو الأسود الهادي أو الثيمات القديمة.",
+if st.session_state.current_page == "Home":
+    with st.container(key="ejada_home_header"):
+        st.markdown(
+            """<div class="ejada-home-header" dir="rtl">
+            <div class="ejada-home-brand"><div><strong>إجادة</strong><b dir="ltr">EJADA</b></div>
+            <small>منظومة تحصيل الديون<br>وتقارير الأداء</small></div>
+            <div class="ejada-home-actions"><details class="ejada-home-help">
+            <summary>المساعدة ؟</summary><p>اضغطي على كارت البنك لفتح تقاريره. للرجوع استخدمي زر «تغيير البنك».</p>
+            </details><span class="ejada-home-avatar" aria-label="رنا">ر</span></div></div>""",
+            unsafe_allow_html=True,
         )
-    st.markdown(f"""
-<div class="ejada-header" style="text-align:center;direction:ltr;line-height:1.12;color:{header_logo_color};font-weight:900;">
-  <div style="font-size:43px;font-family:Tahoma,sans-serif;">إجـــادة</div>
-  <div style="font-size:18px;letter-spacing:9px;">EJADA</div>
-  <div style="font-size:16px;">لتحصيل الديون</div>
-</div>
-""", unsafe_allow_html=True)
+else:
+    with st.container(key="brand_header"):
+        with st.container(key="theme_picker"):
+            st.selectbox(
+                "🎨 الثيم", options=THEMES, key="theme_choice",
+                label_visibility="visible",
+                help="اختاري ثيم البنك التلقائي أو الأسود الهادي أو الثيمات القديمة.",
+            )
+        st.markdown(f"""
+    <div class="ejada-header" style="text-align:center;direction:ltr;line-height:1.12;color:{header_logo_color};font-weight:900;">
+      <div style="font-size:43px;font-family:Tahoma,sans-serif;">إجـــادة</div>
+      <div style="font-size:18px;letter-spacing:9px;">EJADA</div>
+      <div style="font-size:16px;">لتحصيل الديون</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Keep report navigation in the SAME row as SNB/STC, aligned to the top right.
 def _render_ejada_main_navigation():
@@ -2525,10 +2553,7 @@ else:
     # The Home screen exposes bank logos only, not report navigation.
     pass
 
-if st.session_state.current_page == "Activity" and st.session_state.selected_bank == "SNB":
-    shift_notice = st.empty()
-
-if st.session_state.current_page != "Performance":
+if st.session_state.current_page not in ("Home", "Activity", "Performance"):
     st.markdown(
         f"<hr style='margin: 10px 0 20px 0; border-color: {border_color}; clear: both;'>",
         unsafe_allow_html=True
@@ -6840,7 +6865,6 @@ def save_activity_page_upload(bank, kind, widget_key):
         # A different upload should not silently keep its predecessor's shift.
         st.session_state.pop("snb_activity_daily_shift", None)
         st.session_state.pop("snb_activity_exclude_after_shift", None)
-        st.session_state.pop("snb_activity_exclude_last_hour", None)
     if bank == 'SNB':
         uploads = st.session_state.activity_page_uploads[bank]
         st.session_state.snb_activity_screen = (
@@ -7928,7 +7952,7 @@ def _infer_snb_daily_period(frame):
 
 
 def _filter_snb_activity_period(frame, activity_kind, daily_period,
-                                exclude_after_shift=True, exclude_last_hour=False):
+                                exclude_after_shift=True):
     valid = frame.dropna(subset=["__ejada_parsed_created"]).copy()
     if valid.empty:
         return valid, 0
@@ -7937,14 +7961,13 @@ def _filter_snb_activity_period(frame, activity_kind, daily_period,
     overtime_excluded = 0
 
     if activity_kind == "يومي":
-        start_hour, end_hour = {"first": (2, 12), "second": (12, 16),
-                                "full": (2, 16)}[daily_period]
+        if daily_period == "full":
+            return valid.loc[timestamps.dt.normalize().eq(day_start)].copy(), 0
+        start_hour, end_hour = {"first": (2, 12), "second": (12, 16)}[daily_period]
         start = day_start + pd.Timedelta(hours=start_hour)
         end = day_start + pd.Timedelta(hours=end_hour)
         hour = pd.Timedelta(hours=1)
         within_shift = (timestamps >= start) & (timestamps < end)
-        if exclude_last_hour:
-            within_shift &= timestamps < end - hour
         extra = (timestamps >= end) & (timestamps < end + hour)
         if exclude_after_shift:
             overtime_excluded = int(extra.sum())
@@ -10043,7 +10066,7 @@ def render_stc_activity_report(activity_upload, activity_kind="تلقائي",
         )
 
 
-def render_snb_activity_report(model_upload, activity_upload, activity_kind, error_slot, shift_selector, shift_notice):
+def render_snb_activity_report(model_upload, activity_upload, activity_kind, error_slot, shift_selector):
     """Report screen opens with both upload boxes still visible above."""
     if activity_upload is None:
         return
@@ -10098,14 +10121,16 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
             with st.container(key="snb_activity_daily_options"):
                 period = shift_selector.selectbox("فترة التقرير", list(names), index=list(names).index(suggestion),
                                       format_func=names.get, key="snb_activity_daily_shift")
-                shift_notice.markdown(f'<div class="ejada-shift-notice">رنا إحنا في {names[period]}</div>',
-                                      unsafe_allow_html=True)
-                # Always retain the final hour of either shift.
-                remove_extra, remove_last = True, False
-                if period != "first":
-                    remove_extra = st.checkbox(
-                        "استبعاد الساعة الزيادة بعد نهاية الفترة (4–5 عصرًا)",
-                        value=True, key="snb_activity_exclude_after_shift")
+                remove_extra = True
+                if period == "second":
+                    stamps = prepared["__ejada_parsed_created"]
+                    report_day = stamps.dt.normalize().max()
+                    overtime_start = report_day + pd.Timedelta(hours=16)
+                    overtime_end = report_day + pd.Timedelta(hours=17)
+                    if ((stamps >= overtime_start) & (stamps < overtime_end)).any():
+                        remove_extra = st.checkbox(
+                            "استبعاد الساعة الزيادة بعد نهاية الفترة (4–5 عصرًا)",
+                            value=True, key="snb_activity_exclude_after_shift")
             # Warn about late notes in the uploaded daily file, without blocking
             # processing or changing the shift boundaries.
             if period in ("first", "second"):
@@ -10124,7 +10149,7 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                             "التقرير سيستمر بشكل طبيعي، ولن يتم حذف الساعة الأخيرة."
                         )
             selected, excluded_after_shift = _filter_snb_activity_period(
-                prepared, activity_kind, period, remove_extra, remove_last)
+                prepared, activity_kind, period, remove_extra)
         else:
             st.info(message)
             if activity_kind is None:
@@ -10209,13 +10234,16 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
             )
             return
 
+        excluded_note = (
+            f'المستبعد بعد نهاية الفترة: {excluded_after_shift:,} | '
+            if excluded_after_shift else ""
+        )
         st.markdown(
             f'<p style="color:{label_color};font-weight:800;direction:rtl;'
             'text-align:right;font-size:15px;line-height:1.9;">'
             f'صفوف الملف: {stats["original"]:,} | '
             f'التكرارات المحذوفة: {stats["duplicates"]:,} | '
-            f'بعد الفترة: {len(result):,} | '
-            f'المستبعد بعد نهاية الفترة: {excluded_after_shift:,} | '
+            f'بعد الفترة: {len(result):,} | {excluded_note}'
             f'ناجحة: {successful:,} | غير ناجحة: {unsuccessful:,}'
             '</p>',
             unsafe_allow_html=True
@@ -10586,33 +10614,13 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
                 <style>
                 .stApp .st-key-report_upload_bar_{selected_bank}_Neglect {{
                     direction:rtl !important;
-                    background:linear-gradient(100deg,#0A2B4A 0%,#06284A 55%,#031F40 100%) !important;
-                    border:1px solid #163D60 !important;
-                    border-radius:9px 9px 0 0 !important;
-                    min-height:70px !important;
-                    box-sizing:border-box !important;
-                    padding:5px 16px 4px !important;
+                    padding:0 !important;
                     margin:0 !important;
-                    color:#FFFFFF !important;
                 }}
-                .st-key-report_upload_bar_{selected_bank}_Neglect [data-testid="stHorizontalBlock"] {{
+                .st-key-report_upload_bar_{selected_bank}_Neglect > [data-testid="stHorizontalBlock"] {{
                     direction:rtl !important;
-                    flex-wrap:nowrap !important;
-                    align-items:center !important;
-                    gap:8px !important;
-                    min-height:58px !important;
                 }}
-                .st-key-report_upload_bar_{selected_bank}_Neglect [data-testid="stColumn"] {{
-                    min-width:0 !important;
-                    align-self:center !important;
-                }}
-                .stApp .st-key-neglect_upload_header {{
-                    background:{bg_color} !important;
-                    border-radius:10px !important;
-                    padding:6px 8px !important;
-                    width:fit-content !important;
-                    max-width:100% !important;
-                }}
+                .stApp .st-key-neglect_upload_header {{width:100% !important;}}
                 .st-key-neglect_mode_controls {{
                     width:100% !important;
                 }}
@@ -10693,22 +10701,16 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
                     font-weight:900 !important;
                     white-space:nowrap !important;
                 }}
-                .st-key-neglect_header_divider {{
-                    height:42px !important;
-                    border-left:2px solid #A9BCD1 !important;
-                    width:2px !important;
-                    margin:auto !important;
-                }}
                 </style>
                 """,
                 unsafe_allow_html=True
             )
-            download_col, spacer_col, mode_col, divider_col, upload_col = st.columns(
-                [1.65, 2.0, 2.05, 0.08, 1.7], gap="small",
+            upload_col, mode_col, spacer_col, download_col = st.columns(
+                [1.7, 2.05, 4.5, 1.75], gap="small",
                 vertical_alignment="center"
             )
-            with download_col:
-                with st.container(key="neglect_download_header"):
+            if current_files:
+                with download_col, st.container(key="neglect_download_header"):
                     _xlsx_bytes = (
                         _cached_neglect_xlsx_bytes(_download_df)
                         if not _download_df.empty else b""
@@ -10741,11 +10743,6 @@ def render_report_upload_bar(page, promise_metrics=None, neglect_export_df=None)
                             type="secondary", use_container_width=True,
                             on_click=choose_neglect_mode, args=("followup",)
                         )
-            with divider_col:
-                st.markdown(
-                    "<div class='st-key-neglect_header_divider'></div>",
-                    unsafe_allow_html=True
-                )
             with upload_col:
                 with st.container(key="neglect_upload_header"):
                     with upload_field("رفع ملف المحفظة", f"report_{selected_bank}_{page}"):
@@ -11370,17 +11367,41 @@ page_uploaded = None if curr_page in ('Activity', 'ModelManagement', 'Performanc
 
 if page_uploaded is None:
     if curr_page == 'Home':
-        with st.container(border=True, key="ejada_home_bank_picker"):
+        with st.container(key="ejada_home_bank_picker"):
             st.markdown(
-                '<h2 class="bank-picker-heading" dir="rtl">اختاري البنك</h2>',
+                """<div class="ejada-home-intro" dir="rtl">
+                <span class="ejada-welcome-chip">أهلاً بيكي في إجادة</span>
+                <h1>اختاري البنك</h1>
+                <p>اختاري المحفظة اللي عايزة تشتغلي عليها النهاردة، وكل تقاريرها هتظهرلك فورًا</p>
+                </div>""",
                 unsafe_allow_html=True,
             )
+            banks = (
+                ("STC", "بنك STC", "محفظة تحصيل بنك STC لمتابعة أداء المحصلين، الوعود، المتابعات، والمعالجات.",
+                 ("تقارير الأداء", "المحصلين", "المتابعات")),
+                ("SNB", "البنك الأهلي السعودي", "محفظة تحصيل البنك الأهلي السعودي لمتابعة الأداء، جودة التواصل، القانونية، وPayroll.",
+                 ("تقارير الأداء", "القانونية", "Payroll")),
+            )
             with st.container(key="ejada_home_bank_cards"):
-                for bank, name in (("SNB", "البنك الأهلي السعودي"), ("STC", "بنك STC")):
-                    st.button(
-                        name, key=f"home_open_bank_{bank}", width="stretch",
-                        on_click=open_bank_reports, args=(bank,),
-                    )
+                for bank, name, description, reports in banks:
+                    with st.container(key=f"bank_card_{bank}"):
+                        chips = "".join(f"<span>{report}</span>" for report in reports)
+                        st.markdown(
+                            f"""<div class="ejada-bank-card" dir="rtl">
+                            <div class="ejada-bank-card-top"><span class="ejada-bank-badge">{bank}</span>
+                            <span class="ejada-bank-arrow" aria-hidden="true">←</span></div>
+                            <h2>{name}</h2><p>{description}</p><div class="ejada-bank-chips">{chips}</div>
+                            </div>""",
+                            unsafe_allow_html=True,
+                        )
+                        st.button(
+                            f"فتح تقارير {name}", key=f"home_open_bank_{bank}", width="stretch",
+                            on_click=open_bank_reports, args=(bank,),
+                        )
+            st.markdown(
+                '<footer class="ejada-home-footer">منصة إجادة لتحصيل الديون © 2026</footer>',
+                unsafe_allow_html=True,
+            )
     elif curr_page == 'Overview':
         st.markdown(f"""
         <div style="background-color:{card_color};border:1px solid {border_color};border-radius:15px;padding:22px 18px;margin:8px 0 18px;text-align:center;direction:rtl;">
@@ -11496,7 +11517,7 @@ if page_uploaded is None:
                 render_snb_activity_report(
                     None, _uploaded['activity'],
                     activity_kind=activity_kind,
-                    error_slot=activity_error_slot, shift_selector=shift_selector, shift_notice=shift_notice
+                    error_slot=activity_error_slot, shift_selector=shift_selector
                 )
     else:
         st.markdown(f"<p style='color:{label_color};font-weight:800;font-size:15px;text-align:right;direction:rtl;margin-top:8px;'>ارفعي الملف من الخانة اللي فوق لعرض التقرير.</p>", unsafe_allow_html=True)
