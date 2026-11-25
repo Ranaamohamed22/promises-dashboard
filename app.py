@@ -5,7 +5,6 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
-from pathlib import Path
 import io
 import base64
 import os
@@ -2029,7 +2028,6 @@ st.markdown(f"""
         background:white;color:#0A7A3F;border-radius:12px;padding:9px 13px;font-size:22px;font-weight:800;
     }}
     .snb-pr-brand i {{height:56px;width:1px;background:#ffffff40;}}
-    .snb-pr-brand img {{height:64px;width:auto;object-fit:contain;}}
     .snb-pr-update {{
         display:inline-flex;align-items:center;gap:8px;min-height:48px;padding:0 12px;
         border:1px solid #ffffff33;border-radius:14px;background:#ffffff14;
@@ -2735,15 +2733,10 @@ _snb_promises_page = (st.session_state.current_page == "Promises"
                       and st.session_state.selected_bank == "SNB")
 if _snb_promises_page:
     with st.container(key="snb_pr_header", horizontal=True, vertical_alignment="center"):
-        asset_dir = Path(__file__).resolve().parent / "assets"
-        logo_path = next((asset for asset in sorted(asset_dir.rglob("*"))
-                          if asset.is_file() and asset.suffix.lower() in (".png", ".svg")
-                          and any(name in asset.stem.casefold() for name in ("ejada", "إجادة"))), None)
-        logo = '<span>ملف اللوجو غير موجود</span>'
-        if logo_path:
-            media_type = "image/svg+xml" if logo_path.suffix.lower() == ".svg" else "image/png"
-            encoded = base64.b64encode(logo_path.read_bytes()).decode("ascii")
-            logo = f'<img src="data:{media_type};base64,{encoded}" alt="إجادة EJADA">'
+        logo = """<div style="text-align:center;width:112px">
+    <div style="font-family:'Cairo',sans-serif;font-size:46px;font-weight:800;line-height:1.05;color:#fff;padding-bottom:12px;margin-top:-6px">إجادة</div>
+    <div dir="ltr" style="font-family:'Cairo',sans-serif;font-size:14px;letter-spacing:9px;font-weight:600;color:#d3f5e2;line-height:1;margin-right:-9px;margin-top:-4px">EJADA</div>
+  </div>"""
         st.markdown(
             f'<div class="snb-pr-brand"><strong>SNB</strong><i aria-hidden="true"></i>{logo}</div>',
             unsafe_allow_html=True, width="stretch",
