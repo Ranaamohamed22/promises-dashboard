@@ -128,7 +128,7 @@ class TestSnbTodayActivePromises(unittest.TestCase):
 
     def test_active_filter_order_is_status_writeoff_classification_dates(self):
         fn_start = self.source.index("def _snb_promise_data(raw, today):")
-        fn_end = self.source.index("\\ndef _render_snb_promises(files):", fn_start)
+        fn_end = self.source.index("def _render_snb_promises(files):", fn_start)
         code = self.source[fn_start:fn_end]
         steps = (
             "after_status = unprocessed",
