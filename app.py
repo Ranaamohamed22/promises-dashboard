@@ -11874,19 +11874,37 @@ def _snb_promise_data(raw, today):
     after_classification = after_writeoff & is_promise
 
     # 4. Due date: only promises due today (Cairo local date).
-    dates = pd.to_datetime(raw["Follow up Due Date"], errors="coerce").dt.date
+    due_datetime = pd.to_datetime(raw["Follow up Due Date"], errors="coerce").dt.normalize()
+    dates = due_datetime.dt.date
     valid = dates.notna()
     after_due = after_classification & valid & dates.eq(today)
 
     # 5. Last follow-up: exclude today's date, retain older/blank dates.
-    last_dates = pd.to_datetime(raw["Follow up Last Date"], errors="coerce").dt.date
+    last_datetime = pd.to_datetime(raw["Follow up Last Date"], errors="coerce").dt.normalize()
+    last_dates = last_datetime.dt.date
     current = after_due & last_dates.ne(today)
 
-    # Preserve broken promises unchanged: classified promises due before today.
-    broken = is_promise & valid & dates.lt(today)
+    # BROKEN promises use the same first three ordered filters as ACTIVE:
+    # 1. Unprocessed, 2. Not WriteOff, 3. In-progress Classification.
+    # 4. Due Date strictly BEFORE today.
+    broken_before_today = after_classification & valid & dates.lt(today)
+    # 5. Do not independently filter Last Date. Subtract it from Due Date
+    #    in whole calendar days and keep ONLY strictly negative differences.
+    difference_days = (last_datetime - due_datetime).dt.days
+    broken = broken_before_today & difference_days.lt(0)
+    broken_rows = raw.loc[broken].copy()
+    # Rebuild a single, audit-friendly difference column even if the input
+    # already contains a previous export's difference column.
+    broken_rows = broken_rows.drop(columns=["الفرق", "الفرق "], errors="ignore")
+    broken_rows.insert(
+        broken_rows.columns.get_loc("Follow up Last Date") + 1,
+        "الفرق",
+        difference_days.loc[broken].astype("int64"),
+    )
+
     sub = raw["Sub State"].map(_clean_snb_promise_text)
     types = sub[is_promise].str.removeprefix("وعد بسداد ").value_counts()
-    return raw.loc[current], raw.loc[broken], types, int(is_promise.sum()), int((is_promise & ~valid).sum())
+    return raw.loc[current], broken_rows, types, int(is_promise.sum()), int((is_promise & ~valid).sum())
 
 
 def _render_snb_promises(files):
