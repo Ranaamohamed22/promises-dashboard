@@ -152,6 +152,29 @@ class TestSnbPromiseProducts(unittest.TestCase):
         self.assertEqual(len(sheets["الوعود القائمة"]), len(active))
         self.assertEqual(len(sheets["الوعود المكسورة"]), len(broken))
 
+    def test_empty_product_card_survives_all_three_streamlit_themes(self):
+        from streamlit.testing.v1 import AppTest
+        path = Path(__file__).resolve().parents[1] / "app.py"
+        ui = AppTest.from_file(str(path), default_timeout=60).run()
+        for theme in ("navy", "dark", "light"):
+            ui.button(key=f"ejada_theme_{theme}").click().run()
+            self.assertEqual(ui.session_state["theme"], theme)
+            ui.button(key="home_report_open_Promises").click().run()
+            self.assertEqual(len(ui.exception), 0)
+            self.assertEqual(ui.session_state["current_page"], "Promises")
+            product_html = [
+                markdown.value for markdown in ui.markdown
+                if "snb-pr-product-section" in markdown.value
+                and "الوعود لكل منتج" in markdown.value
+            ]
+            self.assertEqual(len(product_html), 1)
+            self.assertIn("ارفعي الملف علشان تظهر الأرقام", product_html[0])
+            self.assertEqual(
+                product_html[0].count('<article class="snb-pr-product-item">'), 3,
+            )
+            ui.button(key="snb_pr_change_bank").click().run()
+            self.assertEqual(len(ui.exception), 0)
+
     def test_card_is_between_existing_sections_and_old_sections_unchanged(self):
         start = self.source.index('def _render_snb_promises(files):')
         end = self.source.index('if _snb_overview_page:', start)
