@@ -32,7 +32,7 @@ class TestSnbTodayActivePromises(unittest.TestCase):
         self.fn, self.source = load_promise_calculation()
         self.today = date(2026, 11, 26)
         self.frame = pd.DataFrame([
-            # Current active: due today, unprocessed and last != today.
+            # This WriteOff is excluded despite due today, unprocessed and last != today.
             {"account": "A", "sub": "وعد بسداد مبلغ المعالجة", "due": "2026-11-26",
              "last": "2026-11-25", "state": "غير معالج", "category": "WriteOff"},
             # Today's last follow-up means EXCLUDE.
@@ -68,7 +68,7 @@ class TestSnbTodayActivePromises(unittest.TestCase):
     def test_exact_active_condition(self):
         active, broken, types, promise_count, missing_dates = (
             self.fn["_snb_promise_data"](self.frame, self.today))
-        self.assertEqual(active["account"].tolist(), ["A", "E"])
+        self.assertEqual(active["account"].tolist(), ["E"])
         self.assertEqual(broken["account"].tolist(), ["G", "H"])
         self.assertEqual(promise_count, 8)
         self.assertEqual(missing_dates, 1)
@@ -78,9 +78,18 @@ class TestSnbTodayActivePromises(unittest.TestCase):
         active, *_ = self.fn["_snb_promise_data"](self.frame, self.today)
         self.assertFalse({"B", "C", "D"} & set(active["account"].tolist()))
 
-    def test_writeoff_not_silently_excluded_without_requested_rule(self):
-        active, *_ = self.fn["_snb_promise_data"](self.frame, self.today)
-        self.assertIn("A", active["account"].tolist())
+    def test_writeoff_is_excluded_from_active_only(self):
+        active, broken, *_ = self.fn["_snb_promise_data"](self.frame, self.today)
+        self.assertNotIn("A", active["account"].tolist())
+        self.assertEqual(broken["account"].tolist(), ["G", "H"])
+
+    def test_writeoff_spelling_and_whitespace_are_normalized(self):
+        extra = self.frame.loc[self.frame["account"].eq("A")].copy()
+        extra["account"] = "J"
+        extra["تحديث فئة العميل - التمويل"] = "  WRITEoff  "
+        data = pd.concat([self.frame, extra], ignore_index=True)
+        active, *_ = self.fn["_snb_promise_data"](data, self.today)
+        self.assertEqual(active["account"].tolist(), ["E"])
 
     def test_uploader_requires_last_date_and_processing_status(self):
         self.assertIn(
@@ -88,7 +97,7 @@ class TestSnbTodayActivePromises(unittest.TestCase):
             self.source,
         )
         self.assertIn(
-            '"حالة المعالجة - التمويل"\n    }.issubset(raw.columns)',
+            '"حالة المعالجة - التمويل", "تحديث فئة العميل - التمويل"\n    }.issubset(raw.columns)',
             self.source,
         )
 
