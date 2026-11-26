@@ -126,6 +126,22 @@ class TestSnbTodayActivePromises(unittest.TestCase):
         active, *_ = self.fn["_snb_promise_data"](data, self.today)
         self.assertIn("J", active["account"].tolist())
 
+    def test_active_filter_order_is_status_writeoff_classification_dates(self):
+        fn_start = self.source.index("def _snb_promise_data(raw, today):")
+        fn_end = self.source.index("def _render_snb_promises(files):", fn_start)
+        code = self.source[fn_start:fn_end]
+        steps = (
+            "after_status = unprocessed",
+            "after_writeoff = after_status & not_writeoff",
+            "after_classification = after_writeoff & is_promise",
+            "after_due = after_classification & valid & dates.eq(today)",
+            "current = after_due & last_dates.ne(today)",
+        )
+        indices = [code.index(step) for step in steps]
+        self.assertEqual(indices, sorted(indices))
+        # The separate broken-promise path must retain its existing rule.
+        self.assertIn("broken = is_promise & valid & dates.lt(today)", code)
+
     def test_uploader_requires_last_date_and_processing_status(self):
         self.assertIn(
             '"Classification", "Sub State", "Follow up Due Date", "Follow up Last Date",',
