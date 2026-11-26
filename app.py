@@ -11853,8 +11853,11 @@ def _clean_snb_promise_text(value):
 
 
 def _snb_promise_data(raw, today):
+    classification = raw["Classification"].map(_clean_snb_promise_text)
+    # Classification is the authoritative promise selector for SNB.
+    # Sub State identifies the promise TYPE for display, not eligibility.
+    is_promise = classification.eq("وعود السداد قيد التنفيذ")
     sub = raw["Sub State"].map(_clean_snb_promise_text)
-    is_promise = sub.str.contains("وعد بسداد", regex=False, na=False)
     dates = pd.to_datetime(raw["Follow up Due Date"], errors="coerce").dt.date
     last_dates = pd.to_datetime(raw["Follow up Last Date"], errors="coerce").dt.date
     unprocessed = (
@@ -11889,7 +11892,7 @@ def _render_snb_promises(files):
             st.error(f"تعذر قراءة الملف {uploaded.name}: {exc}")
     raw = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
     ready = {
-        "Sub State", "Follow up Due Date", "Follow up Last Date",
+        "Classification", "Sub State", "Follow up Due Date", "Follow up Last Date",
         "حالة المعالجة - التمويل", "تحديث فئة العميل - التمويل"
     }.issubset(raw.columns)
     account_col = _snb_find_column(raw, "Account Number", "رقم الحساب", "Customer Account Number",
