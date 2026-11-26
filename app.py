@@ -11917,7 +11917,7 @@ def _snb_promise_product_cards_html(per, has_file, ready, has_product_column):
     if not has_file:
         cards = ''.join(card() for _ in range(3))
         body = (
-            '<div class="snb-pr-product-list snb-pr-product-few">'
+            '<div class="snb-pr-product-list">'
             f'{cards}</div><p class="snb-pr-product-note">ارفعي الملف علشان تظهر الأرقام</p>'
         )
     elif not has_product_column:
