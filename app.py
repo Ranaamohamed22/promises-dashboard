@@ -11936,7 +11936,7 @@ def _snb_promise_product_cards_html(per, has_file, ready, has_product_column):
     return css + '<section class="snb-ov-card snb-pr-product-section">' + title + body + '</section>'
 
 
-def _snb_promises_export(summary, types, active, broken, collectors):
+def _snb_promises_export(summary, types, active, broken, collectors, products):
     stream = io.BytesIO()
     overview = pd.DataFrame(summary, columns=["المؤشر", "القيمة"])
     type_table = types.rename_axis("نوع الوعد").reset_index(name="العدد")
@@ -11951,6 +11951,17 @@ def _snb_promises_export(summary, types, active, broken, collectors):
         active.to_excel(writer, sheet_name="الوعود القائمة", index=False)
         broken.to_excel(writer, sheet_name="الوعود المكسورة", index=False)
         collector_table.to_excel(writer, sheet_name="لكل محصل", index=False)
+        product_table = (
+            products if products is not None else pd.DataFrame(columns=[
+                "المنتج", "قائمة", "مكسورة", "الإجمالي", "نسبة الكسر (محسوبة)"
+            ])
+        )
+        product_table.to_excel(writer, sheet_name="لكل منتج", index=False)
+        for row in writer.sheets["لكل منتج"].iter_rows(
+            min_row=2, min_col=5, max_col=5,
+        ):
+            for cell in row:
+                cell.number_format = "0.0%"
         writer.sheets["ملخص"]["B5"].number_format = "0.0%"
         for row in writer.sheets["لكل محصل"].iter_rows(min_row=2, min_col=4):
             for cell in row:
@@ -12074,7 +12085,14 @@ def _render_snb_promises(files):
             for key, count in keys[names.ne("")].value_counts().items():
                 collectors.setdefault(key, [0, 0])[position] = count
     ordered = sorted(collectors.items(), key=lambda item: -sum(item[1]))
-    export = _snb_promises_export(summary, types, active, broken, ordered) if ready else b""
+    product_summary = _snb_promise_product_summary(raw, active, broken) if ready else None
+    product_section = _snb_promise_product_cards_html(
+        product_summary, bool(files), ready, "نوع المتنج-التمويل" in raw.columns,
+    )
+    export = (
+        _snb_promises_export(summary, types, active, broken, ordered, product_summary)
+        if ready else b""
+    )
 
     with st.container(key="snb_glass_promises"):
         with st.container(key="snb_pr_titlebar", horizontal=True, vertical_alignment="center"):
@@ -12127,6 +12145,7 @@ def _render_snb_promises(files):
             + "".join(metrics) + '</section>'
             + '<section class="snb-ov-card"><h3>أنواع الوعود</h3><div class="snb-pr-pills">'
             + ("".join(pills) or empty) + '</div></section>'
+            + product_section
             + '<section><h2 class="snb-ov-title">الوعود لكل محصل · أعلى 10 محصلين</h2>'
             + (f'<div class="snb-pr-grid">{"".join(cards)}</div>' if cards else
                f'<div class="snb-ov-card">{empty}{notice}</div>')
