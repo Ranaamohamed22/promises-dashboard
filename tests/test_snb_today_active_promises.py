@@ -50,7 +50,7 @@ class TestSnbTodayActivePromises(unittest.TestCase):
             # Not a promise type.
             {"account": "F", "sub": "لا يجيب", "due": "2026-11-26",
              "last": "2026-11-25", "state": "غير معالج", "category": "Normal"},
-            # Broken rule stays independent/unmodified.
+            # Broken candidate is unprocessed and has a negative Last - Due delta.
             {"account": "G", "sub": "وعد بسداد قسط", "due": "2026-11-25",
              "last": "2026-11-24", "state": "غير معالج", "category": "Normal"},
             {"account": "H", "sub": "وعد بسداد قسط", "due": "2026-11-25",
@@ -91,7 +91,7 @@ class TestSnbTodayActivePromises(unittest.TestCase):
         active, broken, types, promise_count, missing_dates = (
             self.fn["_snb_promise_data"](self.frame, self.today))
         self.assertEqual(active["account"].tolist(), ["E", "J"])
-        self.assertEqual(broken["account"].tolist(), ["G", "H", "L"])
+        self.assertEqual(broken["account"].tolist(), ["G", "L"])
         self.assertEqual(promise_count, 10)
         self.assertEqual(missing_dates, 1)
         self.assertEqual(int(types.sum()), 10)
@@ -103,7 +103,7 @@ class TestSnbTodayActivePromises(unittest.TestCase):
     def test_writeoff_is_excluded_from_active_only(self):
         active, broken, *_ = self.fn["_snb_promise_data"](self.frame, self.today)
         self.assertNotIn("A", active["account"].tolist())
-        self.assertEqual(broken["account"].tolist(), ["G", "H", "L"])
+        self.assertEqual(broken["account"].tolist(), ["G", "L"])
 
     def test_writeoff_spelling_and_whitespace_are_normalized(self):
         extra = self.frame.loc[self.frame["account"].eq("A")].copy()
@@ -139,8 +139,71 @@ class TestSnbTodayActivePromises(unittest.TestCase):
         )
         indices = [code.index(step) for step in steps]
         self.assertEqual(indices, sorted(indices))
-        # The separate broken-promise path must retain its existing rule.
-        self.assertIn("broken = is_promise & valid & dates.lt(today)", code)
+        # The broken-promise path must use the three staged business filters,
+        # then overdue date, then negative Last-Date-minus-Due-Date.
+        broken_steps = (
+            "broken_before_today = after_classification & valid & dates.lt(today)",
+            "difference_days = (last_datetime - due_datetime).dt.days",
+            "broken = broken_before_today & difference_days.lt(0)",
+        )
+        broken_positions = [code.index(step) for step in broken_steps]
+        self.assertEqual(broken_positions, sorted(broken_positions))
+
+    def test_broken_report_has_exact_negative_difference_column(self):
+        active, broken, *_ = self.fn["_snb_promise_data"](self.frame, self.today)
+        self.assertEqual(active["account"].tolist(), ["E", "J"])
+        # H is processed and must not appear in broken.
+        self.assertEqual(broken["account"].tolist(), ["G", "L"])
+        self.assertEqual(broken["الفرق"].tolist(), [-1, -1])
+        self.assertEqual(
+            broken.columns[broken.columns.get_loc("Follow up Last Date") + 1],
+            "الفرق",
+        )
+        self.assertTrue((broken["الفرق"] < 0).all())
+
+    def test_broken_rejects_zero_positive_missing_and_invalid_differences(self):
+        base = self.frame.loc[self.frame["account"].eq("G")].copy()
+        def case(account, *, due="2026-11-25", last="2026-11-24",
+                 status="غير معالج", category="Normal",
+                 classification="وعود السداد قيد التنفيذ"):
+            sample = base.copy()
+            sample["account"] = account
+            sample["Follow up Due Date"] = due
+            sample["Follow up Last Date"] = last
+            sample["حالة المعالجة - التمويل"] = status
+            sample["تحديث فئة العميل - التمويل"] = category
+            sample["Classification"] = classification
+            return sample
+
+        cases = [
+            case("NEG"),
+            case("ZERO", last="2026-11-25"),
+            case("POS", last="2026-11-26"),
+            case("EMPTY", last=None),
+            case("INVALID", last="not-a-date"),
+            case("PROCESSED", status="معالج"),
+            case("WRITEOFF", category="  WRITEoff  "),
+            case("NOT_PROMISE", classification="محاولة التوصل للعميل"),
+            case("DUE_TODAY", due="2026-11-26"),
+            case("DUE_FUTURE", due="2026-11-27"),
+        ]
+        raw = pd.concat(cases, ignore_index=True)
+        # A stale old difference column in an input must never be trusted.
+        raw["الفرق"] = 500
+        raw["الفرق "] = 999
+        _, broken, *_ = self.fn["_snb_promise_data"](raw, self.today)
+        self.assertEqual(broken["account"].tolist(), ["NEG"])
+        self.assertEqual(broken["الفرق"].tolist(), [-1])
+        self.assertEqual(list(broken.columns).count("الفرق"), 1)
+        self.assertNotIn("الفرق ", broken.columns)
+
+    def test_last_date_is_used_for_subtraction_not_independent_filter(self):
+        # A last date of today is allowed to be examined, but its
+        # positive difference is excluded by the ONLY-negative rule.
+        raw = self.frame.loc[self.frame["account"].eq("G")].copy()
+        raw["Follow up Last Date"] = "2026-11-26"
+        _, broken, *_ = self.fn["_snb_promise_data"](raw, self.today)
+        self.assertEqual(len(broken), 0)
 
     def test_uploader_requires_last_date_and_processing_status(self):
         self.assertIn(
