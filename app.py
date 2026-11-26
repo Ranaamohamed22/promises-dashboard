@@ -11814,6 +11814,128 @@ def _render_snb_overview():
                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
+def _snb_promise_product_summary(raw, active, broken):
+    """Group the *existing* SNB promise KPI rows by uploaded product.
+
+    No promise/due-date conditions are recalculated: active and broken are
+    exactly the two already-filtered DataFrames used by the KPI strip.
+    """
+    product_column = "نوع المتنج-التمويل"
+    if product_column not in raw.columns:
+        return None
+
+    products = raw[product_column].map(_clean_snb_promise_text).replace("", "غير محدد")
+    # Include every product actually present in the uploaded file, even if
+    # its current classified promises amount to zero.
+    per = pd.DataFrame({"المنتج": products.unique()})
+    active_counts = products.loc[active.index].value_counts()
+    broken_counts = products.loc[broken.index].value_counts()
+    per["قائمة"] = per["المنتج"].map(active_counts).fillna(0).astype(int)
+    per["مكسورة"] = per["المنتج"].map(broken_counts).fillna(0).astype(int)
+    per["الإجمالي"] = per["قائمة"] + per["مكسورة"]
+    per["نسبة الكسر (محسوبة)"] = per.apply(
+        lambda row: row["مكسورة"] / row["الإجمالي"]
+        if row["الإجمالي"] else None,
+        axis=1,
+    )
+    return per.sort_values(
+        ["الإجمالي", "المنتج"], ascending=[False, True], kind="stable",
+    ).reset_index(drop=True)
+
+
+def _snb_promise_product_cards_html(per, has_file, ready, has_product_column):
+    """One scoped glass card section; never changes the existing dashboard."""
+    css = """
+<style>
+.snb-pr-product-section {margin:4px 0;direction:rtl;font-family:'Cairo',sans-serif}
+.snb-pr-product-heading {display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:12px}
+.snb-pr-product-heading h3 {font-family:'Cairo',sans-serif !important;font-size:17px !important;font-weight:700 !important;margin:0 !important}
+.snb-pr-product-legend {display:flex;align-items:center;gap:14px;font-size:12px;color:var(--muted);font-family:'Cairo',sans-serif}
+.snb-pr-product-legend span {display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
+.snb-pr-product-swatch {display:inline-block;width:10px;height:10px;border-radius:3px}
+.snb-pr-product-list {display:flex;flex-wrap:wrap;gap:14px;align-items:stretch}
+.snb-pr-product-item {box-sizing:border-box;flex:1 1 280px;min-width:0;padding:18px;border-radius:20px;text-align:center;
+    background:var(--card);border:1px solid var(--border);color:var(--text);
+    backdrop-filter:blur(14px);font-family:'Cairo',sans-serif}
+.snb-pr-product-list.snb-pr-product-few .snb-pr-product-item {max-width:380px}
+.snb-pr-product-name {font-size:20px;font-weight:700;overflow-wrap:anywhere;line-height:1.5}
+.snb-pr-product-gauge {position:relative;width:240px;height:125px;max-width:100%;overflow:hidden;margin:10px auto 0}
+.snb-pr-product-ring {position:absolute;top:0;left:50%;transform:translateX(-50%);width:240px;height:240px;
+    border-radius:50%;-webkit-mask:radial-gradient(circle,transparent 80px,#000 81px);
+    mask:radial-gradient(circle,transparent 80px,#000 81px)}
+.snb-pr-product-pct {position:absolute;bottom:0;left:0;right:0;text-align:center;
+    color:var(--text);font-size:30px;font-weight:800;line-height:1.2;white-space:nowrap}
+.snb-pr-product-pct-label {font-size:12px;color:var(--muted);margin-top:4px}
+.snb-pr-product-values {display:flex;justify-content:space-around;gap:12px;margin-top:12px}
+.snb-pr-product-value {display:flex;flex-direction:column;gap:1px;align-items:center;min-width:0}
+.snb-pr-product-value strong {font-size:22px;font-weight:800;line-height:1.3;white-space:nowrap}
+.snb-pr-product-value small {font-size:11px;color:var(--muted);font-weight:400}
+.snb-pr-product-note {font-size:12px;color:var(--muted);margin:12px 0 0;text-align:center}
+.snb-pr-product-warning {font-size:13px;color:var(--text);padding:18px 4px;text-align:center}
+@media(max-width:650px) {
+    .snb-pr-product-list {flex-direction:column}
+    .snb-pr-product-item,.snb-pr-product-list.snb-pr-product-few .snb-pr-product-item {width:100%;max-width:none;flex:0 0 auto}
+}
+</style>"""
+    title = (
+        '<div class="snb-pr-product-heading"><h3>الوعود لكل منتج</h3>'
+        '<div class="snb-pr-product-legend">'
+        '<span><i class="snb-pr-product-swatch" style="background:var(--accent)"></i>قائمة</span>'
+        '<span><i class="snb-pr-product-swatch" style="background:var(--broken)"></i>مكسورة</span>'
+        '</div></div>'
+    )
+
+    def card(name=None, standing=None, broken=None):
+        is_placeholder = standing is None or broken is None
+        total = 0 if is_placeholder else standing + broken
+        rate = (broken / total) if total else None
+        stop = rate * 50 if rate is not None else 0
+        background = (
+            f"conic-gradient(from 270deg, var(--broken) 0 {stop:.6f}%, "
+            "var(--accent) 0 50%, transparent 0)"
+            if rate is not None else "rgba(255,255,255,0.15)"
+        )
+        pct = f"{rate:.1%}" if rate is not None else "—"
+        current = f"{standing:,}" if standing is not None else "—"
+        missed = f"{broken:,}" if broken is not None else "—"
+        label = _xml_escape(name) if name is not None else "—"
+        return (
+            '<article class="snb-pr-product-item">'
+            f'<div class="snb-pr-product-name">{label}</div>'
+            '<div class="snb-pr-product-gauge">'
+            f'<div class="snb-pr-product-ring" style="background:{background}"></div>'
+            f'<strong class="snb-pr-product-pct">{pct}</strong></div>'
+            '<div class="snb-pr-product-pct-label">نسبة الكسر (محسوبة)</div>'
+            '<div class="snb-pr-product-values">'
+            '<div class="snb-pr-product-value">'
+            f'<strong style="color:var(--accent)">{current}</strong><small>قائمة</small></div>'
+            '<div class="snb-pr-product-value">'
+            f'<strong style="color:var(--broken)">{missed}</strong><small>مكسورة</small></div>'
+            '</div></article>'
+        )
+
+    if not has_file:
+        cards = ''.join(card() for _ in range(3))
+        body = (
+            '<div class="snb-pr-product-list snb-pr-product-few">'
+            f'{cards}</div><p class="snb-pr-product-note">ارفعي الملف علشان تظهر الأرقام</p>'
+        )
+    elif not has_product_column:
+        body = '<div class="snb-pr-product-warning">العمود نوع المتنج-التمويل غير موجود في الملف المرفوع</div>'
+    elif not ready:
+        body = '<div class="snb-pr-product-warning">ملف المحفظة لا يحتوي على أعمدة الوعود المطلوبة</div>'
+    elif per is None or per.empty:
+        body = '<div class="snb-pr-product-warning">لا توجد منتجات في الملف المرفوع</div>'
+    else:
+        cards = ''.join(
+            card(str(row["المنتج"]), int(row["قائمة"]), int(row["مكسورة"]))
+            for _, row in per.iterrows()
+        )
+        few = " snb-pr-product-few" if len(per) < 3 else ""
+        body = f'<div class="snb-pr-product-list{few}">{cards}</div>'
+    return css + '<section class="snb-ov-card snb-pr-product-section">' + title + body + '</section>'
+
+
 def _snb_promises_export(summary, types, active, broken, collectors):
     stream = io.BytesIO()
     overview = pd.DataFrame(summary, columns=["المؤشر", "القيمة"])
