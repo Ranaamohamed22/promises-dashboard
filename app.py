@@ -11853,29 +11853,38 @@ def _clean_snb_promise_text(value):
 
 
 def _snb_promise_data(raw, today):
-    classification = raw["Classification"].map(_clean_snb_promise_text)
-    # Classification is the authoritative promise selector for SNB.
-    # Sub State identifies the promise TYPE for display, not eligibility.
-    is_promise = classification.eq("وعود السداد قيد التنفيذ")
-    sub = raw["Sub State"].map(_clean_snb_promise_text)
-    dates = pd.to_datetime(raw["Follow up Due Date"], errors="coerce").dt.date
-    last_dates = pd.to_datetime(raw["Follow up Last Date"], errors="coerce").dt.date
+    # Filter ACTIVE promises in the exact sequence used in the SNB workflow.
+    # 1. Processing status: only unprocessed accounts.
     unprocessed = (
         raw["حالة المعالجة - التمويل"].astype(str).str.strip() == "غير معالج"
     )
+    after_status = unprocessed
+
+    # 2. Customer category: exclude WriteOff.
     not_writeoff = (
         raw["تحديث فئة العميل - التمويل"]
         .astype(str).str.strip().str.casefold().ne("writeoff")
     )
+    after_writeoff = after_status & not_writeoff
+
+    # 3. Classification: select in-progress payment promises.
+    # Sub State labels promise types only; it does not decide eligibility.
+    classification = raw["Classification"].map(_clean_snb_promise_text)
+    is_promise = classification.eq("وعود السداد قيد التنفيذ")
+    after_classification = after_writeoff & is_promise
+
+    # 4. Due date: only promises due today (Cairo local date).
+    dates = pd.to_datetime(raw["Follow up Due Date"], errors="coerce").dt.date
     valid = dates.notna()
-    # SNB active promises: unprocessed, not WriteOff, due TODAY,
-    # and last follow-up NOT today. Broken logic below stays unchanged.
-    current = (
-        is_promise & unprocessed & not_writeoff & valid
-        & dates.eq(today) & last_dates.ne(today)
-    )
-    # Keep the existing broken-promises calculation exactly as before.
+    after_due = after_classification & valid & dates.eq(today)
+
+    # 5. Last follow-up: exclude today's date, retain older/blank dates.
+    last_dates = pd.to_datetime(raw["Follow up Last Date"], errors="coerce").dt.date
+    current = after_due & last_dates.ne(today)
+
+    # Preserve broken promises unchanged: classified promises due before today.
     broken = is_promise & valid & dates.lt(today)
+    sub = raw["Sub State"].map(_clean_snb_promise_text)
     types = sub[is_promise].str.removeprefix("وعد بسداد ").value_counts()
     return raw.loc[current], raw.loc[broken], types, int(is_promise.sum()), int((is_promise & ~valid).sum())
 
