@@ -11860,10 +11860,17 @@ def _snb_promise_data(raw, today):
     unprocessed = (
         raw["حالة المعالجة - التمويل"].astype(str).str.strip() == "غير معالج"
     )
+    not_writeoff = (
+        raw["تحديث فئة العميل - التمويل"]
+        .astype(str).str.strip().str.casefold().ne("writeoff")
+    )
     valid = dates.notna()
-    # SNB active promises: unprocessed, due TODAY, and last follow-up NOT today.
-    # Do not introduce a WriteOff restriction: it is not part of the approved rule.
-    current = is_promise & unprocessed & valid & dates.eq(today) & last_dates.ne(today)
+    # SNB active promises: unprocessed, not WriteOff, due TODAY,
+    # and last follow-up NOT today. Broken logic below stays unchanged.
+    current = (
+        is_promise & unprocessed & not_writeoff & valid
+        & dates.eq(today) & last_dates.ne(today)
+    )
     # Keep the existing broken-promises calculation exactly as before.
     broken = is_promise & valid & dates.lt(today)
     types = sub[is_promise].str.removeprefix("وعد بسداد ").value_counts()
@@ -11883,7 +11890,7 @@ def _render_snb_promises(files):
     raw = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
     ready = {
         "Sub State", "Follow up Due Date", "Follow up Last Date",
-        "حالة المعالجة - التمويل"
+        "حالة المعالجة - التمويل", "تحديث فئة العميل - التمويل"
     }.issubset(raw.columns)
     account_col = _snb_find_column(raw, "Account Number", "رقم الحساب", "Customer Account Number",
                                    "Debitor", "Debtor", "ID Numer", "ID Number")
