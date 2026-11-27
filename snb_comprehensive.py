@@ -182,6 +182,8 @@ def build_comprehensive_report(source_bytes):
         f"A1:{get_column_letter(max(sheet.max_column, start + 5))}{sheet.max_row}"
     )
     output = BytesIO()
+    for ws in workbook.worksheets:
+        ws.sheet_view.rightToLeft = False
     workbook.save(output)
     return output.getvalue(), sheet.max_row - 1, (
         sheet.cell(1, first_bucket).value, sheet.cell(1, last_bucket).value
