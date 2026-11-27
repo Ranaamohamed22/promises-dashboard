@@ -87,7 +87,7 @@ class CombinedSNBPerformanceTests(unittest.TestCase):
         self.assertEqual(new_portfolio["C1"].value, "DPD30")
         self.assertEqual(new_portfolio["E1"].value, "DPD60")
         self.assertEqual(new_portfolio["G1"].value, "NPL")
-        self.assertTrue(new_portfolio.sheet_view.rightToLeft)
+        self.assertFalse(new_portfolio.sheet_view.rightToLeft)
         self.assertEqual(new_portfolio.freeze_panes, "C3")
 
         # Old daily-payments output remains a separate, unchanged workbook.
