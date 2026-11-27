@@ -221,6 +221,7 @@ def build_snb_performance(portfolio_bytes, payments_bytes):
     }
 
 
+@st.cache_data(show_spinner=False, max_entries=6)
 def build_combined_snb_performance_workbook(processed_bytes, portfolio_table):
     """Combine original, unchanged processed export with styled portfolio tab.
 
@@ -308,16 +309,24 @@ def render_snb_performance_page():
             if processed_result is not None and portfolio_table is not None:
                 # New optional single-file export; old individual Excel downloads
                 # remain available and unchanged in their respective tabs.
-                st.download_button(
-                    "📥 تحميل ملف واحد: المعالج + المحفظة",
-                    data=build_combined_snb_performance_workbook(
-                        processed_result["processed_bytes"], portfolio_table
-                    ),
-                    file_name=f"SNB_Performance_Combined_{processed_result['today'].isoformat()}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="snb_perf_download_combined",
-                    use_container_width=False,
-                )
+                if st.button("📦 تجهيز ملف المعالج + المحفظة", key="snb_perf_prepare_combined"):
+                    st.download_button(
+                        "📥 تحميل ملف واحد: المعالج + المحفظة",
+                        data=build_combined_snb_performance_workbook(
+                            processed_result["processed_bytes"], portfolio_table
+                        ),
+                        file_name=f"SNB_Performance_Combined_{processed_result['today'].isoformat()}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="snb_perf_download_combined",
+                        use_container_width=False,
+                        on_click="ignore",
+                    )
+
+
+@st.cache_data(show_spinner=False, max_entries=6)
+def _cached_snb_performance_result(portfolio_bytes, payments_bytes, cairo_day):
+    # Day is part of the key because the original calculations use today's date.
+    return build_snb_performance(portfolio_bytes, payments_bytes)
 
 
 def _render_original_snb_processed_report(portfolio_file, payments_file):
@@ -337,7 +346,10 @@ def _render_original_snb_processed_report(portfolio_file, payments_file):
         f"(نسخة {payments_version})"
     )
     try:
-        result = build_snb_performance(portfolio_bytes, payments_bytes)
+        result = _cached_snb_performance_result(
+            portfolio_bytes, payments_bytes,
+            datetime.now(ZoneInfo("Africa/Cairo")).date().isoformat(),
+        )
     except Exception as exc:
         st.error(f"تعذر تجهيز تقرير الأداء: {exc}")
         return
