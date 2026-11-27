@@ -74,6 +74,7 @@ def _export_excel(df, sheet_name, highlight_payment_treated=False):
     stream.seek(0)
     book = load_workbook(stream)
     sheet = book.active
+    sheet.sheet_view.rightToLeft = False
     sheet.freeze_panes = "A2"
     if sheet.max_column:
         sheet.auto_filter.ref = (
@@ -105,6 +106,8 @@ def _export_excel(df, sheet_name, highlight_payment_treated=False):
             if cell.value == "المعالج بالسداد":
                 cell.fill = green_fill
     output = BytesIO()
+    for ws in book.worksheets:
+        ws.sheet_view.rightToLeft = False
     book.save(output)
     return output.getvalue()
 
@@ -230,6 +233,8 @@ def build_combined_snb_performance_workbook(processed_bytes, portfolio_table):
     portfolio_sheet = book.create_sheet("المحفظة")
     write_portfolio_sheet(portfolio_sheet, portfolio_table)
     output = BytesIO()
+    for ws in book.worksheets:
+        ws.sheet_view.rightToLeft = False
     book.save(output)
     return output.getvalue()
 
