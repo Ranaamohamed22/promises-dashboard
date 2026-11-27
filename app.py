@@ -12100,9 +12100,17 @@ def _read_snb_promise_file_cached(file_bytes, file_name):
 
 
 def _render_snb_promises(files):
-    # ===== مؤشر التحميل (UI فقط): يظهر أثناء قراءة الملف وتجهيز التقرير ثم يختفي =====
+    # Show the 5-second loader only for a newly uploaded portfolio, not every rerun.
+    import time as _promise_time
+    _loader_signature = tuple(
+        (f.name, hashlib.sha256(f.getvalue()).hexdigest()) for f in (files or [])
+    )
+    _show_loader = bool(files) and (
+        st.session_state.get("_snb_promises_loader_signature") != _loader_signature
+    )
+    _loader_start = _promise_time.monotonic() if _show_loader else None
     _loader_slot = st.empty()
-    if files:
+    if _show_loader:
         _loader_slot.markdown(
             """<style>
 @property --snbp{syntax:'<integer>';initial-value:0;inherits:false}
@@ -12115,14 +12123,14 @@ font-family:'Cairo',sans-serif;color:var(--text)}
 .snb-ld-wrap{display:flex;flex-direction:column;align-items:center}
 .snb-ld-track{position:relative;width:260px;height:18px;margin-top:34px;border-radius:14px;direction:ltr;
 background:rgba(127,214,224,.18);border:2px solid var(--text)}
-.snb-ld-fill{height:100%;border-radius:12px;background:linear-gradient(90deg,#5be39a,#7fd6e0);animation:snbwid 4.5s ease-in-out infinite}
-.snb-ld-run{position:absolute;top:-43px;left:0;width:34px;height:39px;animation:snbmv 4.5s ease-in-out infinite}
+.snb-ld-fill{height:100%;border-radius:12px;background:linear-gradient(90deg,#5be39a,#7fd6e0);animation:snbwid 5s ease-in-out infinite}
+.snb-ld-run{position:absolute;top:-43px;left:0;width:34px;height:39px;animation:snbmv 5s ease-in-out infinite}
 .snb-ld-girl{overflow:visible;animation:snbbob .3s ease-in-out infinite alternate}
 .snb-ld-pony{transform-origin:12px 14px;animation:snbsw .3s ease-in-out infinite alternate}
 .snb-ld-leg{transform-origin:20px 35px}
 .snb-ld-l1{animation:snblg .3s ease-in-out infinite alternate}
 .snb-ld-l2{animation:snblg .3s ease-in-out infinite alternate-reverse}
-.snb-ld-pct{counter-reset:snbn var(--snbp);animation:snbcnt 4.5s ease-in-out infinite;font-size:16px;font-weight:800;direction:ltr;margin:0}
+.snb-ld-pct{counter-reset:snbn var(--snbp);animation:snbcnt 5s ease-in-out infinite;font-size:16px;font-weight:800;direction:ltr;margin:0}
 .snb-ld-pct::after{content:counter(snbn) "%"}
 @keyframes snbwid{0%{width:0}80%,100%{width:100%}}
 @keyframes snbmv{0%{left:-6px}80%,100%{left:228px}}
@@ -12335,6 +12343,9 @@ background:rgba(127,214,224,.18);border:2px solid var(--text)}
         )) if ready else b""
     )
 
+    if _show_loader:
+        _promise_time.sleep(max(0.0, 5.0 - (_promise_time.monotonic() - _loader_start)))
+        st.session_state["_snb_promises_loader_signature"] = _loader_signature
     _loader_slot.empty()
     with st.container(key="snb_glass_promises"):
         with st.container(key="snb_pr_titlebar", horizontal=True, vertical_alignment="center"):
