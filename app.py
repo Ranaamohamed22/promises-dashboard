@@ -11843,97 +11843,55 @@ def _snb_promise_product_summary(raw, active, broken):
     ).reset_index(drop=True)
 
 
-def _snb_promise_product_cards_html(per, has_file, ready, has_product_column):
-    """One scoped glass card section; never changes the existing dashboard."""
-    css = """
-<style>
-.snb-pr-product-section {margin:4px 0;direction:rtl;font-family:'Cairo',sans-serif}
-.snb-pr-product-heading {display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:12px}
-.snb-pr-product-heading h3 {font-family:'Cairo',sans-serif !important;font-size:17px !important;font-weight:700 !important;margin:0 !important}
-.snb-pr-product-legend {display:flex;align-items:center;gap:14px;font-size:12px;color:var(--muted);font-family:'Cairo',sans-serif}
-.snb-pr-product-legend span {display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
-.snb-pr-product-swatch {display:inline-block;width:10px;height:10px;border-radius:3px}
-.snb-pr-product-list {display:flex;flex-wrap:wrap;gap:14px;align-items:stretch}
-.snb-pr-product-item {box-sizing:border-box;flex:1 1 280px;min-width:0;padding:18px;border-radius:20px;text-align:center;
-    background:var(--card);border:1px solid var(--border);color:var(--text);
-    backdrop-filter:blur(14px);font-family:'Cairo',sans-serif}
-.snb-pr-product-list.snb-pr-product-few .snb-pr-product-item {max-width:380px}
-.snb-pr-product-name {font-size:20px;font-weight:700;overflow-wrap:anywhere;line-height:1.5}
-.snb-pr-product-gauge {position:relative;width:240px;height:125px;max-width:100%;overflow:hidden;margin:10px auto 0}
-.snb-pr-product-ring {position:absolute;top:0;left:50%;transform:translateX(-50%);width:240px;height:240px;
-    border-radius:50%;-webkit-mask:radial-gradient(circle,transparent 80px,#000 81px);
-    mask:radial-gradient(circle,transparent 80px,#000 81px)}
-.snb-pr-product-pct {position:absolute;bottom:0;left:0;right:0;text-align:center;
-    color:var(--text);font-size:30px;font-weight:800;line-height:1.2;white-space:nowrap}
-.snb-pr-product-pct-label {font-size:12px;color:var(--muted);margin-top:4px}
-.snb-pr-product-values {display:flex;justify-content:space-around;gap:12px;margin-top:12px}
-.snb-pr-product-value {display:flex;flex-direction:column;gap:1px;align-items:center;min-width:0}
-.snb-pr-product-value strong {font-size:22px;font-weight:800;line-height:1.3;white-space:nowrap}
-.snb-pr-product-value small {font-size:11px;color:var(--muted);font-weight:400}
-.snb-pr-product-note {font-size:12px;color:var(--muted);margin:12px 0 0;text-align:center}
-.snb-pr-product-warning {font-size:13px;color:var(--text);padding:18px 4px;text-align:center}
-@media(max-width:650px) {
-    .snb-pr-product-list {flex-direction:column}
-    .snb-pr-product-item,.snb-pr-product-list.snb-pr-product-few .snb-pr-product-item {width:100%;max-width:none;flex:0 0 auto}
-}
-</style>"""
-    title = (
-        '<div class="snb-pr-product-heading"><h3>الوعود لكل منتج</h3>'
-        '<div class="snb-pr-product-legend">'
-        '<span><i class="snb-pr-product-swatch" style="background:var(--accent)"></i>قائمة</span>'
-        '<span><i class="snb-pr-product-swatch" style="background:var(--broken)"></i>مكسورة</span>'
-        '</div></div>'
-    )
-
+def _snb_promise_product_cards_html(per, has_file, ready, has_product_column, detail_panels=None):
+    """Presentation only: reuse the already-calculated product counts."""
+    detail_panels = detail_panels or {}
     def card(name=None, standing=None, broken=None):
-        is_placeholder = standing is None or broken is None
-        total = 0 if is_placeholder else standing + broken
-        rate = (broken / total) if total else None
-        stop = rate * 50 if rate is not None else 0
+        missing = standing is None or broken is None
+        total = 0 if missing else standing + broken
+        rate = broken / total if total else None
+        stop = rate * 100 if rate is not None else 0
         background = (
-            f"conic-gradient(from 270deg, var(--broken) 0 {stop:.6f}%, "
-            "var(--accent) 0 50%, transparent 0)"
-            if rate is not None else "rgba(255,255,255,0.15)"
+            f"conic-gradient(var(--broken) 0 {stop:.6f}%, var(--accent) 0 100%)"
+            if rate is not None else "rgba(127,214,224,.18)"
         )
         pct = f"{rate:.1%}" if rate is not None else "—"
-        current = f"{standing:,}" if standing is not None else "—"
-        missed = f"{broken:,}" if broken is not None else "—"
-        label = _xml_escape(name) if name is not None else "—"
+        name_text = _xml_escape(str(name)) if name is not None else "—"
+        active_text = f"{standing:,}" if standing is not None else "—"
+        broken_text = f"{broken:,}" if broken is not None else "—"
+        detail_id = detail_panels.get(str(name)) if name is not None else None
+        detail = (f'<a class="snb-pr-detail snb-pr-product-action" href="#{detail_id}">◉ عرض التفاصيل</a>'
+                  if detail_id else "")
         return (
             '<article class="snb-pr-product-item">'
-            f'<div class="snb-pr-product-name">{label}</div>'
-            '<div class="snb-pr-product-gauge">'
-            f'<div class="snb-pr-product-ring" style="background:{background}"></div>'
-            f'<strong class="snb-pr-product-pct">{pct}</strong></div>'
-            '<div class="snb-pr-product-pct-label">نسبة الكسر (محسوبة)</div>'
-            '<div class="snb-pr-product-values">'
-            '<div class="snb-pr-product-value">'
-            f'<strong style="color:var(--accent)">{current}</strong><small>قائمة</small></div>'
-            '<div class="snb-pr-product-value">'
-            f'<strong style="color:var(--broken)">{missed}</strong><small>مكسورة</small></div>'
-            '</div></article>'
+            + detail
+            + f'<div class="snb-pr-product-name">{name_text}</div>'
+            + '<div class="snb-pr-product-gauge">'
+            + f'<div class="snb-pr-product-ring" style="background:{background}"></div>'
+            + f'<strong class="snb-pr-product-pct">{pct}</strong></div>'
+            + '<div class="snb-pr-product-values">'
+            + f'<span>قائمة <b>{active_text}</b></span>'
+            + f'<span>مكسورة <b>{broken_text}</b></span>'
+            + '</div></article>'
         )
-
+    title = '<div class="snb-pr-section-title"><h3>الوعود لكل منتج</h3></div>'
     if not has_file:
-        cards = ''.join(card() for _ in range(3))
-        body = (
-            '<div class="snb-pr-product-list">'
-            f'{cards}</div><p class="snb-pr-product-note">ارفعي الملف علشان تظهر الأرقام</p>'
-        )
+        content = ''.join(card() for _ in range(3))
+        notice = '<p class="snb-pr-note">ارفعي الملف علشان تظهر الأرقام</p>'
     elif not has_product_column:
-        body = '<div class="snb-pr-product-warning">العمود نوع المتنج-التمويل غير موجود في الملف المرفوع</div>'
+        return '<section class="snb-pr-section">' + title + '<p>العمود نوع المتنج-التمويل غير موجود في الملف المرفوع</p></section>'
     elif not ready:
-        body = '<div class="snb-pr-product-warning">ملف المحفظة لا يحتوي على أعمدة الوعود المطلوبة</div>'
+        return '<section class="snb-pr-section">' + title + '<p>ملف المحفظة لا يحتوي على أعمدة الوعود المطلوبة</p></section>'
     elif per is None or per.empty:
-        body = '<div class="snb-pr-product-warning">لا توجد منتجات في الملف المرفوع</div>'
+        return '<section class="snb-pr-section">' + title + '<p>لا توجد منتجات في الملف المرفوع</p></section>'
     else:
-        cards = ''.join(
+        content = ''.join(
             card(str(row["المنتج"]), int(row["قائمة"]), int(row["مكسورة"]))
             for _, row in per.iterrows()
         )
-        few = " snb-pr-product-few" if len(per) < 3 else ""
-        body = f'<div class="snb-pr-product-list{few}">{cards}</div>'
-    return css + '<section class="snb-ov-card snb-pr-product-section">' + title + body + '</section>'
+        notice = ''
+    return ('<section class="snb-pr-section">' + title
+            + '<div class="snb-pr-product-grid">' + content + '</div>' + notice + '</section>')
 
 
 def _snb_promises_export(summary, types, active, broken, collectors, products):
@@ -12041,6 +11999,7 @@ def _snb_promise_data(raw, today):
 
 
 def _render_snb_promises(files):
+    """Dynamic SNB promise presentation and read-only per-card detail exports."""
     frames = []
     for uploaded in files or []:
         try:
@@ -12071,7 +12030,6 @@ def _render_snb_promises(files):
     ratio = counts[1] / total if total else None
     summary = [("إجمالي الحسابات", accounts), ("الوعود القائمة", counts[0]),
                ("الوعود المكسورة", counts[1]), ("نسبة الكسر (محسوبة)", ratio)]
-    colors = ("var(--accent)", "var(--broken)", "var(--snb-end)", "var(--snb-start)")
     collectors = {}
     if ready and "Salesperson" in raw.columns:
         identity_col = _snb_find_column(raw, "Collector ID", "Salesperson ID", "Agent ID", "User ID")
@@ -12086,12 +12044,269 @@ def _render_snb_promises(files):
                 collectors.setdefault(key, [0, 0])[position] = count
     ordered = sorted(collectors.items(), key=lambda item: -sum(item[1]))
     product_summary = _snb_promise_product_summary(raw, active, broken) if ready else None
-    product_section = _snb_promise_product_cards_html(
-        product_summary, bool(files), ready, "نوع المتنج-التمويل" in raw.columns,
-    )
     export = (
         _snb_promises_export(summary, types, active, broken, ordered, product_summary)
         if ready else b""
+    )
+
+    # Only the already-classified rows are used below. The original index
+    # preserves the uploaded row order across active and broken promises.
+    promise_rows = pd.concat(
+        [active.assign(_promise_state="قائمة", _src_idx=active.index),
+         broken.assign(_promise_state="مكسورة", _src_idx=broken.index)],
+        ignore_index=True,
+    ).sort_values("_src_idx", kind="stable") if ready else pd.DataFrame()
+    original_columns = list(raw.columns)
+    detail_modals = []
+    product_panels = {}
+    unique_id = [0]
+
+    def modal(title, selected):
+        if selected is None:
+            return None
+        unique_id[0] += 1
+        modal_id = f"snb-pr-modal-{unique_id[0]}"
+        selected = selected.sort_values("_src_idx", kind="stable").copy()
+        row_count = len(selected)
+        # Keep original uploaded columns, order and values; no KPI recalculation.
+        indices = selected["_src_idx"].tolist()
+        df_export = raw.loc[indices, original_columns].copy().head(20000)
+        # Preserve typed dates and numeric amounts, without touching identifier columns.
+        for column in df_export.columns:
+            if str(column).strip() in (
+                "Follow up Due Date", "Follow up Last Date", "Debit Date",
+                "Assign Date", "Expected Closing", "Next_Call_DateTime",
+                "Created_DateTime", "وقت المكالمة التالية لنفس المحصل"
+            ):
+                df_export[column] = pd.to_datetime(df_export[column], errors="coerce")
+            elif str(column).strip() in ("Amount", "Net Amount", "Payment"):
+                df_export[column] = pd.to_numeric(df_export[column], errors="coerce")
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.title = "التفاصيل"
+        _write_df_sheet(worksheet, df_export)
+        worksheet.sheet_view.rightToLeft = True
+        worksheet.freeze_panes = "A2"
+        output = io.BytesIO()
+        workbook.save(output)
+        href = "data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64," + base64.b64encode(output.getvalue()).decode("ascii")
+
+        customer_col = _snb_find_column(raw, "Customer Name", "Customer", "اسم العميل", "Debtor Name", "Debitor Name", "Account Number", "رقم الحساب")
+        collector_col = "Salesperson" if "Salesperson" in raw.columns else None
+        date_col = "Follow up Due Date" if "Follow up Due Date" in raw.columns else None
+
+        def detail_table(records, label):
+            subset = records.head(50)
+            rows = []
+            for _, rec in subset.iterrows():
+                ix = rec["_src_idx"]
+                customer = _xml_escape(str(raw.at[ix, customer_col])) if customer_col and pd.notna(raw.at[ix, customer_col]) else "—"
+                collector = _xml_escape(str(raw.at[ix, collector_col])) if collector_col and pd.notna(raw.at[ix, collector_col]) else "—"
+                day = _xml_escape(str(raw.at[ix, date_col])) if date_col and pd.notna(raw.at[ix, date_col]) else "—"
+                state = rec["_promise_state"]
+                state_class = "active" if state == "قائمة" else "broken"
+                rows.append(
+                    '<tr><td>' + customer + '</td><td>' + collector + '</td><td>'
+                    + day + '</td><td><span class="snb-pr-state ' + state_class + '">'
+                    + state + '</span></td></tr>'
+                )
+            footer = (f'<p class="snb-pr-table-note">أول 50 صف من {len(records):,} — الباقي في ملف التنزيل</p>'
+                      if len(records) > 50 else '')
+            return (
+                f'<div class="snb-pr-table snb-pr-table-{label}"><div class="snb-pr-table-scroll">'
+                '<table><thead><tr><th>العميل</th><th>المحصل</th><th>تاريخ الوعد</th><th>الحالة</th></tr></thead><tbody>'
+                + ''.join(rows) + '</tbody></table></div>' + footer + '</div>'
+            )
+
+        active_rows = selected[selected["_promise_state"].eq("قائمة")]
+        broken_rows = selected[selected["_promise_state"].eq("مكسورة")]
+        safe_title = _xml_escape(str(title))
+        download = (
+            f'<a class="snb-pr-download" href="{href}" download="promise_details_{unique_id[0]}.xlsx">⬇ تحميل Excel</a>'
+        )
+        detail_modals.append(
+            f'<div class="snb-pr-overlay" id="{modal_id}"><a class="snb-pr-backdrop" href="#snb-pr-close" aria-label="إغلاق"></a>'
+            '<div class="snb-pr-modal" role="dialog" aria-modal="true">'
+            '<a class="snb-pr-close" href="#snb-pr-close" aria-label="إغلاق">✕</a>'
+            '<div class="snb-pr-modal-header"><div><b>📋 ' + safe_title + '</b>'
+            '<small>تفاصيل الصفوف من الملف المحمّل · قراءة فقط</small></div>'
+            f'<div class="snb-pr-modal-tools"><span>{row_count:,} وعد</span>{download}</div></div>'
+            f'<input type="radio" name="filter-{modal_id}" id="{modal_id}-all" checked>'
+            f'<input type="radio" name="filter-{modal_id}" id="{modal_id}-active">'
+            f'<input type="radio" name="filter-{modal_id}" id="{modal_id}-broken">'
+            '<div class="snb-pr-segments">'
+            f'<label for="{modal_id}-all">الكل</label>'
+            f'<label for="{modal_id}-active">قائمة</label>'
+            f'<label for="{modal_id}-broken">مكسورة</label></div>'
+            '<div class="snb-pr-tables">'
+            + detail_table(selected, "all")
+            + detail_table(active_rows, "active")
+            + detail_table(broken_rows, "broken")
+            + '</div></div></div>'
+        )
+        return modal_id
+
+    metric_panels = []
+    if ready:
+        metric_panels = [
+            modal("إجمالي الحسابات", promise_rows),
+            modal("الوعود القائمة", promise_rows[promise_rows["_promise_state"].eq("قائمة")]),
+            modal("الوعود المكسورة", promise_rows[promise_rows["_promise_state"].eq("مكسورة")]),
+            modal("نسبة الكسر", promise_rows[promise_rows["_promise_state"].eq("مكسورة")]),
+        ]
+    types_total = int(types.sum())
+    type_cards = []
+    if not files:
+        type_cards = ['<article class="snb-pr-type-card"><b>—</b><strong>—</strong><small>ارفعي الملف علشان تظهر الأرقام</small></article>'] * 6
+    elif not ready:
+        type_cards = ['<p class="snb-pr-note">ملف المحفظة لا يحتوي على أعمدة الوعود المطلوبة</p>']
+    elif types.empty:
+        type_cards = ['<p class="snb-pr-note">لا توجد وعود في الملف المرفوع</p>']
+    else:
+        # Preserve the source Series iteration order; do not re-sort.
+        for i, (name, count) in enumerate(types.items()):
+            sub_name = "وعد بسداد " + str(name)
+            source_sub = raw["Sub State"].map(_clean_snb_promise_text)
+            selection = promise_rows[promise_rows["_src_idx"].isin(
+                raw.index[source_sub.eq(sub_name)]
+            )]
+            destination = modal(str(name), selection)
+            type_cards.append(
+                f'<article class="snb-pr-type-card" style="--type-index:{i % 6}">'
+                f'<b>{_xml_escape(str(name))}</b><strong>{count:,}</strong>'
+                f'<a class="snb-pr-detail" href="#{destination}">◉ عرض التفاصيل</a></article>'
+            )
+    if product_summary is not None and ready and "نوع المتنج-التمويل" in raw.columns:
+        product_values = raw["نوع المتنج-التمويل"].map(_clean_snb_promise_text).replace("", "غير محدد")
+        for _, row in product_summary.iterrows():
+            name = str(row["المنتج"])
+            subset = promise_rows[promise_rows["_src_idx"].isin(raw.index[product_values.eq(name)])]
+            product_panels[name] = modal(name, subset)
+    product_section = _snb_promise_product_cards_html(
+        product_summary, bool(files), ready, "نوع المتنج-التمويل" in raw.columns,
+        detail_panels=product_panels,
+    )
+    collector_cards = []
+    for i, ((key_id, name), (current, missed)) in enumerate(ordered[:10]):
+        active_share = current / (current + missed)
+        broken_share = missed / (current + missed)
+        identity_col = _snb_find_column(raw, "Collector ID", "Salesperson ID", "Agent ID", "User ID")
+        collector_rows = promise_rows.iloc[0:0]
+        if "Salesperson" in raw.columns:
+            names = raw["Salesperson"].map(_clean_snb_promise_text).str.replace(
+                r"SNB\s*II\s*NPL\s*II", "", regex=True
+            ).str.strip()
+            ids = (raw[identity_col].map(_clean_snb_promise_text) if identity_col
+                   else pd.Series("", index=raw.index))
+            matching = names.eq(name) & ids.eq(key_id)
+            collector_rows = promise_rows[promise_rows["_src_idx"].isin(raw.index[matching])]
+        destination = modal(name, collector_rows)
+        collector_cards.append(
+            '<article class="snb-pr-collector-card">'
+            f'<header><b>{_xml_escape(name)}</b><span>{broken_share:.1%} كسر</span></header>'
+            f'<div class="snb-pr-bar" style="--active:{active_share:.5%}"></div>'
+            '<div class="snb-pr-product-values">'
+            f'<span>قائمة <b>{current:,}</b></span><span>مكسورة <b>{missed:,}</b></span></div>'
+            f'<a class="snb-pr-detail" href="#{destination}">◉ عرض التفاصيل</a></article>'
+        )
+    if not files:
+        collector_cards = ['<article class="snb-pr-collector-card"><b>—</b><div class="snb-pr-bar"></div><small>ارفعي الملف علشان تظهر الأرقام</small></article>'] * 5
+
+    css = """
+<style>
+.snb-pr-shell{direction:rtl;font-family:'Cairo',sans-serif;color:var(--text)}
+.snb-pr-shell *{box-sizing:border-box}
+.snb-pr-metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:20px}
+.snb-pr-metric,.snb-pr-type-card,.snb-pr-product-item,.snb-pr-collector-card{position:relative;background:var(--card);border:1px solid var(--border);border-radius:18px;backdrop-filter:blur(14px);transition:transform .25s,border-color .25s,box-shadow .25s}
+.snb-pr-metric{display:flex;flex-direction:column;align-items:flex-start;min-height:130px;padding:20px;gap:9px;color:var(--text);text-decoration:none}
+.snb-pr-metric small{font-size:13px;color:var(--muted)}
+.snb-pr-metric strong{font-size:30px;font-weight:800}
+.snb-pr-metric:hover,.snb-pr-type-card:hover,.snb-pr-collector-card:hover{transform:translateY(-6px);border-color:#2fb5a6;box-shadow:0 10px 28px #2fb5a633}
+.snb-pr-metric .snb-pr-detail{opacity:0;transition:opacity .2s}
+.snb-pr-metric:hover .snb-pr-detail{opacity:1}
+.snb-pr-detail,.snb-pr-download{display:inline-flex;align-items:center;justify-content:center;gap:6px;background:linear-gradient(100deg,#2fb5a6,#5be39a);color:#10382c!important;border-radius:100px;text-decoration:none!important;padding:6px 15px;font-size:11px;font-weight:800;white-space:nowrap}
+.snb-pr-section{margin:14px 0 22px}
+.snb-pr-section-title{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px}
+.snb-pr-section-title h3{font:700 17px Cairo,sans-serif!important;margin:0!important}
+.snb-pr-section-title small,.snb-pr-note{font-size:12px;color:var(--muted)}
+.snb-pr-type-grid{display:grid;grid-template-columns:repeat(var(--count,6),minmax(0,1fr));gap:10px}
+.snb-pr-type-card{padding:16px 13px 54px;min-height:162px;text-align:center;border-top:3px solid #5be39a}
+.snb-pr-type-card:nth-child(6n+2){border-top-color:#2fb5a6}
+.snb-pr-type-card:nth-child(6n+3){border-top-color:#7fd6e0}
+.snb-pr-type-card:nth-child(6n+4){border-top-color:#b9f5d8}
+.snb-pr-type-card:nth-child(6n+5){border-top-color:#1f8f6a}
+.snb-pr-type-card:nth-child(6n+6){border-top-color:#8fe3c9}
+.snb-pr-type-card b{display:block;font-size:13px;overflow-wrap:anywhere}
+.snb-pr-type-card strong{display:block;font-size:34px;font-weight:800;margin:5px 0}
+.snb-pr-type-card .snb-pr-detail,.snb-pr-collector-card .snb-pr-detail{position:absolute;bottom:12px;left:50%;transform:translateX(-50%)}
+.snb-pr-product-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.snb-pr-product-item{padding:44px 14px 18px;text-align:center;min-height:266px}
+.snb-pr-product-item:hover{transform:translateY(-7px) scale(1.02);border-color:#5be39a}
+.snb-pr-product-action{position:absolute;left:12px;top:12px}
+.snb-pr-product-name{font-size:30px;font-weight:800;overflow-wrap:anywhere}
+.snb-pr-product-gauge{position:relative;width:120px;height:120px;margin:8px auto}
+.snb-pr-product-ring{width:120px;height:120px;border-radius:50%;-webkit-mask:radial-gradient(circle,transparent 34px,#000 35px);mask:radial-gradient(circle,transparent 34px,#000 35px)}
+.snb-pr-product-pct{position:absolute;inset:0;display:grid;place-items:center;font-size:19px;font-weight:800}
+.snb-pr-product-values{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:12px}
+.snb-pr-product-values span{padding:5px 11px;background:rgba(127,214,224,.1);border-radius:100px;font-size:12px}
+.snb-pr-collector-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.snb-pr-collector-card{padding:18px 16px 56px;min-height:156px}
+.snb-pr-collector-card header{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px}
+.snb-pr-collector-card header span{white-space:nowrap;font-weight:800}
+.snb-pr-bar{height:9px;background:rgba(127,214,224,.2);border-radius:100px;overflow:hidden;margin-top:16px}
+.snb-pr-bar:before{content:"";display:block;width:var(--active,0%);height:100%;background:linear-gradient(90deg,#2fb5a6,#5be39a);border-radius:100px}
+.snb-pr-overlay{position:fixed;inset:0;z-index:999999;display:none;align-items:center;justify-content:center;padding:3vh 3vw}
+.snb-pr-overlay:target{display:flex}
+.snb-pr-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(8px)}
+.snb-pr-modal{position:relative;z-index:1;width:min(730px,94vw);height:min(565px,88vh);background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:18px;padding:20px;box-shadow:0 25px 80px #0008;direction:rtl}
+.snb-pr-close{position:absolute;left:14px;top:12px;display:grid;place-items:center;width:28px;height:28px;border:1px solid var(--border);border-radius:50%;color:var(--text)!important;text-decoration:none!important}
+.snb-pr-modal-header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-left:36px;margin-bottom:16px}
+.snb-pr-modal-header b{display:block;font-size:16.5px;font-weight:800}
+.snb-pr-modal-header small{font-size:11px;color:var(--muted)}
+.snb-pr-modal-tools{display:flex;align-items:center;gap:8px;white-space:nowrap;font-size:12px}
+.snb-pr-modal-tools>span{padding:5px 9px;border-radius:100px;border:1px solid var(--border)}
+.snb-pr-modal>input[type=radio]{position:absolute;opacity:0;pointer-events:none}
+.snb-pr-segments{display:flex;gap:4px;margin-bottom:12px;background:rgba(127,214,224,.12);padding:4px;border-radius:12px;width:max-content}
+.snb-pr-segments label{padding:6px 17px;cursor:pointer;border-radius:9px;font-size:12px}
+.snb-pr-modal>input[id$="-all"]:checked~.snb-pr-segments label:nth-child(1),.snb-pr-modal>input[id$="-active"]:checked~.snb-pr-segments label:nth-child(2),.snb-pr-modal>input[id$="-broken"]:checked~.snb-pr-segments label:nth-child(3){background:#2fb5a6;color:#10382c}
+.snb-pr-table{display:none}
+.snb-pr-modal>input[id$="-all"]:checked~.snb-pr-tables .snb-pr-table-all,.snb-pr-modal>input[id$="-active"]:checked~.snb-pr-tables .snb-pr-table-active,.snb-pr-modal>input[id$="-broken"]:checked~.snb-pr-tables .snb-pr-table-broken{display:block}
+.snb-pr-table-scroll{max-height:320px;overflow:auto}
+.snb-pr-table table{border-collapse:collapse;width:100%;font-size:12px}
+.snb-pr-table th,.snb-pr-table td{padding:10px;text-align:right;border-bottom:1px solid var(--border)}
+.snb-pr-table th{position:sticky;top:0;background:var(--card);z-index:1}
+.snb-pr-state{padding:4px 10px;border-radius:20px;background:#2fb5a633}
+.snb-pr-state.active{background:#5be39a33}
+.snb-pr-table-note{font-size:11px;color:var(--muted)}
+@media(max-width:1100px){.snb-pr-type-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.snb-pr-type-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.snb-pr-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.snb-pr-modal-header{flex-wrap:wrap}.snb-pr-metric .snb-pr-detail{opacity:1}}
+@media(hover:none){.snb-pr-metric .snb-pr-detail{opacity:1}}
+</style>
+"""
+    metrics = []
+    metric_titles = ["إجمالي الحسابات", "الوعود القائمة", "الوعود المكسورة", "نسبة الكسر"]
+    for index, ((_, value), title) in enumerate(zip(summary, metric_titles)):
+        display = "—" if value is None else (f"{value:.1%}" if index == 3 else f"{value:,}")
+        detail = (f'<span class="snb-pr-detail">◉ عرض التفاصيل</span>' if ready else '')
+        link = f' href="#{metric_panels[index]}"' if ready else ''
+        metrics.append(
+            f'<a class="snb-pr-metric"{link}><small>{title}</small>'
+            f'<strong>{display}</strong>{detail}</a>'
+        )
+    type_count = min(len(types), 6) if files and ready and not types.empty else 6
+    notice = '' if files else '<p class="snb-pr-note">ارفعي الملف علشان تظهر الأرقام</p>'
+    body = (
+        '<div class="snb-pr-shell"><div class="snb-pr-metric-grid">' + ''.join(metrics) + '</div>'
+        + '<section class="snb-pr-section"><div class="snb-pr-section-title">'
+        + '<h3>أنواع الوعود</h3>'
+        + f'<small>إجمالي {types_total:,} وعد</small></div>'
+        + f'<div class="snb-pr-type-grid" style="--count:{type_count}">'
+        + ''.join(type_cards) + '</div>' + notice + '</section>'
+        + product_section
+        + '<section class="snb-pr-section"><div class="snb-pr-section-title">'
+        + '<h3>الوعود لكل محصل · أعلى 10 محصلين</h3></div>'
+        + '<div class="snb-pr-collector-grid">' + ''.join(collector_cards) + '</div></section>'
+        + ''.join(detail_modals) + '</div>'
     )
 
     with st.container(key="snb_glass_promises"):
@@ -12118,39 +12333,7 @@ def _render_snb_promises(files):
         if missing_dates:
             with st.expander("تشخيص"):
                 st.write(f"وعود بتاريخ فارغ أو غير قابل للقراءة: {missing_dates:,}")
-        metrics = []
-        for index, ((title, value), color) in enumerate(zip(summary, colors)):
-            display = "—" if value is None else (f"{value:.1%}" if index == len(summary) - 1 else f"{value:,}")
-            metrics.append(f'<div><span>{title}</span><strong>{display}</strong><i style="background:{color}"></i></div>')
-        pills = [
-            f'<span><i style="background:{colors[index % len(colors)]}"></i>{_xml_escape(name)} <b>{count:,}</b></span>'
-            for index, (name, count) in enumerate(types.items())
-        ]
-        cards = []
-        for (_, name), (current, missed) in ordered[:10]:
-            active_share = current / (current + missed)
-            broken_share = missed / (current + missed)
-            cards.append(
-                f'<article class="snb-ov-card snb-pr-card"><header><b>{_xml_escape(name)}</b>'
-                f'<span>{broken_share:.1%} كسر</span></header>'
-                f'<div class="snb-pr-bar" style="--active:{active_share:.5%}"></div>'
-                f'<div class="snb-pr-counts"><span><b>{current:,}</b> قائمة</span>'
-                f'<span><b>{missed:,}</b> مكسورة</span></div></article>'
-            )
-        empty = '<div class="snb-ov-empty">—</div>'
-        notice = ( '<p class="snb-pr-message">مفيش ملف لسه مرفوع يا رنا، ارفعي الملف من الخانة اللي فوق</p>'
-                   if not files else '')
-        st.markdown(
-            '<div class="snb-ov-stack"><section class="snb-ov-card snb-pr-metrics">'
-            + "".join(metrics) + '</section>'
-            + '<section class="snb-ov-card"><h3>أنواع الوعود</h3><div class="snb-pr-pills">'
-            + ("".join(pills) or empty) + '</div></section>'
-            + product_section
-            + '<section><h2 class="snb-ov-title">الوعود لكل محصل · أعلى 10 محصلين</h2>'
-            + (f'<div class="snb-pr-grid">{"".join(cards)}</div>' if cards else
-               f'<div class="snb-ov-card">{empty}{notice}</div>')
-            + '</section></div>', unsafe_allow_html=True,
-        )
+        st.markdown(css + body, unsafe_allow_html=True)
 
 
 if _snb_overview_page:
