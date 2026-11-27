@@ -205,7 +205,7 @@ def build_portfolio_summary(portfolio_bytes):
 def write_portfolio_sheet(sheet, table):
     """Write the existing portfolio grid unchanged into any Excel worksheet."""
     sheet.title = "المحفظة"
-    sheet.sheet_view.rightToLeft = True
+    sheet.sheet_view.rightToLeft = False
     sheet.sheet_view.showGridLines = False
     sheet.freeze_panes = "C3"
 
