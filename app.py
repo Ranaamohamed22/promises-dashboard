@@ -2016,6 +2016,20 @@ st.markdown(f"""
     html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page :is([data-testid="stFileUploaderFile"],[data-testid="stFileUploaderFileList"]) {{
         display:none !important;
     }}
+    /* إخفاء الصندوق الأسود الأصلي (كارت الملف + زرار Upload التاني) داخل مربع رفع الوعود فقط */
+    html body .stApp .st-key-snb_glass_promises .st-key-snb_ov_upload_promises_page {{
+        position:relative !important;overflow:hidden !important;
+    }}
+    html body .stApp .st-key-snb_glass_promises .st-key-snb_ov_upload_promises_page [data-testid="stFileUploader"]:has(:is([data-testid="stFileUploaderFile"],[data-testid="stFileUploaderFileList"])) {{
+        display:none !important;
+    }}
+    html body .stApp .st-key-snb_glass_promises .st-key-snb_ov_upload_promises_page :is([data-testid="stFileUploaderFile"],[data-testid="stFileUploaderFileList"],[data-testid="stFileUploaderDeleteBtn"],[data-testid="stFileUploaderPagination"]) {{
+        display:none !important;visibility:hidden !important;position:absolute !important;
+        width:0 !important;height:0 !important;opacity:0 !important;pointer-events:none !important;
+    }}
+    html body .stApp .st-key-snb_glass_promises .st-key-snb_ov_upload_promises_page [data-stale="true"]:has([data-testid="stFileUploaderFile"]) {{
+        display:none !important;
+    }}
     /* بعد الملف: علامة صح + اسم الملف + "تغيير" */
     html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page div[class*="st-key-uploaded_chip_"]::before {{
         content:"✓";flex:none;width:28px;height:28px;border-radius:50%;background:var(--accent);
