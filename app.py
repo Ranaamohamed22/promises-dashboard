@@ -12119,20 +12119,6 @@ def _render_snb_promises(files):
         identifiers = raw[account_col].map(_clean_snb_promise_text)
         accounts = identifiers[identifiers.ne("")].nunique()
     today = datetime.now(ZoneInfo("Africa/Cairo")).date()
-    # A new file or day must never reuse old downloadable output.
-    _promise_export_signature = (
-        tuple((f.name, hashlib.sha256(f.getvalue()).hexdigest()) for f in (files or [])),
-        today.isoformat(),
-    )
-    def _prepare_snb_promise_exports(kind):
-        st.session_state[f"_snb_pr_{kind}_export_signature"] = _promise_export_signature
-
-    _details_exports_enabled = (
-        st.session_state.get("_snb_pr_details_export_signature") == _promise_export_signature
-    )
-    _main_export_enabled = (
-        st.session_state.get("_snb_pr_main_export_signature") == _promise_export_signature
-    )
     active, broken, types, _, missing_dates = (
         _snb_promise_data(raw, today) if ready else
         (pd.DataFrame(), pd.DataFrame(), pd.Series(dtype=int), None, None)
@@ -12214,15 +12200,12 @@ def _render_snb_promises(files):
         )
 
     csv_row_cap = 20000
+    _card_downloads = {}
 
-    def csv_link(title, frame):
-        """UI-only download: all rows of this item, read from the same rows the table shows."""
-        if frame is None or frame.empty or not _details_exports_enabled:
-            return ""
-        import base64 as _b64
-        import io as _io
-
+    def _snb_card_excel_bytes(frame):
+        """Generate the existing detailed workbook only when its button is clicked."""
         from openpyxl import Workbook as _Wb
+
         order = frame["_src_idx"] if "_src_idx" in frame.columns else frame.index.to_series()
         ordered_frame = (
             frame.assign(_order=order.to_numpy()).sort_values("_order", kind="mergesort").head(csv_row_cap)
@@ -12234,13 +12217,19 @@ def _render_snb_promises(files):
         _write_df_sheet(ws, ordered_frame[original_cols])
         ws.sheet_view.rightToLeft = False
         ws.freeze_panes = "A2"
-        out = _io.BytesIO()
+        out = io.BytesIO()
         wb.save(out)
-        payload = _b64.b64encode(out.getvalue()).decode("ascii")
+        return out.getvalue()
+
+    def csv_link(title, frame, mid):
+        """The visible modal button delegates to a native deferred Streamlit download."""
+        if frame is None or frame.empty:
+            return ""
         name = re.sub(r'[\\/:*?"<>|\s]+', "_", str(title)).strip("_") or "details"
+        _card_downloads[mid] = (name, frame)
         return (
-            f'<a class="snb-m-dl" download="{_xml_escape(name)}.xlsx" '
-            f'href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{payload}">⬇ تحميل Excel</a>'
+            f'<a class="snb-m-dl" href="#" role="button" '
+            f'data-snb-download="{_xml_escape(mid)}">⬇ تحميل Excel</a>'
         )
 
     def modal_box(mid, title, frame):
@@ -12253,7 +12242,7 @@ def _render_snb_promises(files):
             '<div class="snb-m-head"><span class="snb-m-ic">📋</span><div class="snb-m-t">'
             f'<h4>{_xml_escape(str(title))}</h4>'
             '<span>تفاصيل الصفوف من الملف المحمّل · قراءة فقط</span></div>'
-            f'<span class="snb-m-count">{count:,} وعد</span>' + csv_link(title, frame) + '</div>'
+            f'<span class="snb-m-count">{count:,} وعد</span>' + csv_link(title, frame, mid) + '</div>'
             '<div class="snb-m-seg">'
             f'<label class="la" for="f-{mid}-a">الكل</label>'
             f'<label class="lo" for="f-{mid}-o">قائمة</label>'
@@ -12295,9 +12284,12 @@ def _render_snb_promises(files):
         product_summary, bool(files), ready, "نوع المتنج-التمويل" in raw.columns,
         detail_panels=product_panels,
     )
+    # Always show the main download immediately after upload, while generating
+    # its exact two-sheet workbook lazily on the download click.
     export = (
-        _snb_promises_export(summary, types, active, broken, ordered, product_summary)
-        if ready and _main_export_enabled else b""
+        (lambda: _snb_promises_export(
+            summary, types, active, broken, ordered, product_summary
+        )) if ready else b""
     )
 
     with st.container(key="snb_glass_promises"):
@@ -12313,25 +12305,13 @@ def _render_snb_promises(files):
                     st.file_uploader("رفع ملف الوعود", type=["xlsx", "csv"], accept_multiple_files=True,
                                      label_visibility="collapsed", key=key, on_change=save_uploaded_files,
                                      args=("page_files", "SNB", "Promises", key))
-            st.button(
-                "📄 تجهيز ملف الوعود", key="snb_pr_prepare_main_export",
-                on_click=_prepare_snb_promise_exports, args=("main",),
-                disabled=not ready,
-                help="إنشاء ملف الوعود القائمة والمكسورة عند الطلب فقط",
-            )
-            st.button(
-                "📋 تجهيز تنزيلات تفاصيل الكروت", key="snb_pr_prepare_details_exports",
-                on_click=_prepare_snb_promise_exports, args=("details",),
-                disabled=not ready,
-                help="ملفات تفاصيل الكروت لا تُنشأ إلا بعد الضغط هنا",
-            )
             st.download_button(
                 "تنزيل ملف الوعود", export, icon="⬇️",
                 file_name=f"promises_{datetime.now(ZoneInfo('Africa/Cairo')):%Y-%m-%d}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                disabled=not export, help="ارفعي المحفظة أولًا" if not files else (
+                disabled=not ready, help="ارفعي المحفظة أولًا" if not files else (
                     "ملف المحفظة لا يحتوي على أعمدة الوعود المطلوبة" if not ready else None
-                ), key="snb_pr_download",
+                ), key="snb_pr_download", on_click="ignore",
             )
         if missing_dates:
             with st.expander("تشخيص"):
@@ -12620,6 +12600,45 @@ html body .snb-pr-product-section .snb-pr-product-list .snb-pr-product-item{back
             + collectors_body
             + '</section></div>', unsafe_allow_html=True,
         )
+
+        # Hidden native widgets are used only as the secure download transport.
+        # Workbooks are created by their data callables on the user's click.
+        if _card_downloads:
+            with st.container(key="snb_pr_hidden_downloads"):
+                for mid, (name, frame) in _card_downloads.items():
+                    st.download_button(
+                        "تحميل Excel",
+                        data=lambda selected=frame: _snb_card_excel_bytes(selected),
+                        file_name=f"{name}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"snb_pr_dl_{mid}",
+                        on_click="ignore",
+                    )
+            st.html("""
+<style>
+.st-key-snb_pr_hidden_downloads {
+    position:absolute!important; width:1px!important; height:1px!important;
+    overflow:hidden!important; opacity:0!important; pointer-events:none!important;
+}
+</style>
+<script>
+(() => {
+    // Attach only once per browser session, even if Streamlit reruns the script.
+    if (window.__ejadaPromiseDownloadClick) return;
+    window.__ejadaPromiseDownloadClick = function(event) {
+        const link = event.target.closest('a[data-snb-download]');
+        if (!link) return;
+        event.preventDefault();
+        const mid = link.getAttribute('data-snb-download');
+        if (!/^[a-zA-Z0-9-]+$/.test(mid)) return;
+        const host = document.querySelector('.st-key-snb_pr_dl_' + mid);
+        const button = host && host.querySelector('button');
+        if (button) button.click();
+    };
+    document.addEventListener('click', window.__ejadaPromiseDownloadClick, true);
+})();
+</script>
+""", unsafe_allow_javascript=True)
 
 
 
