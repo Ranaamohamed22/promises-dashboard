@@ -12922,10 +12922,10 @@ html body .stApp .st-key-ejada_theme_switch.st-key-ejada_theme_switch button[kin
 html body .stApp .st-key-ejada_theme_switch.st-key-ejada_theme_switch button[kind="secondary"]:hover{transform:scale(1.08)}
 .st-key-ejada_theme_navy{--ejada-ic:url("data:image/svg+xml;utf8,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2024%2024%22%20fill=%22none%22%20stroke=%22%23000%22%20stroke-width=%221.8%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%3E%3Cpath%20d=%22M12%203c3.5%204.2%206%207%206%2010.2A6%206%200%20016%2013.2C6%2010%208.5%207.2%2012%203z%22/%3E%3C/svg%3E")}.st-key-ejada_theme_dark{--ejada-ic:url("data:image/svg+xml;utf8,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2024%2024%22%20fill=%22none%22%20stroke=%22%23000%22%20stroke-width=%221.8%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%3E%3Cpath%20d=%22M20%2014.5A8%208%200%20019.5%204a8%208%200%201010.5%2010.5z%22/%3E%3C/svg%3E")}.st-key-ejada_theme_light{--ejada-ic:url("data:image/svg+xml;utf8,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2024%2024%22%20fill=%22none%22%20stroke=%22%23000%22%20stroke-width=%221.8%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%3E%3Ccircle%20cx=%2212%22%20cy=%2212%22%20r=%224%22/%3E%3Cpath%20d=%22M12%202v2M12%2020v2M2%2012h2M20%2012h2M5%205l1.5%201.5M17.5%2017.5L19%2019M5%2019l1.5-1.5M17.5%206.5L19%205%22/%3E%3C/svg%3E")}.st-key-ejada_theme_ocean{--ejada-ic:url("data:image/svg+xml;utf8,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2024%2024%22%20fill=%22none%22%20stroke=%22%23000%22%20stroke-width=%221.8%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%3E%3Cpath%20d=%22M12%203l2.4%205.4L20%209l-4.2%203.8L17%2018.5%2012%2015.6%207%2018.5l1.2-5.7L4%209l5.6-.6z%22/%3E%3C/svg%3E")}
 /* ---- Orbit ---- */
-html body .stApp [class*="st-key-home_reports_"]{display:grid !important;direction:rtl;position:relative;width:min(100%,1180px) !important;max-width:1180px;margin-inline:auto;gap:0 !important;row-gap:0 !important;grid-template-columns:26.27% 1fr 26.27% !important;grid-auto-rows:30px !important;align-items:stretch;padding-top:24px}
+html body .stApp [class*="st-key-home_reports_"]{display:grid !important;direction:rtl;position:relative;width:min(100%,1180px) !important;max-width:1180px;margin-inline:auto;gap:0 !important;row-gap:0 !important;grid-template-columns:24% 1fr 24% !important;grid-auto-rows:30px !important;align-items:stretch;padding-top:24px}
 html body .stApp [class*="st-key-home_reports_"] > [data-testid="stElementContainer"]:has(.ejada-orbit){grid-column:1 / -1;pointer-events:none;z-index:0;position:relative;min-height:0}
 html body .stApp h1 .ejada-hl{background:linear-gradient(90deg,var(--accent),var(--broken)) !important;-webkit-background-clip:text !important;background-clip:text !important;color:transparent !important;-webkit-text-fill-color:transparent !important}
-.ejada-orbit{position:absolute;inset:0;width:100%;height:100%}
+.ejada-orbit{position:absolute;inset:0;width:100%;height:100%;container-type:inline-size}
 .ejada-orbit-lines{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .ejada-orbit-lines path.eln{fill:none;stroke:var(--border);stroke-width:2;stroke-dasharray:600;stroke-dashoffset:600;animation:ejadaDraw 1.2s ease-out .9s forwards;transition:stroke .25s,stroke-width .25s}
 @keyframes ejadaDraw{to{stroke-dashoffset:0}}
@@ -12933,19 +12933,19 @@ html body .stApp h1 .ejada-hl{background:linear-gradient(90deg,var(--accent),var
 @keyframes ejadaTrav{0%{offset-distance:0%;opacity:0}10%,90%{opacity:1}100%{offset-distance:100%;opacity:0}}
 .ejada-orb-wrap{position:absolute;left:50%;top:50%;width:0;height:0}
 .ejada-ring{position:absolute;border-radius:50%;translate:-50% -50%;left:0;top:0}
-.ejada-ring.r1{width:470px;height:470px;border:1.5px dashed color-mix(in srgb,var(--text) 30%,transparent);animation:ejadaSpin 40s linear infinite}
-.ejada-ring.r2{width:580px;height:580px;border:1.5px dotted color-mix(in srgb,var(--text) 26%,transparent);animation:ejadaSpinR 60s linear infinite}
-.ejada-ring.r3{width:520px;height:520px;border:3px solid transparent;border-top-color:var(--accent);filter:drop-shadow(0 0 6px var(--accent));animation:ejadaSpin 9s linear infinite}
-.ejada-ring.r4{width:400px;height:400px;border:2px solid transparent;border-bottom-color:var(--broken);animation:ejadaSpinR 13s linear infinite}
+.ejada-ring.r1{width:450px;height:450px;width:38.14cqw;height:38.14cqw;border:1.5px dashed color-mix(in srgb,var(--text) 30%,transparent);animation:ejadaSpin 40s linear infinite}
+.ejada-ring.r2{width:540px;height:540px;width:45.76cqw;height:45.76cqw;border:1.5px dotted color-mix(in srgb,var(--text) 26%,transparent);animation:ejadaSpinR 60s linear infinite}
+.ejada-ring.r3{width:500px;height:500px;width:42.37cqw;height:42.37cqw;border:3px solid transparent;border-top-color:var(--accent);filter:drop-shadow(0 0 6px var(--accent));animation:ejadaSpin 9s linear infinite}
+.ejada-ring.r4{width:400px;height:400px;width:33.90cqw;height:33.90cqw;border:2px solid transparent;border-bottom-color:var(--broken);animation:ejadaSpinR 13s linear infinite}
 @keyframes ejadaSpin{to{rotate:360deg}}@keyframes ejadaSpinR{to{rotate:-360deg}}
-.ejada-glow{position:absolute;left:0;top:0;width:820px;height:820px;translate:-50% -50%;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--accent) 30%,transparent),transparent 62%);animation:ejadaGlow 6s ease-in-out infinite}
+.ejada-glow{position:absolute;left:0;top:0;width:800px;height:800px;width:67.80cqw;height:67.80cqw;translate:-50% -50%;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--accent) 30%,transparent),transparent 62%);animation:ejadaGlow 6s ease-in-out infinite}
 @keyframes ejadaGlow{0%,100%{opacity:.7;scale:1}50%{opacity:1;scale:1.12}}
-.ejada-orb{position:absolute;left:0;top:0;width:278px;height:278px;translate:-50% -50%;border-radius:50%;display:grid;place-items:center;text-align:center;overflow:hidden;color:#fff;border:1px solid rgba(255,255,255,.4);background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.55),var(--orb-a) 38%,var(--orb-b) 80%);box-shadow:0 0 80px color-mix(in srgb,var(--orb-a) 45%,transparent),inset 0 -20px 50px rgba(0,30,30,.45);animation:ejadaOrbIn 1.1s .2s cubic-bezier(.2,1.2,.3,1) both,ejadaBreath 5s 1.4s ease-in-out infinite}
+.ejada-orb{position:absolute;left:0;top:0;width:278px;height:278px;width:23.56cqw;height:23.56cqw;translate:-50% -50%;border-radius:50%;display:grid;place-items:center;text-align:center;overflow:hidden;color:#fff;border:1px solid rgba(255,255,255,.4);background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.55),var(--orb-a) 38%,var(--orb-b) 80%);box-shadow:0 0 80px color-mix(in srgb,var(--orb-a) 45%,transparent),inset 0 -20px 50px rgba(0,30,30,.45);animation:ejadaOrbIn 1.1s .2s cubic-bezier(.2,1.2,.3,1) both,ejadaBreath 5s 1.4s ease-in-out infinite}
 @keyframes ejadaOrbIn{from{opacity:0;scale:.2}to{opacity:1;scale:1}}
 @keyframes ejadaBreath{0%,100%{scale:1}50%{scale:1.045}}
 .ejada-orb::before{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,transparent 0 270deg,rgba(255,255,255,.35) 355deg,transparent 360deg);animation:ejadaSpin 4s linear infinite}
-.ejada-orb b{position:relative;display:block;font:800 52px Cairo,sans-serif;letter-spacing:2px;text-shadow:0 4px 18px rgba(0,0,0,.3);line-height:1.1}
-.ejada-orb span{position:relative;font:600 16px Cairo,sans-serif;opacity:.92}
+.ejada-orb b{position:relative;display:block;font:800 52px Cairo,sans-serif;font-size:4.41cqw;letter-spacing:2px;text-shadow:0 4px 18px rgba(0,0,0,.3);line-height:1.1}
+.ejada-orb span{position:relative;font:600 16px Cairo,sans-serif;font-size:1.36cqw;opacity:.92}
 .ejada-stars{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:radial-gradient(1.4px 1.8px at 15% 95%,var(--star,#fff),transparent),radial-gradient(1.8px 1.8px at 21% 14%,var(--star,#fff),transparent),radial-gradient(1.4px 1.4px at 53% 73%,var(--star,#fff),transparent),radial-gradient(1.8px 1.4px at 30% 69%,var(--star,#fff),transparent),radial-gradient(2.2px 1.8px at 37% 25%,var(--star,#fff),transparent),radial-gradient(1.4px 1.8px at 29% 6%,var(--star,#fff),transparent),radial-gradient(2.2px 1.8px at 36% 27%,var(--star,#fff),transparent),radial-gradient(1.4px 1.8px at 39% 83%,var(--star,#fff),transparent),radial-gradient(2.2px 1.8px at 13% 80%,var(--star,#fff),transparent),radial-gradient(1.8px 2.2px at 51% 67%,var(--star,#fff),transparent),radial-gradient(1.4px 1.4px at 33% 63%,var(--star,#fff),transparent),radial-gradient(1.8px 1.4px at 72% 41%,var(--star,#fff),transparent),radial-gradient(1.4px 1.8px at 75% 93%,var(--star,#fff),transparent),radial-gradient(1.8px 2.2px at 26% 55%,var(--star,#fff),transparent),radial-gradient(1.8px 2.2px at 38% 58%,var(--star,#fff),transparent),radial-gradient(1.8px 1.4px at 31% 42%,var(--star,#fff),transparent),radial-gradient(1.8px 1.4px at 12% 8%,var(--star,#fff),transparent),radial-gradient(1.8px 2.2px at 37% 69%,var(--star,#fff),transparent),radial-gradient(2.2px 2.2px at 62% 92%,var(--star,#fff),transparent),radial-gradient(1.8px 1.4px at 88% 28%,var(--star,#fff),transparent),radial-gradient(1.4px 1.8px at 27% 84%,var(--star,#fff),transparent),radial-gradient(2.2px 1.8px at 37% 26%,var(--star,#fff),transparent),radial-gradient(1.8px 1.8px at 97% 78%,var(--star,#fff),transparent),radial-gradient(1.8px 2.2px at 73% 28%,var(--star,#fff),transparent),radial-gradient(1.8px 1.4px at 9% 93%,var(--star,#fff),transparent),radial-gradient(1.4px 1.8px at 76% 81%,var(--star,#fff),transparent),radial-gradient(1.4px 1.4px at 44% 25%,var(--star,#fff),transparent),radial-gradient(1.8px 1.8px at 5% 8%,var(--star,#fff),transparent),radial-gradient(1.8px 2.2px at 12% 39%,var(--star,#fff),transparent),radial-gradient(2.2px 2.2px at 43% 5%,var(--star,#fff),transparent),radial-gradient(1.8px 1.8px at 43% 22%,var(--star,#fff),transparent),radial-gradient(2.2px 1.8px at 81% 90%,var(--star,#fff),transparent),radial-gradient(1.4px 1.8px at 81% 27%,var(--star,#fff),transparent),radial-gradient(1.8px 1.8px at 19% 35%,var(--star,#fff),transparent),radial-gradient(1.8px 2.2px at 22% 45%,var(--star,#fff),transparent),radial-gradient(2.2px 1.4px at 48% 8%,var(--star,#fff),transparent),radial-gradient(1.8px 1.4px at 48% 49%,var(--star,#fff),transparent),radial-gradient(1.8px 2.2px at 14% 59%,var(--star,#fff),transparent),radial-gradient(1.4px 1.8px at 28% 17%,var(--star,#fff),transparent),radial-gradient(1.4px 1.4px at 9% 97%,var(--star,#fff),transparent),radial-gradient(1.4px 2.2px at 88% 22%,var(--star,#fff),transparent),radial-gradient(2.2px 1.4px at 71% 65%,var(--star,#fff),transparent),radial-gradient(2.2px 1.4px at 43% 7%,var(--star,#fff),transparent),radial-gradient(1.4px 2.2px at 39% 55%,var(--star,#fff),transparent),radial-gradient(2.2px 1.4px at 63% 28%,var(--star,#fff),transparent),radial-gradient(1.4px 1.8px at 54% 65%,var(--star,#fff),transparent);opacity:.7;animation:ejadaTw 5s ease-in-out infinite}
 @keyframes ejadaTw{0%,100%{opacity:.12}50%{opacity:.5}}
 html body .stApp [data-testid="stLayoutWrapper"]:has(> [class*="st-key-home_report_card_"]){display:flex}
@@ -12973,7 +12973,7 @@ html body .stApp [class*="st-key-home_reports_"] > [data-testid="stElementContai
 html body .stApp [data-testid="stLayoutWrapper"]:has(> [class*="st-key-home_report_card_"]){grid-column:auto !important;grid-row:auto !important}
 html body .stApp [class*="st-key-home_report_card_"]{min-height:84px !important;margin:0 !important;border-radius:22px !important}
 }
-@media (prefers-reduced-motion:reduce){.ejada-orbit *,[class*="st-key-home_report_card_"]{animation:none !important}}
+@media (prefers-reduced-motion:reduce){.ejada-orbit *,.ejada-stars,[class*="st-key-home_report_card_"]{animation:none !important}}
 </style>"""
 
 
@@ -12993,7 +12993,7 @@ def _ejada_orbit_markup(bank_code, pages):
         j = i if on_right else i - right
         first_row = int(3 * rows_half - 2 + 6 * (j - (count - 1) / 2)) + 1
         cy = (first_row - 1 + 2) * unit
-        x0 = 870 if on_right else 310
+        x0 = 896.8 if on_right else 283.2
         x1 = 730 if on_right else 450
         xm = (x0 + x1) / 2
         paths += (f'<path id="ejada-ln-{page}" class="eln" style="animation-delay:{0.9 + i * 0.12:.2f}s" '
@@ -13011,11 +13011,12 @@ def _ejada_orbit_markup(bank_code, pages):
         f'<style>[class*="st-key-home_reports_"]{{grid-template-rows:repeat({rows_half * 6},{unit}px) !important}}'
         + "".join(cells) + hover_css +
         f'[class*="st-key-home_reports_"] > [data-testid="stElementContainer"]:has(.ejada-orbit){{grid-row:1 / span {rows_half * 6}}}</style>'
-        f'<div class="ejada-orbit"><div class="ejada-stars"></div>'
+        f'<div class="ejada-orbit">'
         f'<svg class="ejada-orbit-lines" viewBox="0 0 1180 {total_h}" preserveAspectRatio="none">{paths}{dots}</svg>'
         f'<div class="ejada-orb-wrap"><div class="ejada-glow"></div><div class="ejada-ring r2"></div><div class="ejada-ring r1"></div>'
         f'<div class="ejada-ring r4"></div><div class="ejada-ring r3"></div>'
         f'<div class="ejada-orb"><div><b>{bank_code}</b><span>المحفظة</span></div></div></div></div>'
+        f'<div class="ejada-stars"></div>'
     )
     return EJADA_ORBIT_CSS + html
 
