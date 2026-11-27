@@ -39,7 +39,7 @@ THEMES = {
              "rgba(255,255,255,.08)", "rgba(255,255,255,.2)", "none", "#fff",
              "rgba(255,255,255,.7)", "#5be39a", "#0E2A47", "#7fd6e0", "#fff",
              "#0A7A3F", "#fff", "#0E2A47", "blur(14px)", "#0E2A47", "#fff", "#9ff0c6"),
-    "light": ("linear-gradient(115deg,#F4F8F6 0%,#EAF3EF 60%,#DDEFE6 100%)",
+    "light": ("linear-gradient(115deg,#FBF7EC 0%,#F3EFE2 55%,#E4EFE6 100%)",
               "#fff", "#d6e4dd", "0 6px 18px rgba(14,42,71,.08)", "#0E2A47",
               "#5b6f80", "#0A7A3F", "#fff", "#2aa3b5", "#0A7A3F",
               "#fff", "#0A7A3F", "#fff", "none", "#F4F8F6", "#0A7A3F", "#2fb5a6"),
@@ -48,6 +48,13 @@ THEMES = {
              "#9aa8ad", "#5be39a", "#12301f", "#7fd6e0", "#5be39a",
              "#12301f", "#5be39a", "#12301f", "none", "#232a2f", "#fff", "#9ff0c6"),
 }
+# مظهر "كحلي" الجديد (الأساسي = navy الحالي، أسود = dark، عاجي = light). نفس ترتيب القيم بالظبط.
+THEMES["ocean"] = ("linear-gradient(115deg,#061a31 0%,#0d2a47 55%,#0b3d63 100%)",
+                   "rgba(255,255,255,.08)", "rgba(255,255,255,.2)", "none", "#fff",
+                   "rgba(255,255,255,.7)", "#5be39a", "#0E2A47", "#7fd6e0", "#fff",
+                   "#0A7A3F", "#fff", "#0E2A47", "blur(14px)", "#0E2A47", "#fff", "#9ff0c6")
+EJADA_THEME_ORDER = ("navy", "dark", "light", "ocean")
+THEME_LABELS = {"navy": "الأساسي", "dark": "أسود", "light": "عاجي", "ocean": "كحلي"}
 requested_theme = st.query_params.get("theme", st.session_state.get("theme", "navy"))
 st.session_state["theme"] = requested_theme if requested_theme in THEMES else "navy"
 theme = st.session_state["theme"]
@@ -59,8 +66,14 @@ icon_bg, icon_fg = {
     "navy": ("#ffffff", "#0A7A3F"),
     "light": ("#0A7A3F", "#ffffff"),
     "dark": ("#5be39a", "#12301f"),
+    "ocean": ("#ffffff", "#0E2A47"),
 }[theme]
 theme_css += f";--icon-bg:{icon_bg};--icon-fg:{icon_fg}"
+_orb_a, _orb_b = {
+    "navy": ("#5be39a", "#0b614f"), "dark": ("#5be39a", "#0b3d30"),
+    "light": ("#2fb5a6", "#0A7A3F"), "ocean": ("#6eaaf0", "#0a2a54"),
+}[theme]
+theme_css += f";--orb-a:{_orb_a};--orb-b:{_orb_b};--theme-label:\"{THEME_LABELS[theme]}\""
 
 
 def change_theme(value):
@@ -2762,9 +2775,8 @@ elif st.session_state.current_page == "Home":
             unsafe_allow_html=True,
         )
         with st.container(key="ejada_theme_switch", horizontal=True, vertical_alignment="center"):
-            st.markdown("المظهر", width="content")
-            for option, label in (("light", "فاتح"), ("dark", "أسود"), ("navy", "كحلي")):
-                st.button(label, key=f"ejada_theme_{option}", width="content",
+            for option in EJADA_THEME_ORDER:
+                st.button(THEME_LABELS[option], key=f"ejada_theme_{option}", width="content",
                           type="primary" if theme == option else "secondary",
                           on_click=change_theme, args=(option,))
 else:
@@ -12781,6 +12793,174 @@ if curr_page in ('Promises', 'Neglect') and not _snb_promises_page:
         neglect_export_df=_neglect_export_df
     )
 
+# ===== الصفحة الرئيسية (UI فقط): تصميم Orbit + مبدّل المظهر بالأيقونات =====
+# كل تقرير جديد يتضاف في _ejada_report_pages بيظهر هنا تلقائيا كتايل حوالين الكرة.
+# لو التقرير ليه أيقونة خاصة ضيفيها في EJADA_REPORT_ICONS، غير كده بياخد أيقونة افتراضية.
+EJADA_REPORT_ICONS = {
+    "Overview": '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5" class="e-pls"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>',
+    "Promises": '<path d="M6 21V4"/><path class="e-flag" d="M6 5c4-2 6 2 12 0v9c-6 2-8-2-12 0"/>',
+    "Neglect": '<g class="e-warn"><path d="M12 3 22 20H2Z"/><path d="M12 10v4"/><circle cx="12" cy="16.8" r=".9" fill="currentColor" stroke="none"/></g>',
+    "Activity": '<g class="e-spin"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></g>',
+    "Performance": '<path class="e-bar e-k1" d="M5 20V13"/><path class="e-bar e-k2" d="M12 20V5"/><path class="e-bar e-k3" d="M19 20v-9"/>',
+    "Comprehensive": '<path d="M7 3h8l4 4v14H7Z"/><path d="M15 3v4h4"/><path d="M10 12h6M10 16h6"/>',
+}
+EJADA_REPORT_ICONS["More"] = '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>'
+# تاريخ إضافة كل تقرير جديد (YYYY-MM-DD): بيظهر عليه بادج "جديد" لمدة 5 أيام وبعدها يختفي لوحده.
+# التقارير الحالية مش محتاجة تاريخ. لما تضيفي تقرير جديد ضيفي سطر زي: "NewReport": "2026-12-01",
+EJADA_REPORT_ADDED = {}
+EJADA_NEW_BADGE_DAYS = 5
+EJADA_HOME_MAX_TILES = 10  # لو التقارير أكتر من كده: أول 9 تايلات + تايل "المزيد"
+
+
+def _ejada_is_new_report(page):
+    added = EJADA_REPORT_ADDED.get(page)
+    if not added:
+        return False
+    try:
+        age = (date.today() - date.fromisoformat(added)).days
+    except Exception:
+        return False
+    return 0 <= age < EJADA_NEW_BADGE_DAYS
+
+
+def _ejada_toggle_more():
+    st.session_state["ejada_home_more"] = not st.session_state.get("ejada_home_more", False)
+
+
+EJADA_DEFAULT_REPORT_ICON = '<path d="M7 3h8l4 4v14H7Z"/><path d="M15 3v4h4"/><path d="M10 12h6M10 16h6"/>'
+EJADA_ORBIT_CSS = """<style>
+@property --ejada-a{syntax:'<angle>';initial-value:0deg;inherits:false}
+html body .stApp .st-key-ejada_theme_switch.st-key-ejada_theme_switch{position:relative;padding:5px !important;gap:4px !important;min-height:0 !important;width:fit-content !important;flex:0 0 auto !important;margin-inline-start:auto !important;margin-inline-end:0 !important}
+html body .stApp .st-key-ejada_theme_switch.st-key-ejada_theme_switch::after{content:var(--theme-label);position:absolute;top:calc(100% + 1px);left:0;right:0;text-align:center;font:700 12px Cairo,sans-serif;color:var(--muted)}
+html body .stApp .st-key-ejada_theme_switch.st-key-ejada_theme_switch button[kind]{width:42px !important;min-width:42px !important;height:42px !important;min-height:42px !important;padding:0 !important;border-radius:50% !important;justify-content:center;transition:background .25s,box-shadow .25s,transform .2s}
+html body .stApp .st-key-ejada_theme_switch.st-key-ejada_theme_switch button[kind] p{display:none !important}
+html body .stApp .st-key-ejada_theme_switch.st-key-ejada_theme_switch button[kind]::before{width:20px !important;height:20px !important;border:0 !important;border-radius:0 !important;background:var(--text) !important;-webkit-mask:var(--ejada-ic) center/20px no-repeat;mask:var(--ejada-ic) center/20px no-repeat;opacity:.85}
+html body .stApp .st-key-ejada_theme_switch.st-key-ejada_theme_switch button[kind="primary"]{background:var(--accent) !important;box-shadow:0 0 18px color-mix(in srgb,var(--accent) 60%,transparent) !important}
+html body .stApp .st-key-ejada_theme_switch.st-key-ejada_theme_switch button[kind="primary"]::before{background:var(--accent-text) !important;opacity:1}
+html body .stApp .st-key-ejada_theme_switch.st-key-ejada_theme_switch button[kind="secondary"]:hover{transform:scale(1.08)}
+.st-key-ejada_theme_navy{--ejada-ic:url("data:image/svg+xml;utf8,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2024%2024%22%20fill=%22none%22%20stroke=%22%23000%22%20stroke-width=%221.8%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%3E%3Cpath%20d=%22M12%203c3.5%204.2%206%207%206%2010.2A6%206%200%20016%2013.2C6%2010%208.5%207.2%2012%203z%22/%3E%3C/svg%3E")}.st-key-ejada_theme_dark{--ejada-ic:url("data:image/svg+xml;utf8,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2024%2024%22%20fill=%22none%22%20stroke=%22%23000%22%20stroke-width=%221.8%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%3E%3Cpath%20d=%22M20%2014.5A8%208%200%20019.5%204a8%208%200%201010.5%2010.5z%22/%3E%3C/svg%3E")}.st-key-ejada_theme_light{--ejada-ic:url("data:image/svg+xml;utf8,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2024%2024%22%20fill=%22none%22%20stroke=%22%23000%22%20stroke-width=%221.8%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%3E%3Ccircle%20cx=%2212%22%20cy=%2212%22%20r=%224%22/%3E%3Cpath%20d=%22M12%202v2M12%2020v2M2%2012h2M20%2012h2M5%205l1.5%201.5M17.5%2017.5L19%2019M5%2019l1.5-1.5M17.5%206.5L19%205%22/%3E%3C/svg%3E")}.st-key-ejada_theme_ocean{--ejada-ic:url("data:image/svg+xml;utf8,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2024%2024%22%20fill=%22none%22%20stroke=%22%23000%22%20stroke-width=%221.8%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%3E%3Cpath%20d=%22M12%203l2.4%205.4L20%209l-4.2%203.8L17%2018.5%2012%2015.6%207%2018.5l1.2-5.7L4%209l5.6-.6z%22/%3E%3C/svg%3E")}
+/* ---- Orbit ---- */
+html body .stApp [class*="st-key-home_reports_"]{display:grid !important;direction:rtl;position:relative;width:min(100%,1180px) !important;max-width:1180px;margin-inline:auto;gap:0 !important;row-gap:0 !important;grid-template-columns:26.27% 1fr 26.27% !important;grid-auto-rows:30px !important;align-items:stretch;padding-top:24px}
+html body .stApp [class*="st-key-home_reports_"] > [data-testid="stElementContainer"]:has(.ejada-orbit){grid-column:1 / -1;pointer-events:none;z-index:0;position:relative;min-height:0}
+html body .stApp h1 .ejada-hl{background:linear-gradient(90deg,var(--accent),var(--broken)) !important;-webkit-background-clip:text !important;background-clip:text !important;color:transparent !important;-webkit-text-fill-color:transparent !important}
+.ejada-orbit{position:absolute;inset:0;width:100%;height:100%}
+.ejada-orbit-lines{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.ejada-orbit-lines path.eln{fill:none;stroke:var(--border);stroke-width:2;stroke-dasharray:600;stroke-dashoffset:600;animation:ejadaDraw 1.2s ease-out .9s forwards;transition:stroke .25s,stroke-width .25s}
+@keyframes ejadaDraw{to{stroke-dashoffset:0}}
+.ejada-orbit-lines circle.edt{fill:var(--accent);opacity:0;offset-distance:0%;animation:ejadaTrav 3.6s linear infinite}
+@keyframes ejadaTrav{0%{offset-distance:0%;opacity:0}10%,90%{opacity:1}100%{offset-distance:100%;opacity:0}}
+.ejada-orb-wrap{position:absolute;left:50%;top:50%;width:0;height:0}
+.ejada-ring{position:absolute;border-radius:50%;translate:-50% -50%;left:0;top:0}
+.ejada-ring.r1{width:470px;height:470px;border:1.5px dashed color-mix(in srgb,var(--text) 30%,transparent);animation:ejadaSpin 40s linear infinite}
+.ejada-ring.r2{width:580px;height:580px;border:1.5px dotted color-mix(in srgb,var(--text) 26%,transparent);animation:ejadaSpinR 60s linear infinite}
+.ejada-ring.r3{width:520px;height:520px;border:3px solid transparent;border-top-color:var(--accent);filter:drop-shadow(0 0 6px var(--accent));animation:ejadaSpin 9s linear infinite}
+.ejada-ring.r4{width:400px;height:400px;border:2px solid transparent;border-bottom-color:var(--broken);animation:ejadaSpinR 13s linear infinite}
+@keyframes ejadaSpin{to{rotate:360deg}}@keyframes ejadaSpinR{to{rotate:-360deg}}
+.ejada-glow{position:absolute;left:0;top:0;width:820px;height:820px;translate:-50% -50%;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--accent) 30%,transparent),transparent 62%);animation:ejadaGlow 6s ease-in-out infinite}
+@keyframes ejadaGlow{0%,100%{opacity:.7;scale:1}50%{opacity:1;scale:1.12}}
+.ejada-orb{position:absolute;left:0;top:0;width:278px;height:278px;translate:-50% -50%;border-radius:50%;display:grid;place-items:center;text-align:center;overflow:hidden;color:#fff;border:1px solid rgba(255,255,255,.4);background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.55),var(--orb-a) 38%,var(--orb-b) 80%);box-shadow:0 0 80px color-mix(in srgb,var(--orb-a) 45%,transparent),inset 0 -20px 50px rgba(0,30,30,.45);animation:ejadaOrbIn 1.1s .2s cubic-bezier(.2,1.2,.3,1) both,ejadaBreath 5s 1.4s ease-in-out infinite}
+@keyframes ejadaOrbIn{from{opacity:0;scale:.2}to{opacity:1;scale:1}}
+@keyframes ejadaBreath{0%,100%{scale:1}50%{scale:1.045}}
+.ejada-orb::before{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,transparent 0 270deg,rgba(255,255,255,.35) 355deg,transparent 360deg);animation:ejadaSpin 4s linear infinite}
+.ejada-orb b{position:relative;display:block;font:800 52px Cairo,sans-serif;letter-spacing:2px;text-shadow:0 4px 18px rgba(0,0,0,.3);line-height:1.1}
+.ejada-orb span{position:relative;font:600 16px Cairo,sans-serif;opacity:.92}
+.ejada-stars{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:radial-gradient(1.4px 1.8px at 15% 95%,var(--star,#fff),transparent),radial-gradient(1.8px 1.8px at 21% 14%,var(--star,#fff),transparent),radial-gradient(1.4px 1.4px at 53% 73%,var(--star,#fff),transparent),radial-gradient(1.8px 1.4px at 30% 69%,var(--star,#fff),transparent),radial-gradient(2.2px 1.8px at 37% 25%,var(--star,#fff),transparent),radial-gradient(1.4px 1.8px at 29% 6%,var(--star,#fff),transparent),radial-gradient(2.2px 1.8px at 36% 27%,var(--star,#fff),transparent),radial-gradient(1.4px 1.8px at 39% 83%,var(--star,#fff),transparent),radial-gradient(2.2px 1.8px at 13% 80%,var(--star,#fff),transparent),radial-gradient(1.8px 2.2px at 51% 67%,var(--star,#fff),transparent),radial-gradient(1.4px 1.4px at 33% 63%,var(--star,#fff),transparent),radial-gradient(1.8px 1.4px at 72% 41%,var(--star,#fff),transparent),radial-gradient(1.4px 1.8px at 75% 93%,var(--star,#fff),transparent),radial-gradient(1.8px 2.2px at 26% 55%,var(--star,#fff),transparent),radial-gradient(1.8px 2.2px at 38% 58%,var(--star,#fff),transparent),radial-gradient(1.8px 1.4px at 31% 42%,var(--star,#fff),transparent),radial-gradient(1.8px 1.4px at 12% 8%,var(--star,#fff),transparent),radial-gradient(1.8px 2.2px at 37% 69%,var(--star,#fff),transparent),radial-gradient(2.2px 2.2px at 62% 92%,var(--star,#fff),transparent),radial-gradient(1.8px 1.4px at 88% 28%,var(--star,#fff),transparent),radial-gradient(1.4px 1.8px at 27% 84%,var(--star,#fff),transparent),radial-gradient(2.2px 1.8px at 37% 26%,var(--star,#fff),transparent),radial-gradient(1.8px 1.8px at 97% 78%,var(--star,#fff),transparent),radial-gradient(1.8px 2.2px at 73% 28%,var(--star,#fff),transparent),radial-gradient(1.8px 1.4px at 9% 93%,var(--star,#fff),transparent),radial-gradient(1.4px 1.8px at 76% 81%,var(--star,#fff),transparent),radial-gradient(1.4px 1.4px at 44% 25%,var(--star,#fff),transparent),radial-gradient(1.8px 1.8px at 5% 8%,var(--star,#fff),transparent),radial-gradient(1.8px 2.2px at 12% 39%,var(--star,#fff),transparent),radial-gradient(2.2px 2.2px at 43% 5%,var(--star,#fff),transparent),radial-gradient(1.8px 1.8px at 43% 22%,var(--star,#fff),transparent),radial-gradient(2.2px 1.8px at 81% 90%,var(--star,#fff),transparent),radial-gradient(1.4px 1.8px at 81% 27%,var(--star,#fff),transparent),radial-gradient(1.8px 1.8px at 19% 35%,var(--star,#fff),transparent),radial-gradient(1.8px 2.2px at 22% 45%,var(--star,#fff),transparent),radial-gradient(2.2px 1.4px at 48% 8%,var(--star,#fff),transparent),radial-gradient(1.8px 1.4px at 48% 49%,var(--star,#fff),transparent),radial-gradient(1.8px 2.2px at 14% 59%,var(--star,#fff),transparent),radial-gradient(1.4px 1.8px at 28% 17%,var(--star,#fff),transparent),radial-gradient(1.4px 1.4px at 9% 97%,var(--star,#fff),transparent),radial-gradient(1.4px 2.2px at 88% 22%,var(--star,#fff),transparent),radial-gradient(2.2px 1.4px at 71% 65%,var(--star,#fff),transparent),radial-gradient(2.2px 1.4px at 43% 7%,var(--star,#fff),transparent),radial-gradient(1.4px 2.2px at 39% 55%,var(--star,#fff),transparent),radial-gradient(2.2px 1.4px at 63% 28%,var(--star,#fff),transparent),radial-gradient(1.4px 1.8px at 54% 65%,var(--star,#fff),transparent);opacity:.7;animation:ejadaTw 5s ease-in-out infinite}
+@keyframes ejadaTw{0%,100%{opacity:.12}50%{opacity:.5}}
+html body .stApp [data-testid="stLayoutWrapper"]:has(> [class*="st-key-home_report_card_"]){display:flex}
+html body .stApp [class*="st-key-home_report_card_"]{flex:1 1 auto;position:relative;z-index:2;min-height:0 !important;height:auto !important;margin:6px 0 !important;border:1px solid var(--border) !important;border-top:1px solid var(--border) !important;border-radius:999px !important;background:var(--card) !important;backdrop-filter:var(--blur);box-shadow:var(--shadow);overflow:visible;animation:ejadaTileIn .9s calc(.7s + var(--ei,0) * .12s) cubic-bezier(.2,.9,.2,1) both,ejadaBob 6s calc(2s + var(--ei,0) * .3s) ease-in-out infinite;transition:border-color .25s,box-shadow .25s,background .25s,scale .25s}
+@keyframes ejadaTileIn{from{opacity:0;transform:translateX(calc(var(--es,1) * 70px)) scale(.9)}to{opacity:1;transform:none}}
+@keyframes ejadaBob{0%,100%{translate:0 0}50%{translate:0 -6px}}
+html body .stApp [class*="st-key-home_report_card_"]{display:flex !important;flex-direction:column;justify-content:center}
+html body .stApp [class*="st-key-home_report_card_"] > [data-testid="stElementContainer"]{width:100%}
+html body .stApp [class*="st-key-home_report_card_"]:hover{transform:none !important;scale:1.04;border-color:var(--accent) !important;box-shadow:0 0 0 1px var(--accent),0 16px 38px color-mix(in srgb,var(--accent) 38%,transparent) !important}
+html body .stApp [class*="st-key-home_report_card_"] .ejada-report-card{display:flex !important;flex-direction:row;justify-content:flex-start;align-items:center;gap:16px;min-height:0 !important;height:100%;padding:0 14px;text-align:right;font-size:18px;font-weight:800}
+html body .stApp [class*="st-key-home_report_card_"] .ejada-report-card > span:last-child{white-space:normal !important;line-height:1.3}
+html body .stApp [class*="st-key-home_report_card_"] .ejada-report-icon{flex:none;width:56px !important;height:56px !important;border-radius:50% !important;box-shadow:0 0 0 6px color-mix(in srgb,var(--icon-bg) 14%,transparent)}
+.ejada-report-icon svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.e-flag{transform-origin:6px 8px;animation:eFlag 2.4s ease-in-out infinite}@keyframes eFlag{0%,100%{transform:skewY(0)}50%{transform:skewY(-5deg)}}
+.e-warn{transform-origin:12px 20px;animation:eWarn 2.8s ease-in-out infinite}@keyframes eWarn{0%,70%,100%{transform:rotate(0)}76%{transform:rotate(-7deg)}82%{transform:rotate(7deg)}88%{transform:rotate(-4deg)}94%{transform:rotate(0)}}
+.e-spin{transform-origin:12px 12px;animation:ejadaSpin 4s linear infinite}
+.e-pls{transform-origin:12px 12px;animation:ePls 2.6s ease-in-out infinite}@keyframes ePls{0%,100%{transform:scale(1)}50%{transform:scale(.7)}}
+.e-bar{stroke-dasharray:20;animation:eBar 2.6s ease-in-out infinite}.e-k2{animation-delay:.25s}.e-k3{animation-delay:.5s}@keyframes eBar{0%,100%{stroke-dashoffset:0}50%{stroke-dashoffset:7}}
+.ejada-new-badge{display:inline-block;margin-inline-start:8px;font:800 11px Cairo,sans-serif;background:var(--accent);color:var(--accent-text);border-radius:999px;padding:1px 9px;vertical-align:middle;box-shadow:0 0 12px color-mix(in srgb,var(--accent) 55%,transparent)}
+html body .stApp .st-key-home_more_list{display:grid !important;direction:rtl;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px !important;width:min(100%,1180px);margin:6px auto 0}
+html body .stApp .st-key-home_more_list [class*="st-key-home_report_card_"]{min-height:84px !important}
+@media (max-width:900px){
+html body .stApp [class*="st-key-home_reports_"]{grid-template-columns:repeat(2,minmax(0,1fr)) !important;grid-auto-rows:auto !important;gap:12px !important;width:min(100%,700px) !important}
+html body .stApp [class*="st-key-home_reports_"] > [data-testid="stElementContainer"]:has(.ejada-orbit){display:none}
+html body .stApp [data-testid="stLayoutWrapper"]:has(> [class*="st-key-home_report_card_"]){grid-column:auto !important;grid-row:auto !important}
+html body .stApp [class*="st-key-home_report_card_"]{min-height:84px !important;margin:0 !important;border-radius:22px !important}
+}
+@media (prefers-reduced-motion:reduce){.ejada-orbit *,[class*="st-key-home_report_card_"]{animation:none !important}}
+</style>"""
+
+
+def _ejada_orbit_markup(bank_code, pages):
+    """CSS + الكرة والخطوط. التايلات نفسها بتتعمل في الحلقة تحت من نفس قايمة التقارير."""
+    n = len(pages)
+    right = (n + 1) // 2
+    left = n - right
+    rows_half = max(max(right, left), 3)
+    unit = 30
+    total_h = rows_half * 6 * unit
+    cy_orb = total_h / 2
+    cells, paths, dots, hover_css = [], "", "", ""
+    for i, (page, _label, _key) in enumerate(pages):
+        on_right = i < right
+        count = right if on_right else left
+        j = i if on_right else i - right
+        first_row = int(3 * rows_half - 2 + 6 * (j - (count - 1) / 2)) + 1
+        cy = (first_row - 1 + 2) * unit
+        x0 = 870 if on_right else 310
+        x1 = 730 if on_right else 450
+        xm = (x0 + x1) / 2
+        paths += (f'<path id="ejada-ln-{page}" class="eln" style="animation-delay:{0.9 + i * 0.12:.2f}s" '
+                  f'd="M{x0} {cy} C{xm} {cy} {xm} {cy_orb} {x1} {cy_orb}"/>')
+        dots += (f'<circle class="edt" r="4.5" style="offset-path:path(\'M{x0} {cy} C{xm} {cy} {xm} {cy_orb} {x1} {cy_orb}\');'
+                 f'animation-delay:{i * 0.7:.1f}s"/>')
+        cells.append(
+            f'html body .stApp [data-testid="stLayoutWrapper"]:has(> .st-key-home_report_card_{page}){{grid-column:{1 if on_right else 3};'
+            f'grid-row:{first_row} / span 4}}'
+            f'html body .stApp .st-key-home_report_card_{page}{{--ei:{i};--es:{1 if on_right else -1}}}'
+        )
+        hover_css += (f'[class*="st-key-home_reports_"]:has(.st-key-home_report_card_{page}:hover) #ejada-ln-{page}'
+                      f'{{stroke:var(--accent);stroke-width:4}}')
+    html = (
+        f'<style>[class*="st-key-home_reports_"]{{grid-template-rows:repeat({rows_half * 6},{unit}px) !important}}'
+        + "".join(cells) + hover_css +
+        f'[class*="st-key-home_reports_"] > [data-testid="stElementContainer"]:has(.ejada-orbit){{grid-row:1 / span {rows_half * 6}}}</style>'
+        f'<div class="ejada-orbit"><div class="ejada-stars"></div>'
+        f'<svg class="ejada-orbit-lines" viewBox="0 0 1180 {total_h}" preserveAspectRatio="none">{paths}{dots}</svg>'
+        f'<div class="ejada-orb-wrap"><div class="ejada-glow"></div><div class="ejada-ring r2"></div><div class="ejada-ring r1"></div>'
+        f'<div class="ejada-ring r4"></div><div class="ejada-ring r3"></div>'
+        f'<div class="ejada-orb"><div><b>{bank_code}</b><span>المحفظة</span></div></div></div></div>'
+    )
+    return EJADA_ORBIT_CSS + html
+
+
+
+
+def _ejada_home_tiles(pages):
+    for page, label, _ in pages:
+        with st.container(key=f"home_report_card_{page}"):
+            badge = '<span class="ejada-new-badge">جديد</span>' if _ejada_is_new_report(page) else ''
+            st.markdown(
+                f'<div class="ejada-report-card" aria-hidden="true">'
+                f'<span class="ejada-report-icon"><svg viewBox="0 0 24 24">'
+                f'{EJADA_REPORT_ICONS.get(page, EJADA_DEFAULT_REPORT_ICON)}</svg></span>'
+                f'<span>{label}{badge}</span></div>',
+                unsafe_allow_html=True,
+            )
+            if page == "More":
+                st.button(label, key="home_report_open_More", width="stretch", on_click=_ejada_toggle_more)
+            else:
+                st.button(
+                    label, key=f"home_report_open_{page}", width="stretch",
+                    on_click=open_neglect_page if page == "Neglect" else set_page,
+                    args=() if page == "Neglect" else (page,),
+                )
+
+
 # Activity is intentionally a blank design canvas until the new report is specified.
 # Keep other pages and their upload state completely unchanged.
 page_uploaded = None if _snb_overview_page or curr_page in ('Activity', 'ModelManagement', 'Performance', 'Comprehensive') else bank_files[curr_page]
@@ -12803,27 +12983,21 @@ elif page_uploaded is None:
             bank_name = "SNB" if bank == "SNB" else "بنك STC"
             st.markdown(
                 f"""<div class="ejada-home-intro" dir="rtl">
-                <h1>أهلاً بيكي في محفظة {bank_name}</h1></div>""",
+                <h1>أهلاً بيكي في محفظة <span class="ejada-hl">{bank_name}</span></h1></div>""",
                 unsafe_allow_html=True,
             )
-            icons = {
-                "Overview": "◉", "Promises": "⚑", "Neglect": "⚠︎",
-                "Activity": "↻", "Performance": "▥", "Comprehensive": "▤",
-            }
             with st.container(key=f"home_reports_{bank}"):
-                for page, label, _ in _ejada_report_pages(bank):
-                    with st.container(key=f"home_report_card_{page}"):
-                        st.markdown(
-                            f'<div class="ejada-report-card" aria-hidden="true">'
-                            f'<span class="ejada-report-icon">{icons[page]}</span>'
-                            f'<span>{label}</span></div>',
-                            unsafe_allow_html=True,
-                        )
-                        st.button(
-                            label, key=f"home_report_open_{page}", width="stretch",
-                            on_click=open_neglect_page if page == "Neglect" else set_page,
-                            args=() if page == "Neglect" else (page,),
-                        )
+                _all_pages = _ejada_report_pages(bank)
+                _more_pages = []
+                _orbit_pages = list(_all_pages)
+                if len(_all_pages) > EJADA_HOME_MAX_TILES:
+                    _more_pages = _all_pages[EJADA_HOME_MAX_TILES - 1:]
+                    _orbit_pages = list(_all_pages[:EJADA_HOME_MAX_TILES - 1]) + [("More", "المزيد", "home_more_btn")]
+                st.markdown(_ejada_orbit_markup(bank, _orbit_pages), unsafe_allow_html=True)
+                _ejada_home_tiles(_orbit_pages)
+            if _more_pages and st.session_state.get("ejada_home_more"):
+                with st.container(key="home_more_list"):
+                    _ejada_home_tiles(_more_pages)
     elif curr_page == 'Overview':
         st.markdown(f"""
         <div style="background-color:{card_color};border:1px solid {border_color};border-radius:15px;padding:22px 18px;margin:8px 0 18px;text-align:center;direction:rtl;">
