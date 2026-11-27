@@ -2047,6 +2047,11 @@ st.markdown(f"""
         position:absolute !important;inset:0 !important;width:100% !important;height:100% !important;
         opacity:0 !important;cursor:pointer !important;z-index:2 !important;display:block !important;
     }}
+    /* v4: ستريمليت الجديد بيرسم الملف كـ stFileChips (الصندوق الأسود). بيتخفى دايمًا داخل مربع رفع الوعود فقط */
+    html body .stApp .st-key-snb_glass_promises .st-key-snb_ov_upload_promises_page :is([data-testid="stFileChips"],[data-testid="stFileChip"],[data-testid="stFileChipName"],[data-testid="stFileChipDeleteBtn"],[data-testid="stFileChipIcon"]) {{
+        display:none !important;visibility:hidden !important;width:0 !important;height:0 !important;
+        margin:0 !important;padding:0 !important;border:0 !important;opacity:0 !important;pointer-events:none !important;
+    }}
     /* بعد الملف: علامة صح + اسم الملف + "تغيير" */
     html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page div[class*="st-key-uploaded_chip_"]::before {{
         content:"✓";flex:none;width:28px;height:28px;border-radius:50%;background:var(--accent);
