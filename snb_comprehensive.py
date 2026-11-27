@@ -85,6 +85,7 @@ def _treatment_category(sheet, row, history_columns, first_number, latest_number
     return "untreated"
 
 
+@st.cache_data(show_spinner=False, max_entries=6)
 def build_comprehensive_report(source_bytes):
     """Generate a fresh SNB workbook with original data and six calculated columns."""
     workbook = load_workbook(BytesIO(source_bytes))
@@ -346,4 +347,5 @@ def render_snb_comprehensive_page():
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         key="snb_comprehensive_download",
         use_container_width=True,
+        on_click="ignore",
     )
