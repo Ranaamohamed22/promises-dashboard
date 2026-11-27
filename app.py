@@ -12100,9 +12100,17 @@ def _read_snb_promise_file_cached(file_bytes, file_name):
 
 
 def _render_snb_promises(files):
-    # ===== مؤشر التحميل (UI فقط): يظهر أثناء قراءة الملف وتجهيز التقرير ثم يختفي =====
+    # Show the 5-second loader only for a newly uploaded portfolio, not every rerun.
+    import time as _promise_time
+    _loader_signature = tuple(
+        (f.name, hashlib.sha256(f.getvalue()).hexdigest()) for f in (files or [])
+    )
+    _show_loader = bool(files) and (
+        st.session_state.get("_snb_promises_loader_signature") != _loader_signature
+    )
+    _loader_start = _promise_time.monotonic() if _show_loader else None
     _loader_slot = st.empty()
-    if files:
+    if _show_loader:
         _loader_slot.markdown(
             """<style>
 @property --snbp{syntax:'<integer>';initial-value:0;inherits:false}
@@ -12335,6 +12343,9 @@ background:rgba(127,214,224,.18);border:2px solid var(--text)}
         )) if ready else b""
     )
 
+    if _show_loader:
+        _promise_time.sleep(max(0.0, 5.0 - (_promise_time.monotonic() - _loader_start)))
+        st.session_state["_snb_promises_loader_signature"] = _loader_signature
     _loader_slot.empty()
     with st.container(key="snb_glass_promises"):
         with st.container(key="snb_pr_titlebar", horizontal=True, vertical_alignment="center"):
