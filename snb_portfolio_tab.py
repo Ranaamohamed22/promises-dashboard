@@ -78,6 +78,7 @@ def _normalize_stage(value):
     return ""
 
 
+@st.cache_data(show_spinner=False, max_entries=8)
 def build_portfolio_summary(portfolio_bytes):
     """Return an Excel-copyable eight-column report and data-quality counts.
 
@@ -353,12 +354,14 @@ def render_portfolio_summary(portfolio_bytes):
             "كل الصفوف موجودة في ملف Excel للتحميل والنسخ."
         )
 
-    st.download_button(
-        "📥 تحميل جدول المحفظة Excel بنفس شكل الأعمدة",
-        data=portfolio_summary_to_excel(table),
-        file_name="SNB_Portfolio_By_Collector_Product_Stages.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        key="snb_perf_portfolio_export",
-        use_container_width=False,
-    )
+    if st.button("📦 تجهيز ملف جدول المحفظة", key="snb_perf_prepare_portfolio_export"):
+        st.download_button(
+            "📥 تحميل جدول المحفظة Excel بنفس شكل الأعمدة",
+            data=portfolio_summary_to_excel(table),
+            file_name="SNB_Portfolio_By_Collector_Product_Stages.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="snb_perf_portfolio_export",
+            use_container_width=False,
+            on_click="ignore",
+        )
     return table

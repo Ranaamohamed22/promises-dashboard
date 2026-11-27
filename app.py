@@ -10039,6 +10039,12 @@ def _stc_summary(result, groups, stamps=None):
 
 
 def _stc_download(sheets, title, filename, summary_title=None):
+    # The sheets are already calculated for the visible report; defer only XLSX creation.
+    if not st.button(
+        f"📦 تجهيز: {title}",
+        key="prepare_stc_export_" + hashlib.sha256(filename.encode("utf-8")).hexdigest()[:14],
+    ):
+        return
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
         for name, data in sheets.items():
@@ -10083,7 +10089,8 @@ def _stc_download(sheets, title, filename, summary_title=None):
             if sheet.freeze_panes == "A2":
                 sheet.freeze_panes = "A3"
     st.download_button(title, buf.getvalue(), file_name=filename,
-                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                       on_click="ignore")
 
 
 def _stc_dashboard(summary, collector, scope):
@@ -10679,89 +10686,94 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
             manual_decisions.copy(), slash_row_decisions.copy(),
         )
         st.caption("✅ التقرير جاهز للتحميل بالتقييمات المعتمدة.")
-        weekly_report = activity_kind == "أسبوعي"
-        details_sheet = (
-            "Wasted_Time_Details_Weekly" if weekly_report
-            else "Wasted_Time_Details"
-        )
-        summary_sheet = (
-            "Wasted_Time_Weekly" if weekly_report
-            else "Wasted_Time_Daily"
-        )
-        export_final = _snb_export_visible_columns(final)
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            export_final.to_excel(writer, sheet_name="Activity", index=False)
-            _snb_export_visible_columns(
-                time_notes
-            ).to_excel(
-                writer,
-                sheet_name=(
-                    "Weekly_First_Last_Notes" if weekly_report
-                    else "First_Shift_Notes" if period == "first"
-                    else "Second_Shift_Notes" if period == "second"
-                    else "Full_Day_Notes"
-                ),
-                index=False,
+        if st.button(
+            "📦 تجهيز ملفات Excel للنشاط",
+            key="snb_activity_prepare_excel",
+            help="تجهيز ملف النشاط الكامل وملف Activity وتفاصيل المحصلين عند الطلب فقط",
+        ):
+            weekly_report = activity_kind == "أسبوعي"
+            details_sheet = (
+                "Wasted_Time_Details_Weekly" if weekly_report
+                else "Wasted_Time_Details"
             )
-            if duty_summary is not None:
-                duty_summary.to_excel(writer, sheet_name=duty_sheet_name, index=False)
-            _snb_export_visible_columns(wasted_details).to_excel(
-                writer, sheet_name=details_sheet, index=False
+            summary_sheet = (
+                "Wasted_Time_Weekly" if weekly_report
+                else "Wasted_Time_Daily"
             )
-            _snb_export_visible_columns(wasted_summary).to_excel(
-                writer, sheet_name=summary_sheet, index=False
-            )
-            calls_under_one_min.to_excel(
-                writer, sheet_name="Calls_Under_1_Min", index=False
-            )
-            waste_collector_table.to_excel(
-                writer, sheet_name="Wasted_Time_Per_Collector", index=False
-            )
-            main_state_table.to_excel(
-                writer, sheet_name="Main_State_Distribution", index=False
-            )
-            if efficiency_quality is not None:
-                _snb_export_visible_columns(efficiency_quality).to_excel(
-                    writer, sheet_name="Efficiency_Call_Quality", index=False
+            export_final = _snb_export_visible_columns(final)
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                export_final.to_excel(writer, sheet_name="Activity", index=False)
+                _snb_export_visible_columns(
+                    time_notes
+                ).to_excel(
+                    writer,
+                    sheet_name=(
+                        "Weekly_First_Last_Notes" if weekly_report
+                        else "First_Shift_Notes" if period == "first"
+                        else "Second_Shift_Notes" if period == "second"
+                        else "Full_Day_Notes"
+                    ),
+                    index=False,
                 )
-                _snb_export_visible_columns(stage_product_detail).to_excel(
-                    writer, sheet_name="Collector_Stage_Product", index=False
+                if duty_summary is not None:
+                    duty_summary.to_excel(writer, sheet_name=duty_sheet_name, index=False)
+                _snb_export_visible_columns(wasted_details).to_excel(
+                    writer, sheet_name=details_sheet, index=False
                 )
-                _snb_export_visible_columns(weekly_daily).to_excel(
-                    writer, sheet_name="Weekly_Dropoff", index=False
+                _snb_export_visible_columns(wasted_summary).to_excel(
+                    writer, sheet_name=summary_sheet, index=False
                 )
-                _snb_export_visible_columns(weekly_collectors).to_excel(
-                    writer, sheet_name="Weekly_Collector_Activity", index=False
+                calls_under_one_min.to_excel(
+                    writer, sheet_name="Calls_Under_1_Min", index=False
                 )
-            _style_snb_activity_workbook(writer.book)
-        activity_only = io.BytesIO()
-        with pd.ExcelWriter(activity_only, engine="openpyxl") as writer:
-            export_final.to_excel(writer, sheet_name="Activity", index=False)
-            _style_snb_activity_workbook(writer.book)
-        collectors_workbook = _build_snb_collector_details_xlsx(
-            result, stats["collector"]
-        )
-        st.download_button(
-            "📥 تحميل شيت Activity منفصل", data=activity_only.getvalue(),
-            file_name=f"SNB_Activity_{activity_kind}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="download_snb_activity_only"
-        )
-        st.download_button(
-            "📥 تحميل نشاط SNB بعد المعالجة",
-            data=output.getvalue(),
-            file_name=f"SNB_Activity_{activity_kind}_Processed.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="download_snb_activity_processed"
-        )
-        st.download_button(
-            "📥 تحميل تقرير مفصل لكل محصل (شيت مستقل)",
-            data=collectors_workbook,
-            file_name=f"SNB_Collectors_Details_{activity_kind}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="download_snb_activity_per_collector"
-        )
+                waste_collector_table.to_excel(
+                    writer, sheet_name="Wasted_Time_Per_Collector", index=False
+                )
+                main_state_table.to_excel(
+                    writer, sheet_name="Main_State_Distribution", index=False
+                )
+                if efficiency_quality is not None:
+                    _snb_export_visible_columns(efficiency_quality).to_excel(
+                        writer, sheet_name="Efficiency_Call_Quality", index=False
+                    )
+                    _snb_export_visible_columns(stage_product_detail).to_excel(
+                        writer, sheet_name="Collector_Stage_Product", index=False
+                    )
+                    _snb_export_visible_columns(weekly_daily).to_excel(
+                        writer, sheet_name="Weekly_Dropoff", index=False
+                    )
+                    _snb_export_visible_columns(weekly_collectors).to_excel(
+                        writer, sheet_name="Weekly_Collector_Activity", index=False
+                    )
+                _style_snb_activity_workbook(writer.book)
+            activity_only = io.BytesIO()
+            with pd.ExcelWriter(activity_only, engine="openpyxl") as writer:
+                export_final.to_excel(writer, sheet_name="Activity", index=False)
+                _style_snb_activity_workbook(writer.book)
+            collectors_workbook = _build_snb_collector_details_xlsx(
+                result, stats["collector"]
+            )
+            st.download_button(
+                "📥 تحميل شيت Activity منفصل", data=activity_only.getvalue(),
+                file_name=f"SNB_Activity_{activity_kind}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="download_snb_activity_only", on_click="ignore"
+            )
+            st.download_button(
+                "📥 تحميل نشاط SNB بعد المعالجة",
+                data=output.getvalue(),
+                file_name=f"SNB_Activity_{activity_kind}_Processed.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="download_snb_activity_processed", on_click="ignore"
+            )
+            st.download_button(
+                "📥 تحميل تقرير مفصل لكل محصل (شيت مستقل)",
+                data=collectors_workbook,
+                file_name=f"SNB_Collectors_Details_{activity_kind}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="download_snb_activity_per_collector", on_click="ignore"
+            )
 
 
 selected_bank = st.session_state.selected_bank
@@ -12079,13 +12091,19 @@ def _snb_promise_data(raw, today):
     return raw.loc[current], broken_rows, types, int(is_promise.sum()), int((is_promise & ~valid).sum())
 
 
+@st.cache_data(show_spinner=False, max_entries=10)
+def _read_snb_promise_file_cached(file_bytes, file_name):
+    """Cache identical uploaded portfolio parsing without changing dtypes or sheet selection."""
+    data = io.BytesIO(file_bytes)
+    return (pd.read_csv(data, dtype=str) if file_name.lower().endswith(".csv")
+            else pd.read_excel(data, sheet_name="Sheet1", dtype=str))
+
+
 def _render_snb_promises(files):
     frames = []
     for uploaded in files or []:
         try:
-            data = io.BytesIO(uploaded.getvalue())
-            frame = (pd.read_csv(data, dtype=str) if uploaded.name.lower().endswith(".csv")
-                     else pd.read_excel(data, sheet_name="Sheet1", dtype=str))
+            frame = _read_snb_promise_file_cached(uploaded.getvalue(), uploaded.name)
             frames.append(frame)
         except (ValueError, OSError) as exc:
             st.error(f"تعذر قراءة الملف {uploaded.name}: {exc}")
@@ -12101,6 +12119,20 @@ def _render_snb_promises(files):
         identifiers = raw[account_col].map(_clean_snb_promise_text)
         accounts = identifiers[identifiers.ne("")].nunique()
     today = datetime.now(ZoneInfo("Africa/Cairo")).date()
+    # A new file or day must never reuse old downloadable output.
+    _promise_export_signature = (
+        tuple((f.name, hashlib.sha256(f.getvalue()).hexdigest()) for f in (files or [])),
+        today.isoformat(),
+    )
+    def _prepare_snb_promise_exports(kind):
+        st.session_state[f"_snb_pr_{kind}_export_signature"] = _promise_export_signature
+
+    _details_exports_enabled = (
+        st.session_state.get("_snb_pr_details_export_signature") == _promise_export_signature
+    )
+    _main_export_enabled = (
+        st.session_state.get("_snb_pr_main_export_signature") == _promise_export_signature
+    )
     active, broken, types, _, missing_dates = (
         _snb_promise_data(raw, today) if ready else
         (pd.DataFrame(), pd.DataFrame(), pd.Series(dtype=int), None, None)
@@ -12185,7 +12217,7 @@ def _render_snb_promises(files):
 
     def csv_link(title, frame):
         """UI-only download: all rows of this item, read from the same rows the table shows."""
-        if frame is None or frame.empty:
+        if frame is None or frame.empty or not _details_exports_enabled:
             return ""
         import base64 as _b64
         import io as _io
@@ -12265,7 +12297,7 @@ def _render_snb_promises(files):
     )
     export = (
         _snb_promises_export(summary, types, active, broken, ordered, product_summary)
-        if ready else b""
+        if ready and _main_export_enabled else b""
     )
 
     with st.container(key="snb_glass_promises"):
@@ -12281,6 +12313,18 @@ def _render_snb_promises(files):
                     st.file_uploader("رفع ملف الوعود", type=["xlsx", "csv"], accept_multiple_files=True,
                                      label_visibility="collapsed", key=key, on_change=save_uploaded_files,
                                      args=("page_files", "SNB", "Promises", key))
+            st.button(
+                "📄 تجهيز ملف الوعود", key="snb_pr_prepare_main_export",
+                on_click=_prepare_snb_promise_exports, args=("main",),
+                disabled=not ready,
+                help="إنشاء ملف الوعود القائمة والمكسورة عند الطلب فقط",
+            )
+            st.button(
+                "📋 تجهيز تنزيلات تفاصيل الكروت", key="snb_pr_prepare_details_exports",
+                on_click=_prepare_snb_promise_exports, args=("details",),
+                disabled=not ready,
+                help="ملفات تفاصيل الكروت لا تُنشأ إلا بعد الضغط هنا",
+            )
             st.download_button(
                 "تنزيل ملف الوعود", export, icon="⬇️",
                 file_name=f"promises_{datetime.now(ZoneInfo('Africa/Cairo')):%Y-%m-%d}.xlsx",
