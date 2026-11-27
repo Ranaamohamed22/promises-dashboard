@@ -1978,6 +1978,74 @@ st.markdown(f"""
     }}
     .stApp .st-key-snb_ov_upload_promises_page p {{font-size:16px;font-weight:600;white-space:nowrap;}}
     .stApp .st-key-snb_pr_titlebar [data-testid="stFileUploader"] {{width:114px !important;min-width:114px !important;}}
+    /* ===== مربع رفع المحفظة (صفحة الوعود): صف واحد بنفس الحجم قبل وبعد الملف ===== */
+    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page {{
+        gap:14px !important;
+    }}
+    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page [data-testid="stFileUploader"],
+    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page div[class*="st-key-uploaded_chip_"] {{
+        width:400px !important;min-width:400px !important;max-width:100% !important;
+    }}
+    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page [data-testid="stFileUploaderDropzone"],
+    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page div[class*="st-key-uploaded_chip_"] {{
+        direction:rtl !important;display:flex !important;flex-direction:row !important;flex-wrap:nowrap !important;
+        align-items:center !important;justify-content:flex-start !important;gap:10px !important;
+        height:46px !important;min-height:46px !important;max-height:46px !important;box-sizing:border-box !important;
+        padding:0 10px !important;border:1px solid var(--border) !important;border-radius:12px !important;
+        background:rgba(127,127,127,.12) !important;box-shadow:none !important;overflow:hidden !important;
+    }}
+    /* قبل الملف: دايرة سهم + "لسه مفيش ملف" + زرار Upload */
+    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page [data-testid="stFileUploaderDropzone"]::before {{
+        content:"↑";order:0;flex:none;width:28px;height:28px;border-radius:50%;box-sizing:border-box;
+        border:2px solid var(--muted);color:var(--muted);display:grid;place-items:center;
+        font:800 15px/1 Cairo,sans-serif;direction:ltr;
+    }}
+    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page [data-testid="stFileUploaderDropzone"]::after {{
+        content:"لسه مفيش ملف";order:1;flex:1 1 auto;min-width:0;color:var(--muted);
+        font:600 13px Cairo,sans-serif;white-space:nowrap;text-align:right;
+    }}
+    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page [data-testid="stFileUploaderDropzone"] button {{
+        order:2;flex:none;width:100px !important;min-width:100px !important;height:30px !important;min-height:30px !important;
+        padding:0 !important;border-radius:15px !important;background:var(--btn) !important;
+        border:0 !important;color:var(--btn-text) !important;
+    }}
+    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page [data-testid="stFileUploaderDropzone"] button::after {{
+        color:var(--btn-text) !important;-webkit-text-fill-color:var(--btn-text) !important;
+        font:800 13px Cairo,sans-serif !important;
+    }}
+    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page :is([data-testid="stFileUploaderFile"],[data-testid="stFileUploaderFileList"]) {{
+        display:none !important;
+    }}
+    /* بعد الملف: علامة صح + اسم الملف + "تغيير" */
+    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page div[class*="st-key-uploaded_chip_"]::before {{
+        content:"✓";flex:none;width:28px;height:28px;border-radius:50%;background:var(--accent);
+        color:var(--accent-text);display:grid;place-items:center;font:900 15px/1 Cairo,sans-serif;
+    }}
+    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page div[class*="st-key-uploaded_chip_"] > div {{
+        min-width:0 !important;width:auto !important;
+    }}
+    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page div[class*="st-key-uploaded_chip_"] > div:first-child {{
+        flex:1 1 auto !important;overflow:hidden !important;
+    }}
+    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page .uploaded-filename {{
+        direction:ltr;text-align:right;font-size:14px;font-weight:700;line-height:1.4;
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    }}
+    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page div[class*="st-key-uploaded_chip_"] > div:last-child {{
+        flex:none !important;
+    }}
+    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page div[class*="st-key-uploaded_chip_"] [data-testid="stButton"] button {{
+        width:auto !important;min-width:0 !important;height:30px !important;min-height:30px !important;
+        padding:0 4px !important;background:transparent !important;border:0 !important;box-shadow:none !important;
+        font-size:0 !important;
+    }}
+    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page div[class*="st-key-uploaded_chip_"] [data-testid="stButton"] button * {{
+        display:none !important;
+    }}
+    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page div[class*="st-key-uploaded_chip_"] [data-testid="stButton"] button::after {{
+        content:"تغيير";color:var(--accent) !important;-webkit-text-fill-color:var(--accent) !important;
+        font:800 13px Cairo,sans-serif;
+    }}
     html body .stApp .st-key-snb_pr_titlebar [data-testid="stFileUploaderDropzone"] button {{
         width:114px !important;min-height:38px !important;height:38px !important;
         padding:0 16px !important;border-radius:12px !important;
