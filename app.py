@@ -6594,7 +6594,7 @@ def _write_pivot_sheet(ws, p, title, is_real_pivot=False):
     n = len(notes)
     last_col = 2 + 2 * n + 2
     # فتح الملخص من أعلى الشيت وبمقياس مناسب حتى تظهر مجموعات الـ Pivot كاملة.
-    ws.sheet_view.rightToLeft = True
+    ws.sheet_view.rightToLeft = False
     ws.sheet_view.zoomScale = 80
     ws.sheet_view.zoomScaleNormal = 80
     ws.sheet_view.showGridLines = False
@@ -6988,7 +6988,7 @@ def build_report_xlsx(active_df, broken_df, neglect_df=None, bank="SNB"):
     broken = wb.create_sheet("تقرير الوعود المكسورة")
     _write_df_sheet(broken, broken_df)
     for ws in wb.worksheets:
-        ws.sheet_view.rightToLeft = True
+        ws.sheet_view.rightToLeft = False
         ws.freeze_panes = "A2"
     output = io.BytesIO()
     wb.save(output)
@@ -7006,7 +7006,7 @@ def build_single_promise_report_xlsx(df, report_kind="active", bank="STC"):
     ws = wb.active
     ws.title = ws_name
     _write_df_sheet(ws, df)
-    ws.sheet_view.rightToLeft = True
+    ws.sheet_view.rightToLeft = False
     ws.freeze_panes = "A2"
     output = io.BytesIO()
     wb.save(output)
@@ -7020,7 +7020,7 @@ def build_neglect_report_xlsx(df):
     ws = wb.active
     ws.title = "تقرير الإهمال"
     _write_df_sheet(ws, df)
-    ws.sheet_view.rightToLeft = True
+    ws.sheet_view.rightToLeft = False
     ws.freeze_panes = "A2"
     output = io.BytesIO()
     wb.save(output)
@@ -8869,7 +8869,7 @@ def _style_snb_activity_workbook(workbook):
             "Weekly_Dropoff", "Weekly_Collector_Activity",
             "Weekly_First_Last_Notes"
         ):
-            sheet.sheet_view.rightToLeft = True
+            sheet.sheet_view.rightToLeft = False
         if sheet.title != "ملخص المحصلين":
             sheet.freeze_panes = "A2"
         sheet.auto_filter.ref = f"A1:{get_column_letter(last_col)}{last_row}"
@@ -9010,7 +9010,7 @@ def _build_snb_collector_details_xlsx(result, collector_col):
         )
         _style_snb_activity_workbook(book)
         for ws in book.worksheets:
-            ws.sheet_view.rightToLeft = True
+            ws.sheet_view.rightToLeft = False
         index_ws = book["فهرس المحصلين"]
         sheet_col = summary_df.columns.get_loc("اسم الشيت") + 1
         for row_num, label in enumerate(summary_df["اسم الشيت"], start=2):
@@ -11895,37 +11895,13 @@ def _snb_promise_product_cards_html(per, has_file, ready, has_product_column, de
 
 
 def _snb_promises_export(summary, types, active, broken, collectors, products):
+    """Export only the already-calculated active and broken promise rows."""
     stream = io.BytesIO()
-    overview = pd.DataFrame(summary, columns=["المؤشر", "القيمة"])
-    type_table = types.rename_axis("نوع الوعد").reset_index(name="العدد")
-    collector_table = pd.DataFrame(
-        [(name, current, missed, missed / (current + missed))
-         for (_, name), (current, missed) in collectors],
-        columns=["اسم المحصل", "قائمة", "مكسورة", "نسبة الكسر"],
-    )
     with pd.ExcelWriter(stream, engine="openpyxl") as writer:
-        overview.to_excel(writer, sheet_name="ملخص", index=False)
-        type_table.to_excel(writer, sheet_name="ملخص", index=False, startrow=len(overview) + 2)
         active.to_excel(writer, sheet_name="الوعود القائمة", index=False)
         broken.to_excel(writer, sheet_name="الوعود المكسورة", index=False)
-        collector_table.to_excel(writer, sheet_name="لكل محصل", index=False)
-        product_table = (
-            products if products is not None else pd.DataFrame(columns=[
-                "المنتج", "قائمة", "مكسورة", "الإجمالي", "نسبة الكسر (محسوبة)"
-            ])
-        )
-        product_table.to_excel(writer, sheet_name="لكل منتج", index=False)
-        for row in writer.sheets["لكل منتج"].iter_rows(
-            min_row=2, min_col=5, max_col=5,
-        ):
-            for cell in row:
-                cell.number_format = "0.0%"
-        writer.sheets["ملخص"]["B5"].number_format = "0.0%"
-        for row in writer.sheets["لكل محصل"].iter_rows(min_row=2, min_col=4):
-            for cell in row:
-                cell.number_format = "0.0%"
         for sheet in writer.sheets.values():
-            sheet.sheet_view.rightToLeft = True
+            sheet.sheet_view.rightToLeft = False
             for column in sheet.columns:
                 width = 10
                 for cell in column:
@@ -12085,7 +12061,7 @@ def _render_snb_promises(files):
         worksheet = workbook.active
         worksheet.title = "التفاصيل"
         _write_df_sheet(worksheet, df_export)
-        worksheet.sheet_view.rightToLeft = True
+        worksheet.sheet_view.rightToLeft = False
         worksheet.freeze_panes = "A2"
         output = io.BytesIO()
         workbook.save(output)
