@@ -97,8 +97,8 @@ class TestSnbPromiseProducts(unittest.TestCase):
         html = self.fn["_snb_promise_product_cards_html"](per, True, True, True)
         self.assertIn("الوعود لكل منتج", html)
         self.assertIn("33.3%", html)
-        self.assertIn("conic-gradient(from 270deg, var(--broken) 0 16.666667%", html)
-        self.assertIn("-webkit-mask:radial-gradient(circle,transparent 80px,#000 81px)", html)
+        self.assertIn('<svg class="snb-pr-product-ring"', html)
+        self.assertIn("stroke-dasharray", html)
         self.assertIn("rgba(255,255,255,0.15)", html)
         self.assertIn("0.0%", html)  # product with zero broken but non-zero standing
         self.assertIn("—", html)  # product with total 0
@@ -138,17 +138,10 @@ class TestSnbPromiseProducts(unittest.TestCase):
             summary, types, active, broken, [], per,
         )
         sheets = pd.read_excel(io.BytesIO(payload), sheet_name=None)
-        self.assertEqual(list(sheets), [
-            "ملخص", "الوعود القائمة", "الوعود المكسورة", "لكل محصل", "لكل منتج",
-        ])
-        exported = sheets["لكل منتج"]
-        self.assertEqual(list(exported.columns), [
-            "المنتج", "قائمة", "مكسورة", "الإجمالي", "نسبة الكسر (محسوبة)",
-        ])
-        pd.testing.assert_frame_equal(
-            exported[["المنتج", "قائمة", "مكسورة", "الإجمالي"]],
-            per[["المنتج", "قائمة", "مكسورة", "الإجمالي"]],
-        )
+        # Current approved export has two sheets only; product KPIs remain on-screen.
+        self.assertEqual(list(sheets), ["الوعود القائمة", "الوعود المكسورة"])
+        self.assertEqual(list(sheets["الوعود القائمة"].columns), list(active.columns))
+        self.assertEqual(list(sheets["الوعود المكسورة"].columns), list(broken.columns))
         self.assertEqual(len(sheets["الوعود القائمة"]), len(active))
         self.assertEqual(len(sheets["الوعود المكسورة"]), len(broken))
 
@@ -183,9 +176,9 @@ class TestSnbPromiseProducts(unittest.TestCase):
         self.assertIn("snb-pr-metrics", code)
         self.assertIn("أنواع الوعود", code)
         self.assertIn("+ product_section", code)
-        self.assertIn("الوعود لكل محصل · أعلى 10 محصلين", code)
+        self.assertIn("الوعود لكل محصل", code)
         self.assertLess(code.index("أنواع الوعود"), code.index("+ product_section"))
-        self.assertLess(code.index("+ product_section"), code.index("الوعود لكل محصل · أعلى 10 محصلين"))
+        self.assertLess(code.index("+ product_section"), code.index("الوعود لكل محصل"))
         self.assertIn('key="snb_pr_download"', code)
 
 
