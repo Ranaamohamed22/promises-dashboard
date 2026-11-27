@@ -12914,7 +12914,6 @@ EJADA_DEFAULT_REPORT_ICON = '<path d="M7 3h8l4 4v14H7Z"/><path d="M15 3v4h4"/><p
 EJADA_ORBIT_CSS = """<style>
 @property --ejada-a{syntax:'<angle>';initial-value:0deg;inherits:false}
 html body .stApp .st-key-ejada_theme_switch.st-key-ejada_theme_switch{position:relative;padding:5px !important;gap:4px !important;min-height:0 !important;width:fit-content !important;flex:0 0 auto !important;margin-inline-start:auto !important;margin-inline-end:0 !important}
-html body .stApp .st-key-ejada_theme_switch.st-key-ejada_theme_switch::after{content:var(--theme-label);position:absolute;top:calc(100% + 1px);left:0;right:0;text-align:center;font:700 12px Cairo,sans-serif;color:var(--muted)}
 html body .stApp .st-key-ejada_theme_switch.st-key-ejada_theme_switch button[kind]{width:42px !important;min-width:42px !important;height:42px !important;min-height:42px !important;padding:0 !important;border-radius:50% !important;justify-content:center;transition:background .25s,box-shadow .25s,transform .2s}
 html body .stApp .st-key-ejada_theme_switch.st-key-ejada_theme_switch button[kind] p{display:none !important}
 html body .stApp .st-key-ejada_theme_switch.st-key-ejada_theme_switch button[kind]::before{width:20px !important;height:20px !important;border:0 !important;border-radius:0 !important;background:var(--text) !important;-webkit-mask:var(--ejada-ic) center/20px no-repeat;mask:var(--ejada-ic) center/20px no-repeat;opacity:.85}
@@ -12956,8 +12955,8 @@ html body .stApp [class*="st-key-home_report_card_"]{flex:1 1 auto;position:rela
 html body .stApp [class*="st-key-home_report_card_"]{display:flex !important;flex-direction:column;justify-content:center}
 html body .stApp [class*="st-key-home_report_card_"] > [data-testid="stElementContainer"]{width:100%}
 html body .stApp [class*="st-key-home_report_card_"]:hover{transform:none !important;scale:1.04;border-color:var(--accent) !important;box-shadow:0 0 0 1px var(--accent),0 16px 38px color-mix(in srgb,var(--accent) 38%,transparent) !important}
-html body .stApp [class*="st-key-home_report_card_"] .ejada-report-card{display:flex !important;flex-direction:row;justify-content:flex-start;align-items:center;gap:16px;min-height:0 !important;height:100%;padding:0 14px;text-align:right;font-size:18px;font-weight:800}
-html body .stApp [class*="st-key-home_report_card_"] .ejada-report-card > span:last-child{white-space:normal !important;line-height:1.3}
+html body .stApp [class*="st-key-home_report_card_"] .ejada-report-card{display:flex !important;flex-direction:row;justify-content:center;align-items:center;gap:16px;min-height:0 !important;height:100%;padding:0 14px;text-align:center;font-size:18px;font-weight:800}
+html body .stApp [class*="st-key-home_report_card_"] .ejada-report-card > span:last-child{white-space:normal !important;line-height:1.3;width:160px;text-align:center}
 html body .stApp [class*="st-key-home_report_card_"] .ejada-report-icon{flex:none;width:56px !important;height:56px !important;border-radius:50% !important;box-shadow:0 0 0 6px color-mix(in srgb,var(--icon-bg) 14%,transparent)}
 .ejada-report-icon svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .e-flag{transform-origin:6px 8px;animation:eFlag 2.4s ease-in-out infinite}@keyframes eFlag{0%,100%{transform:skewY(0)}50%{transform:skewY(-5deg)}}
