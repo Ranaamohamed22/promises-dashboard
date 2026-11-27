@@ -12123,14 +12123,14 @@ font-family:'Cairo',sans-serif;color:var(--text)}
 .snb-ld-wrap{display:flex;flex-direction:column;align-items:center}
 .snb-ld-track{position:relative;width:260px;height:18px;margin-top:34px;border-radius:14px;direction:ltr;
 background:rgba(127,214,224,.18);border:2px solid var(--text)}
-.snb-ld-fill{height:100%;border-radius:12px;background:linear-gradient(90deg,#5be39a,#7fd6e0);animation:snbwid 4.5s ease-in-out infinite}
-.snb-ld-run{position:absolute;top:-43px;left:0;width:34px;height:39px;animation:snbmv 4.5s ease-in-out infinite}
+.snb-ld-fill{height:100%;border-radius:12px;background:linear-gradient(90deg,#5be39a,#7fd6e0);animation:snbwid 5s ease-in-out infinite}
+.snb-ld-run{position:absolute;top:-43px;left:0;width:34px;height:39px;animation:snbmv 5s ease-in-out infinite}
 .snb-ld-girl{overflow:visible;animation:snbbob .3s ease-in-out infinite alternate}
 .snb-ld-pony{transform-origin:12px 14px;animation:snbsw .3s ease-in-out infinite alternate}
 .snb-ld-leg{transform-origin:20px 35px}
 .snb-ld-l1{animation:snblg .3s ease-in-out infinite alternate}
 .snb-ld-l2{animation:snblg .3s ease-in-out infinite alternate-reverse}
-.snb-ld-pct{counter-reset:snbn var(--snbp);animation:snbcnt 4.5s ease-in-out infinite;font-size:16px;font-weight:800;direction:ltr;margin:0}
+.snb-ld-pct{counter-reset:snbn var(--snbp);animation:snbcnt 5s ease-in-out infinite;font-size:16px;font-weight:800;direction:ltr;margin:0}
 .snb-ld-pct::after{content:counter(snbn) "%"}
 @keyframes snbwid{0%{width:0}80%,100%{width:100%}}
 @keyframes snbmv{0%{left:-6px}80%,100%{left:228px}}
