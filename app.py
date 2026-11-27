@@ -12100,6 +12100,49 @@ def _read_snb_promise_file_cached(file_bytes, file_name):
 
 
 def _render_snb_promises(files):
+    # ===== مؤشر التحميل (UI فقط): يظهر أثناء قراءة الملف وتجهيز التقرير ثم يختفي =====
+    _loader_slot = st.empty()
+    if files:
+        _loader_slot.markdown(
+            """<style>
+@property --snbp{syntax:'<integer>';initial-value:0;inherits:false}
+.snb-ld{direction:rtl;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:22px;height:120px;
+margin:6px 0 14px;border-radius:22px;background:var(--card);border:1px solid var(--border);box-sizing:border-box;
+font-family:'Cairo',sans-serif;color:var(--text)}
+.snb-ld-txt{display:flex;flex-direction:column;gap:2px}
+.snb-ld-t{font-size:16px;font-weight:800}
+.snb-ld-s{font-size:12px;color:var(--muted)}
+.snb-ld-wrap{display:flex;flex-direction:column;align-items:center}
+.snb-ld-track{position:relative;width:260px;height:18px;margin-top:34px;border-radius:14px;direction:ltr;
+background:rgba(127,214,224,.18);border:2px solid var(--text)}
+.snb-ld-fill{height:100%;border-radius:12px;background:linear-gradient(90deg,#5be39a,#7fd6e0);animation:snbwid 4.5s ease-in-out infinite}
+.snb-ld-run{position:absolute;top:-43px;left:0;width:34px;height:39px;animation:snbmv 4.5s ease-in-out infinite}
+.snb-ld-girl{overflow:visible;animation:snbbob .3s ease-in-out infinite alternate}
+.snb-ld-pony{transform-origin:12px 14px;animation:snbsw .3s ease-in-out infinite alternate}
+.snb-ld-leg{transform-origin:20px 35px}
+.snb-ld-l1{animation:snblg .3s ease-in-out infinite alternate}
+.snb-ld-l2{animation:snblg .3s ease-in-out infinite alternate-reverse}
+.snb-ld-pct{counter-reset:snbn var(--snbp);animation:snbcnt 4.5s ease-in-out infinite;font-size:16px;font-weight:800;direction:ltr;margin:0}
+.snb-ld-pct::after{content:counter(snbn) "%"}
+@keyframes snbwid{0%{width:0}80%,100%{width:100%}}
+@keyframes snbmv{0%{left:-6px}80%,100%{left:228px}}
+@keyframes snbcnt{0%{--snbp:0}80%,100%{--snbp:100}}
+@keyframes snbbob{to{transform:translateY(-6px)}}
+@keyframes snbsw{from{transform:rotate(-14deg)}to{transform:rotate(14deg)}}
+@keyframes snblg{from{transform:rotate(-28deg)}to{transform:rotate(28deg)}}
+</style>
+<div class="snb-ld"><div class="snb-ld-wrap"><div class="snb-ld-track"><div class="snb-ld-fill"></div>
+<div class="snb-ld-run"><svg class="snb-ld-girl" viewBox="0 0 40 46" width="34" height="39">
+<g class="snb-ld-pony"><ellipse cx="6" cy="19" rx="6.5" ry="3.6" fill="#3b2a2a"/></g>
+<g class="snb-ld-leg snb-ld-l1"><line x1="17" y1="35" x2="17" y2="44" stroke="#fff" stroke-width="3" stroke-linecap="round"/></g>
+<g class="snb-ld-leg snb-ld-l2"><line x1="24" y1="35" x2="24" y2="44" stroke="#fff" stroke-width="3" stroke-linecap="round"/></g>
+<path d="M14 24 L26 24 L30 37 L10 37 Z" fill="#7fd6e0"/><circle cx="20" cy="14" r="10" fill="#ffe2cc"/>
+<path d="M10 14 A10 10 0 0 1 30 14 Q26 8 20 9 Q14 8 10 14 Z" fill="#3b2a2a"/><circle cx="13" cy="7" r="3" fill="#5be39a"/>
+<circle cx="24.5" cy="15.5" r="1.4" fill="#3b2a2a"/><circle cx="27" cy="19" r="2" fill="#ff9bb5" opacity=".7"/></svg></div></div>
+<div class="snb-ld-pct"></div></div>
+<div class="snb-ld-txt"><div class="snb-ld-t">جاري تجهيز التقرير…</div><div class="snb-ld-s">يتم قراءة الملف وحساب الوعود</div></div></div>""",
+            unsafe_allow_html=True,
+        )
     frames = []
     for uploaded in files or []:
         try:
@@ -12292,6 +12335,7 @@ def _render_snb_promises(files):
         )) if ready else b""
     )
 
+    _loader_slot.empty()
     with st.container(key="snb_glass_promises"):
         with st.container(key="snb_pr_titlebar", horizontal=True, vertical_alignment="center"):
             with st.container(key="snb_ov_upload_promises_page", horizontal=True, vertical_alignment="center",
@@ -12448,7 +12492,9 @@ max-width:100%;margin:9px auto 0;opacity:0;visibility:hidden;
 transition:opacity .2s ease,visibility .2s ease;background:linear-gradient(135deg,#2fb5a6,#5be39a);
 color:#0E2A47;font-size:11px;font-weight:800;padding:5px 15px;border-radius:999px;white-space:nowrap;
 box-shadow:0 6px 16px rgba(47,181,166,.4);pointer-events:none}
-.snb-pr-details:hover .snb-pr-btn-open,.snb-pr-details:focus-within .snb-pr-btn-open{opacity:1;visibility:visible}
+.snb-pr-details>summary,.snb-pr-details>summary:focus{outline:none}
+.snb-pr-details>summary:focus-visible>article{box-shadow:0 0 0 2px rgba(91,227,154,.7)}
+.snb-pr-details:hover .snb-pr-btn-open,.snb-pr-details:has(>summary:focus-visible) .snb-pr-btn-open{opacity:1;visibility:visible}
 .snb-pr-details[open] .snb-pr-btn-open{display:none}
 @media (hover:none){.snb-pr-details .snb-pr-btn-open{opacity:1;visibility:visible}}
 .snb-m-backdrop,.snb-m-close{display:none}
