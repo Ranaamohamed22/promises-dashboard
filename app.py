@@ -2030,6 +2030,23 @@ st.markdown(f"""
     html body .stApp .st-key-snb_glass_promises .st-key-snb_ov_upload_promises_page [data-stale="true"]:has([data-testid="stFileUploaderFile"]) {{
         display:none !important;
     }}
+    /* v3: داخل مربع رفع الوعود، أي كارت/قائمة ملفات أو زرار Upload تاني أو شريط تحميل يتخفى دايمًا (مش بس بعد الملف) */
+    html body .stApp .st-key-snb_glass_promises .st-key-snb_ov_upload_promises_page [data-testid="stFileUploader"] > :not([data-testid="stFileUploaderDropzone"]) {{
+        display:none !important;
+    }}
+    html body .stApp .st-key-snb_glass_promises .st-key-snb_ov_upload_promises_page [data-testid="stFileUploaderDropzone"] :is([data-testid="stFileUploaderFile"],[data-testid="stFileUploaderFileList"],[data-testid="stFileUploaderFileData"],[data-testid="stFileUploaderFileName"],[data-testid="stFileUploaderDeleteBtn"],[data-testid="stFileUploaderPagination"],[data-testid="stFileUploaderDropzoneInstructions"],small,svg,[role="progressbar"]) {{
+        display:none !important;
+    }}
+    html body .stApp .st-key-snb_glass_promises .st-key-snb_ov_upload_promises_page [data-testid="stFileUploaderDropzone"] button:not(:first-of-type) {{
+        display:none !important;
+    }}
+    html body .stApp .st-key-snb_glass_promises .st-key-snb_ov_upload_promises_page [data-testid="stFileUploaderDropzone"] {{
+        position:relative !important;overflow:hidden !important;
+    }}
+    html body .stApp .st-key-snb_glass_promises .st-key-snb_ov_upload_promises_page [data-testid="stFileUploaderDropzone"] input[type="file"] {{
+        position:absolute !important;inset:0 !important;width:100% !important;height:100% !important;
+        opacity:0 !important;cursor:pointer !important;z-index:2 !important;display:block !important;
+    }}
     /* بعد الملف: علامة صح + اسم الملف + "تغيير" */
     html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page div[class*="st-key-uploaded_chip_"]::before {{
         content:"✓";flex:none;width:28px;height:28px;border-radius:50%;background:var(--accent);
