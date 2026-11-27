@@ -12079,13 +12079,19 @@ def _snb_promise_data(raw, today):
     return raw.loc[current], broken_rows, types, int(is_promise.sum()), int((is_promise & ~valid).sum())
 
 
+@st.cache_data(show_spinner=False, max_entries=10)
+def _read_snb_promise_file_cached(file_bytes, file_name):
+    """Cache identical uploaded portfolio parsing without changing dtypes or sheet selection."""
+    data = io.BytesIO(file_bytes)
+    return (pd.read_csv(data, dtype=str) if file_name.lower().endswith(".csv")
+            else pd.read_excel(data, sheet_name="Sheet1", dtype=str))
+
+
 def _render_snb_promises(files):
     frames = []
     for uploaded in files or []:
         try:
-            data = io.BytesIO(uploaded.getvalue())
-            frame = (pd.read_csv(data, dtype=str) if uploaded.name.lower().endswith(".csv")
-                     else pd.read_excel(data, sheet_name="Sheet1", dtype=str))
+            frame = _read_snb_promise_file_cached(uploaded.getvalue(), uploaded.name)
             frames.append(frame)
         except (ValueError, OSError) as exc:
             st.error(f"تعذر قراءة الملف {uploaded.name}: {exc}")
@@ -12101,6 +12107,20 @@ def _render_snb_promises(files):
         identifiers = raw[account_col].map(_clean_snb_promise_text)
         accounts = identifiers[identifiers.ne("")].nunique()
     today = datetime.now(ZoneInfo("Africa/Cairo")).date()
+    # A new file or day must never reuse old downloadable output.
+    _promise_export_signature = (
+        tuple((f.name, hashlib.sha256(f.getvalue()).hexdigest()) for f in (files or [])),
+        today.isoformat(),
+    )
+    def _prepare_snb_promise_exports(kind):
+        st.session_state[f"_snb_pr_{kind}_export_signature"] = _promise_export_signature
+
+    _details_exports_enabled = (
+        st.session_state.get("_snb_pr_details_export_signature") == _promise_export_signature
+    )
+    _main_export_enabled = (
+        st.session_state.get("_snb_pr_main_export_signature") == _promise_export_signature
+    )
     active, broken, types, _, missing_dates = (
         _snb_promise_data(raw, today) if ready else
         (pd.DataFrame(), pd.DataFrame(), pd.Series(dtype=int), None, None)
@@ -12185,7 +12205,7 @@ def _render_snb_promises(files):
 
     def csv_link(title, frame):
         """UI-only download: all rows of this item, read from the same rows the table shows."""
-        if frame is None or frame.empty:
+        if frame is None or frame.empty or not _details_exports_enabled:
             return ""
         import base64 as _b64
         import io as _io
@@ -12265,7 +12285,7 @@ def _render_snb_promises(files):
     )
     export = (
         _snb_promises_export(summary, types, active, broken, ordered, product_summary)
-        if ready else b""
+        if ready and _main_export_enabled else b""
     )
 
     with st.container(key="snb_glass_promises"):
@@ -12281,6 +12301,18 @@ def _render_snb_promises(files):
                     st.file_uploader("رفع ملف الوعود", type=["xlsx", "csv"], accept_multiple_files=True,
                                      label_visibility="collapsed", key=key, on_change=save_uploaded_files,
                                      args=("page_files", "SNB", "Promises", key))
+            st.button(
+                "📄 تجهيز ملف الوعود", key="snb_pr_prepare_main_export",
+                on_click=_prepare_snb_promise_exports, args=("main",),
+                disabled=not ready,
+                help="إنشاء ملف الوعود القائمة والمكسورة عند الطلب فقط",
+            )
+            st.button(
+                "📋 تجهيز تنزيلات تفاصيل الكروت", key="snb_pr_prepare_details_exports",
+                on_click=_prepare_snb_promise_exports, args=("details",),
+                disabled=not ready,
+                help="ملفات تفاصيل الكروت لا تُنشأ إلا بعد الضغط هنا",
+            )
             st.download_button(
                 "تنزيل ملف الوعود", export, icon="⬇️",
                 file_name=f"promises_{datetime.now(ZoneInfo('Africa/Cairo')):%Y-%m-%d}.xlsx",
