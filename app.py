@@ -9386,7 +9386,8 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
         for _i, (_product, _value) in enumerate(_values):
             _share = float(_value) / max(1, int(pv.sum()))
             _length = _share * _c
-            _col = _palette[_i % len(_palette)]
+            _col = ("#5be39a" if _product == "CC+PF" else
+                    "#7fd6e0" if _product == "RF" else "#2fb3a6")
             if _share >= 1:
                 _parts.append(f'<circle cx="160" cy="90" r="{_r}" fill="none" stroke="{_col}" stroke-width="{_sw}"/>')
             elif _share > 0:
