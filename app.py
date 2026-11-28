@@ -8929,6 +8929,26 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
         '{opacity:1;}'
         '[class*="st-key-snb_activity_card_"]:hover [data-testid="stVerticalBlockBorderWrapper"]'
         '{border-color:#5be39a!important;box-shadow:0 0 12px rgba(91,227,154,.28);}'
+        '.snb-v-rank-list{padding:5px 4px;direction:rtl;}'
+        '.snb-v-rank-row{display:flex;gap:7px;align-items:center;height:31px;font-size:11px;}'
+        '.snb-v-rank{border-radius:50%;background:#43697d;color:#e1fff7;min-width:20px;text-align:center;}'
+        '.snb-v-rank-row:nth-child(-n+3) .snb-v-rank{background:#7fd6e0;color:#0e2a47;}'
+        '.snb-v-rank-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
+        '.snb-v-rank-row b{font-size:11px;white-space:nowrap;}'
+        '.snb-v-ring{height:20px;width:20px;display:inline-block;border-radius:50%;'
+        'background:conic-gradient(#5be39a var(--part),rgba(127,214,224,.28) 0);'
+        'mask:radial-gradient(farthest-side,transparent 55%,#000 60%);}'
+        '.snb-v-rank-row small{min-width:35px;color:#a9c5ce;text-align:left;}'
+        '.snb-v-heat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;direction:rtl;}'
+        '.snb-v-heat{background:rgba(255,255,255,.065);border-radius:9px;padding:9px 7px;'
+        'text-align:center;display:flex;flex-direction:column;gap:2px;}'
+        '.snb-v-heat small{font-size:10px;color:#d2edec;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
+        '.snb-v-heat strong{font-size:23px;line-height:1.15;}'
+        '.snb-v-track{background:rgba(255,255,255,.13);height:4px;border-radius:4px;overflow:hidden;}'
+        '.snb-v-track i{display:block;height:4px;border-radius:4px;}'
+        '.snb-v-donut{text-align:center;direction:rtl;}'
+        '.snb-v-pills{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;}'
+        '.snb-v-pills span{border-radius:6px;padding:4px 7px;background:rgba(255,255,255,.07);font-size:10px;}'
         '</style>', unsafe_allow_html=True
     )
 
@@ -9252,21 +9272,27 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
         for label in ("أول مكالمة","آخر مكالمة"):
             summary[label] = pd.to_datetime(summary[label]).dt.strftime("%H:%M").fillna("—")
         visible_summary = summary if selected_names else summary.head(10)
+        if selected_names:
+            overall = pd.DataFrame([{
+                "المحصل":"الإجمالي",
+                "المكالمات":total,
+                "نسبة الناجحة":round(100*int((rated=="ناجحة").sum())/max(1,total),1),
+                "الوقت المهدر":round(float(waste.sum()),2),
+                "أول مكالمة":timestamps.min().strftime("%H:%M") if timestamps.notna().any() else "—",
+                "آخر مكالمة":timestamps.max().strftime("%H:%M") if timestamps.notna().any() else "—",
+            }])
+            visible_summary = pd.concat([visible_summary,overall],ignore_index=True)
         suffix = (f"{len(selected_names)} محصلين مختارين" if selected_names
                   else f"أعلى 10 من {len(calls)}")
         with st.expander(f"١٢. ملخص لكل محصل ({suffix})",expanded=False):
-            st.dataframe(visible_summary,hide_index=True,use_container_width=True)
-            with st.popover("◉ عرض التفاصيل"):
-                st.dataframe(summary,hide_index=True,use_container_width=True)
-                workbook = io.BytesIO()
-                with pd.ExcelWriter(workbook,engine="openpyxl") as writer:
-                    summary.to_excel(writer,sheet_name="Collectors",index=False)
-                    writer.book.active.sheet_view.showGridLines = True
-                st.download_button(
-                    "⬇ تحميل Excel",workbook.getvalue(),"SNB_Activity_Collectors.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="snb_visual_collectors_excel"
-                )
+            st.dataframe(
+                visible_summary.style.apply(
+                    lambda row: ["color: #5be39a; font-weight: bold"]*len(row)
+                    if row["المحصل"]=="الإجمالي" else [""]*len(row),axis=1
+                ),hide_index=True,use_container_width=True
+            )
+            if st.button("◉ عرض التفاصيل",key="snb_visual_summary_details"):
+                _snb_card_modal("ملخص لكل محصل",summary,"collectors")
         # The original processed Excel always uses the unfiltered result.
         fragment = '<html lang="ar" dir="rtl"><meta charset="utf-8"><body style="background:#0e2a47;color:white;">'
         fragment += f'<h2>لوحة مؤشرات النشاط | SNB</h2><p>{html_escape(period_label)}</p>'
