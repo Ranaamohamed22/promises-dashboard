@@ -11439,26 +11439,53 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                         _ejada_activity_kpis("SNB", *review_counts, period=scope)
         approved_special_keys = set(model_mapping) | set(manual_decisions)
         st.markdown('<div id="snb-activity-review"></div>', unsafe_allow_html=True)
-        slash_row_decisions, slash_reviewed = _snb_review_slash_rows(
-            selected, stats["notes"], activity_upload,
-            model_mapping, manual_decisions,
-            approved_special_keys=approved_special_keys,
-        )
-        # Keep both original review lists visible on the same page.
-        # Special-review rows use their own row-level manual decisions.
-        # Skip repeat note-level review for those rows.
+        # Weekly files can contain many individually reviewable special rows.
+        # Show the distinct new Notes editor FIRST, like the daily review,
+        # so it is visible without scrolling past a large row-level table.
+        # Keep both review lists and their original approval requirements.
         ordinary_notes = selected.loc[
             ~_snb_special_review_mask(
                 selected[stats["notes"]], approved_special_keys
             ),
             stats["notes"]
         ]
-        similarity, fully_reviewed = _snb_review_new_notes(
-            ordinary_notes,
-            model_mapping,
-            manual_decisions,
-            conflicted=conflicted_notes
-        )
+        if activity_kind == "أسبوعي":
+            unknown_keys = (
+                set(ordinary_notes.map(_snb_normalize_note).unique())
+                - set(model_mapping) - set(manual_decisions)
+            )
+            special_pending = int((
+                _snb_special_review_mask(
+                    selected[stats["notes"]], approved_special_keys
+                ) & ~selected.index.map(str).isin(slash_row_decisions)
+            ).sum())
+            if unknown_keys or special_pending:
+                st.warning(
+                    f"مراجعة النشاط الأسبوعي: {len(unknown_keys):,} إفادة جديدة "
+                    f"و{special_pending:,} صف بحالة خاصة محتاجين اعتماد. "
+                    "اعتمدي التقييمات في القائمتين أدناه، وبعدها هيظهر شيت الأسبوعي."
+                )
+            similarity, fully_reviewed = _snb_review_new_notes(
+                ordinary_notes, model_mapping, manual_decisions,
+                conflicted=conflicted_notes
+            )
+            # A successful form submit triggers rerun, so special-note suggestions
+            # will use the approved values on the next pass.
+            slash_row_decisions, slash_reviewed = _snb_review_slash_rows(
+                selected, stats["notes"], activity_upload,
+                model_mapping, manual_decisions,
+                approved_special_keys=approved_special_keys,
+            )
+        else:
+            slash_row_decisions, slash_reviewed = _snb_review_slash_rows(
+                selected, stats["notes"], activity_upload,
+                model_mapping, manual_decisions,
+                approved_special_keys=approved_special_keys,
+            )
+            similarity, fully_reviewed = _snb_review_new_notes(
+                ordinary_notes, model_mapping, manual_decisions,
+                conflicted=conflicted_notes
+            )
         if not fully_reviewed or not slash_reviewed:
             # Visual preview only: same established model and duration functions.
             # Never make an unresolved report or Excel available for download.
