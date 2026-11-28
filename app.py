@@ -9021,23 +9021,51 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
             fig.update_layout(margin=dict(l=6,r=35,t=8,b=8))
             return fig
 
-        @st.dialog("تفاصيل مؤشرات النشاط", width="large")
-        def _snb_card_modal(title, detail, key):
+        # Reuse the promise page's HTML details/summary/modal class structure.
+        # Each card gets the same snb-pr-details / snb-m-backdrop / snb-m-close.
+        def _activity_modal_html(title, detail, key):
             detail = table(detail).reset_index(drop=True)
-            st.markdown(f"### {title}")
-            st.caption("Excel بتحمّل صفوف الكارت ده بس · قراءة فقط")
-            st.caption(f"{len(detail):,} صف")
-            workbook = io.BytesIO()
-            with pd.ExcelWriter(workbook, engine="openpyxl") as writer:
+            excel = io.BytesIO()
+            with pd.ExcelWriter(excel, engine="openpyxl") as writer:
                 detail.to_excel(writer, sheet_name="Details", index=False)
                 writer.book.active.sheet_view.showGridLines = True
-            st.download_button(
-                "⬇ تحميل Excel", data=workbook.getvalue(),
-                file_name=f"SNB_Activity_Card_{key}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=f"snb_visual_export_{key}"
+            filename = f"SNB_Activity_Card_{key}.xlsx"
+            uri = "data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64," + base64.b64encode(excel.getvalue()).decode("ascii")
+            columns = detail.columns.tolist()
+            header = "".join(f"<th>{html_escape(str(c))}</th>" for c in columns)
+            rows = "".join(
+                "<tr>" + "".join(
+                    f"<td>{html_escape('—' if pd.isna(v) else str(v))}</td>"
+                    for v in row
+                ) + "</tr>"
+                for row in detail.head(50).itertuples(index=False,name=None)
             )
-            st.dataframe(detail, hide_index=True, use_container_width=True)
+            more = (f'<p class="snb-pr-note">أول 50 صف من {len(detail):,} — الباقي في ملف التنزيل</p>'
+                    if len(detail)>50 else "")
+            return (
+                '<div class="snb-m-panel"><div class="snb-m-box">'
+                '<div class="snb-m-head"><span class="snb-m-ic">📋</span><div class="snb-m-t">'
+                f'<h4>{html_escape(title)}</h4>'
+                '<span>Excel بتحمّل صفوف الكارت ده بس · قراءة فقط</span></div>'
+                f'<span class="snb-m-count">{len(detail):,} صف</span>'
+                f'<a class="snb-m-dl" href="{uri}" download="{filename}">⬇ تحميل Excel</a>'
+                '</div><div class="snb-m-tblwrap"><table class="snb-m-tbl"><thead><tr>'
+                + header + '</tr></thead><tbody>' + rows + '</tbody></table>' + more
+                + '</div></div></div>'
+            )
+
+        def _activity_details_html(title, detail, key):
+            # Same HTML component and close/backdrop classes as promises.
+            return (
+                '<details class="snb-pr-details snb-v-details"><summary>'
+                '<span class="snb-pr-detail-btn snb-pr-btn-open">'
+                '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" '
+                'stroke="currentColor" stroke-width="2.4">'
+                '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11-8-11-8z"/>'
+                '<circle cx="12" cy="12" r="3"/></svg>عرض التفاصيل</span>'
+                '<span class="snb-m-backdrop"></span><span class="snb-m-close">✕</span>'
+                '</summary>' + _activity_modal_html(title, detail, key) + '</details>'
+            )
 
         def open_card(number, title, figure, detail, key, custom=None):
             with st.container(border=True, key=f"snb_activity_card_{key}"):
@@ -9050,8 +9078,7 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
                     st.html(custom)
                 else:
                     st.info("—")
-                if st.button("◉ عرض التفاصيل", key=f"snb_activity_details_{key}"):
-                    _snb_card_modal(title, detail, key)
+                st.html(_activity_details_html(title, detail, key))
 
         top = calls.head(10)
         fig1 = fig_base()
@@ -9185,46 +9212,60 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
             pv = pd.Series(dtype=int)
         d10 = pd.DataFrame({"المنتج":pv.index,"عدد المكالمات":pv.values,
                             "%":[round(100*v/max(1,total),1) for v in pv.values]})
-        # Rounded SVG arcs and leader labels match the promises-tab ring family.
-        ring_parts = []
-        leaders = []
-        pills = []
-        previous = -90.0
-        for i, (product, value) in enumerate(pv.items()):
-            ratio = float(value) / max(1, int(pv.sum()))
-            portion = ratio * 360
-            start_angle = previous + 2
-            end_angle = previous + portion - 2
-            if end_angle > start_angle:
-                start_rad, end_rad = [math.radians(v) for v in (start_angle,end_angle)]
-                x1,y1 = 130+57*math.cos(start_rad),130+57*math.sin(start_rad)
-                x2,y2 = 130+57*math.cos(end_rad),130+57*math.sin(end_rad)
-                ring_parts.append(
-                    f'<path d="M{x1:.2f} {y1:.2f} A57 57 0 {1 if end_angle-start_angle>180 else 0} 1 '
-                    f'{x2:.2f} {y2:.2f}" stroke="{colors[i%len(colors)]}" stroke-width="24" '
-                    f'stroke-linecap="round" fill="none"/>'
+        # Exact promises-tab circle geometry: 320x180, radius 46, stroke 28,
+        # 6px arc separation, rounded dash ends and identical leader coordinates.
+        _r, _sw, _gap = 46.0, 28.0, 6.0
+        _c = 2 * math.pi * _r
+        _parts = []
+        _values = list(pv.items())
+        _palette = ["#5be39a", "#7fd6e0", "#2fb3a6"]
+        _share_start = 0.0
+        for _i, (_product, _value) in enumerate(_values):
+            _share = float(_value) / max(1, int(pv.sum()))
+            _length = _share * _c
+            _col = _palette[_i % len(_palette)]
+            if _share >= 1:
+                _parts.append(f'<circle cx="160" cy="90" r="{_r}" fill="none" stroke="{_col}" stroke-width="{_sw}"/>')
+            elif _share > 0:
+                _dash = max(_length - _sw - _gap, .01)
+                _offset = _share_start * _c + _sw/2 + _gap/2
+                _parts.append(
+                    f'<circle cx="160" cy="90" r="{_r}" fill="none" stroke="{_col}" '
+                    f'stroke-width="{_sw}" stroke-linecap="round" '
+                    f'stroke-dasharray="{_dash:.3f} {_c:.3f}" '
+                    f'stroke-dashoffset="{-_offset:.3f}" transform="rotate(-90 160 90)"/>'
                 )
-                angle = math.radians(previous + portion/2)
-                a,b = 130+78*math.cos(angle),130+78*math.sin(angle)
-                c,d = 130+94*math.cos(angle),130+94*math.sin(angle)
-                right = math.cos(angle)>=0
-                endx = c+(12 if right else -12)
-                tx = endx+(8 if right else -8)
-                leaders.append(
-                    f'<path d="M{a:.1f} {b:.1f} L{c:.1f} {d:.1f} L{endx:.1f} {d:.1f}" '
-                    f'fill="none" stroke="{colors[i%len(colors)]}" stroke-width="1.5"/>'
-                    f'<text x="{tx:.1f}" y="{d+5:.1f}" text-anchor="{"start" if right else "end"}" '
-                    f'font-size="12" font-weight="bold" fill="{colors[i%len(colors)]}">'
-                    f'{ratio*100:.1f}%</text>'
+            if _share > 0:
+                _ang = (_share_start + _share / 2) * 2 * math.pi
+                _sn, _cs = math.sin(_ang), -math.cos(_ang)
+                _x1, _y1 = 160 + (_r+_sw/2+3)*_sn, 90+(_r+_sw/2+3)*_cs
+                _x2, _y2 = 160+78*_sn, 90+78*_cs
+                _right = _sn >= 0
+                _x3 = _x2 + (20 if _right else -20)
+                _parts.append(
+                    f'<polyline points="{_x1:.1f},{_y1:.1f} {_x2:.1f},{_y2:.1f} {_x3:.1f},{_y2:.1f}" '
+                    f'fill="none" stroke="{_col}" stroke-width="1.6" '
+                    f'stroke-linecap="round" stroke-linejoin="round"/>'
+                    f'<circle cx="{_x1:.1f}" cy="{_y1:.1f}" r="2.4" fill="{_col}"/>'
+                    f'<text x="{_x3+(4 if _right else -4):.1f}" y="{_y2:.1f}" '
+                    f'text-anchor="{"start" if _right else "end"}" dominant-baseline="central" '
+                    f'class="snb-pr-ring-txt" style="fill:{_col}">{_share:.1%}</text>'
                 )
-            previous += portion
-            pills.append(f'<span>{html_escape(str(product))} · {int(value)}</span>')
-        custom10 = ('<div class="snb-v-donut">'
-                    '<svg viewBox="0 0 300 270" style="width:100%;max-height:230px;overflow:visible">'
-                    + "".join(ring_parts+leaders)
-                    + f'<text x="130" y="126" text-anchor="middle" font-size="23" font-weight="800" fill="#fff">{total}</text>'
-                    + '<text x="130" y="147" text-anchor="middle" font-size="13" fill="#eafbf7">مكالمة</text>'
-                    + '</svg><div class="snb-v-pills">' + "".join(pills) + '</div></div>')
+            _share_start += _share
+        _ring_svg = (
+            '<svg class="snb-pr-product-ring" viewBox="0 0 320 180">'
+            + "".join(_parts) + '</svg>'
+        )
+        custom10 = (
+            '<div class="snb-v-donut snb-pr-product-section">'
+            '<div class="snb-pr-product-gauge">'
+            + _ring_svg
+            + f'<strong class="snb-v-ring-center">{total:,}<small>مكالمة</small></strong>'
+            + '</div><div class="snb-v-pills">'
+            + "".join(f'<span>{html_escape(str(name))} · {int(value)}</span>'
+                      for name,value in _values)
+            + '</div></div>'
+        )
 
         debtor_col = _snb_find_column(frame,"Debitor","Debtor","رقم العميل","رقم الهوية")
         repeat = (frame[debtor_col].fillna("").astype(str).value_counts()
@@ -9291,8 +9332,7 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
                     if row["المحصل"]=="الإجمالي" else [""]*len(row),axis=1
                 ),hide_index=True,use_container_width=True
             )
-            if st.button("◉ عرض التفاصيل",key="snb_visual_summary_details"):
-                _snb_card_modal("ملخص لكل محصل",summary,"collectors")
+            st.html(_activity_details_html("ملخص لكل محصل", summary, "collectors"))
         # The original processed Excel always uses the unfiltered result.
         fragment = '<html lang="ar" dir="rtl"><meta charset="utf-8"><body style="background:#0e2a47;color:white;">'
         fragment += f'<h2>لوحة مؤشرات النشاط | SNB</h2><p>{html_escape(period_label)}</p>'
