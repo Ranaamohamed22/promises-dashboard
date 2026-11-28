@@ -9025,14 +9025,15 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
 
         # Reuse the promise page's HTML details/summary/modal class structure.
         # Each card gets the same snb-pr-details / snb-m-backdrop / snb-m-close.
+        _activity_downloads = {}
+
         def _activity_modal_html(title, detail, key):
             detail = table(detail).reset_index(drop=True)
             excel = io.BytesIO()
             with pd.ExcelWriter(excel, engine="openpyxl") as writer:
                 detail.to_excel(writer, sheet_name="Details", index=False)
                 writer.book.active.sheet_view.showGridLines = True
-            filename = f"SNB_Activity_Card_{key}.xlsx"
-            uri = "data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64," + base64.b64encode(excel.getvalue()).decode("ascii")
+            _activity_downloads[str(key)] = excel.getvalue()
             columns = detail.columns.tolist()
             header = "".join(f"<th>{html_escape(str(c))}</th>" for c in columns)
             rows = "".join(
@@ -9050,7 +9051,7 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
                 f'<h4>{html_escape(title)}</h4>'
                 '<span>Excel بتحمّل صفوف الكارت ده بس · قراءة فقط</span></div>'
                 f'<span class="snb-m-count">{len(detail):,} صف</span>'
-                f'<a class="snb-m-dl" href="{uri}" download="{filename}">⬇ تحميل Excel</a>'
+                f'<a class="snb-m-dl" href="#" role="button" data-snb-activity-download="{key}">⬇ تحميل Excel</a>'
                 '</div><div class="snb-m-tblwrap"><table class="snb-m-tbl"><thead><tr>'
                 + header + '</tr></thead><tbody>' + rows + '</tbody></table>' + more
                 + '</div></div></div>'
@@ -9335,6 +9336,40 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
                 ),hide_index=True,use_container_width=True
             )
             st.html(_activity_details_html("ملخص لكل محصل", summary, "collectors"))
+        # Same hidden-native-button transport and click delegation as promises tab.
+        if _activity_downloads:
+            with st.container(key="snb_activity_hidden_downloads"):
+                for mid, payload in _activity_downloads.items():
+                    st.download_button(
+                        "تحميل Excel", data=payload,
+                        file_name=f"SNB_Activity_Card_{mid}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"snb_activity_dl_{mid}", on_click="ignore"
+                    )
+            st.html("""
+<style>
+.st-key-snb_activity_hidden_downloads{
+position:absolute!important;width:1px!important;height:1px!important;
+overflow:hidden!important;opacity:0!important;pointer-events:none!important}
+</style>
+<script>
+(() => {
+  if (window.__ejadaActivityDownloadClick) return;
+  window.__ejadaActivityDownloadClick = function(event) {
+    const link = event.target.closest('a[data-snb-activity-download]');
+    if (!link) return;
+    event.preventDefault();
+    const mid = link.getAttribute('data-snb-activity-download');
+    if (!/^(?:\d+|collectors)$/.test(mid)) return;
+    const host = document.querySelector('.st-key-snb_activity_dl_' + mid);
+    const button = host && host.querySelector('button');
+    if (button) button.click();
+  };
+  document.addEventListener('click',window.__ejadaActivityDownloadClick,true);
+})();
+</script>
+""",unsafe_allow_javascript=True)
+
         # The original processed Excel always uses the unfiltered result.
         fragment = '<html lang="ar" dir="rtl"><meta charset="utf-8"><body style="background:#0e2a47;color:white;">'
         fragment += f'<h2>لوحة مؤشرات النشاط | SNB</h2><p>{html_escape(period_label)}</p>'
