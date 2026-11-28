@@ -11272,7 +11272,29 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
             scope += f" | {dates.min():%Y-%m-%d} – {dates.max():%Y-%m-%d}"
         if counts[3]:
             with dashboard_slot:
-                _ejada_activity_kpis("SNB", *counts, period=scope)
+                with st.container(key="snb_review_filter"):
+                    review_kpi_slot = st.container()
+                    review_names = selected[stats["collector"]].fillna("(بدون اسم)").astype(str).str.strip()
+                    review_options = sorted(review_names.unique().tolist())
+                    review_token = hashlib.sha256(activity_upload.getvalue()).hexdigest()
+                    if st.session_state.get("snb_activity_visual_upload_digest") != review_token:
+                        st.session_state["snb_activity_visual_upload_digest"] = review_token
+                        st.session_state["snb_activity_visual_collectors"] = []
+                    review_choices = st.multiselect(
+                        "فلتر المحصل (اختيار أكثر من محصل)",
+                        options=review_options, key="snb_activity_visual_collectors",
+                        placeholder="ابحث عن محصل..."
+                    )
+                    review_selected = (
+                        selected.loc[review_names.isin(review_choices)]
+                        if review_choices else selected
+                    )
+                    review_counts = _snb_kpi_counts(
+                        review_selected, stats["notes"], model_mapping,
+                        manual_decisions, slash_row_decisions
+                    )
+                    with review_kpi_slot:
+                        _ejada_activity_kpis("SNB", *review_counts, period=scope)
         approved_special_keys = set(model_mapping) | set(manual_decisions)
         st.markdown('<div id="snb-activity-review"></div>', unsafe_allow_html=True)
         slash_row_decisions, slash_reviewed = _snb_review_slash_rows(
