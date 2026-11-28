@@ -8544,6 +8544,7 @@ def _snb_review_new_notes(notes, mapping, manual, conflicted=0):
             )
         })
 
+    st.markdown("### القائمة 2: إفادات جديدة أو غير محسومة في الموديل")
     st.warning(
         f"يوجد {len(pending):,} إفادة جديدة أو غير محسومة في موديل النشاط. "
         "حددي هل كل إفادة ناجحة أم غير ناجحة قبل اعتماد التقرير."
@@ -8705,7 +8706,7 @@ def _snb_review_slash_rows(frame, notes_col, activity_upload, model_mapping,
 
     pending = sum(str(i) not in decisions for i in original_indices)
     with st.expander(
-        f"📋 مراجعة الإفادات وبيانات العملاء الكاملة — {len(flagged):,} صف "
+        f"القائمة 1: مراجعة الإفادات وبيانات العملاء الكاملة — {len(flagged):,} صف "
         f"(متبقي {pending:,})",
         expanded=True
     ):
@@ -8902,6 +8903,9 @@ border-radius:16px;padding:22px;font-family:Tahoma,Arial,sans-serif;text-align:r
 def _snb_activity_glass_kpis(covered, successful, unsuccessful, unresolved, period=""):
     """SNB activity KPI presentation only; calculations remain in existing helpers."""
     from html import escape as _esc
+    period = period.replace("الفترة الأولى", "الفترة الأولى (02:00 – 12:00)").replace(
+        "الفترة التانية", "الفترة الثانية (12:00 – 16:00)"
+    )
     values = [
         ("إجمالي المكالمات", covered),
         ("ناجحة", successful if not unresolved else None),
@@ -9150,6 +9154,8 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
 
         def _activity_modal_html(title, detail, key):
             detail = table(detail).reset_index(drop=True)
+            heading = re.sub(r"\\s*\\(أعلى \\d+\\)$", "", title)
+            unit = "محصل" if str(key)=="1" else "صف"
             excel = io.BytesIO()
             with pd.ExcelWriter(excel, engine="openpyxl") as writer:
                 detail.to_excel(writer, sheet_name="Details", index=False)
@@ -9169,9 +9175,9 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
             return (
                 '<div class="snb-m-panel"><div class="snb-m-box">'
                 '<div class="snb-m-head"><span class="snb-m-ic">📋</span><div class="snb-m-t">'
-                f'<h4>{html_escape(title)}</h4>'
+                f'<h4>{html_escape(heading)}</h4>'
                 '<span>Excel بتحمّل صفوف الكارت ده بس · قراءة فقط</span></div>'
-                f'<span class="snb-m-count">{len(detail):,} صف</span>'
+                f'<span class="snb-m-count">{len(detail):,} {unit}</span>'
                 f'<a class="snb-m-dl" href="#" role="button" data-snb-activity-download="{key}">⬇ تحميل Excel</a>'
                 '</div><div class="snb-m-tblwrap"><table class="snb-m-tbl"><thead><tr>'
                 + header + '</tr></thead><tbody>' + rows + '</tbody></table>' + more
@@ -9218,7 +9224,8 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
         fig1.update_layout(margin=dict(l=7,r=7,t=20,b=35), bargap=.34)
         fig1.update_xaxes(tickmode="array",tickvals=top.index.tolist(),
                           ticktext=[short_name(n) for n in top.index],tickangle=0,autorange="reversed")
-        d1 = pd.DataFrame({"المحصل":calls.index,"عدد المكالمات":calls.values})
+        d1 = pd.DataFrame({"#":list(range(1,len(top)+1)),
+                           "المحصل":top.index,"عدد المكالمات":top.values})
 
         top2 = calls.head(len(selected_names) if selected_names else 4)
         custom2 = '<div class="snb-v-split-list">' + "".join(
@@ -9240,9 +9247,9 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
         all_rated = result["تقييم المكالمات"].fillna("").astype(str).str.strip()
         full_unsuccessful_total = int((all_rated == "غير ناجحة").sum())
         d3 = pd.DataFrame({
-            "المحصل":rank3.index,"غير ناجحة":rank3.values,
+            "المحصل":rank3.head(8).index,"غير ناجحة":rank3.head(8).values,
             "% من إجمالي غير الناجحة":[
-                round(100*x/max(1,full_unsuccessful_total),1) for x in rank3.values
+                round(100*x/max(1,full_unsuccessful_total),1) for x in rank3.head(8).values
             ]
         })
         custom3 = '<div class="snb-v-rank-list">' + "".join(
@@ -9254,7 +9261,7 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
             for i,(name,value) in enumerate(rank3.head(8).items())
         ) + '</div>'
         rank4 = waste.sort_values(ascending=False)
-        d4 = pd.DataFrame({"المحصل":rank4.index,"الوقت المهدر (د)":rank4.round(2).values})
+        d4 = pd.DataFrame({"المحصل":rank4.head(8).index,"الوقت المهدر (د)":rank4.head(8).round(2).values})
         custom4 = '<div class="snb-v-heat-grid">' + "".join(
             f'<div class="snb-v-heat"><small>#{i+1} · {html_escape(short_name(name))}</small>'
             f'<strong style="color:{colors[0] if i<3 else colors[1]}">{value:.0f} <small>د</small></strong>'
@@ -9329,8 +9336,8 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
             f'<b>{int(value)} مرات</b></div>'
             for name,value in gap_counts.head(5).items()
         ) + '<small>فجوة = أكثر من 30 دقيقة بين مكالمتين ورا بعض</small></div>'
-        d7 = pd.DataFrame({"المحصل":gap_counts.index,"عدد الفجوات":gap_counts.values,
-                           "أطول فجوة (د)":[round(gaps.max().get(n,0),1) for n in gap_counts.index]})
+        d7 = pd.DataFrame({"المحصل":gap_counts.head(5).index,"عدد الفجوات":gap_counts.head(5).values,
+                           "أطول فجوة (د)":[round(gaps.max().get(n,0),1) for n in gap_counts.head(5).index]})
 
         state_col = _snb_find_column(frame,"Main State","الحالة")
         cls_col = _snb_find_column(frame,"Classification","التصنيف")
