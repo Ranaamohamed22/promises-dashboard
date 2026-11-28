@@ -11706,7 +11706,7 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                     )
                 _style_snb_activity_workbook(writer.book)
             st.download_button(
-                "📥 تحميل نشاط SNB بعد المعالجة",
+                "📥 تحميل نشاط SNB",
                 data=output.getvalue(),
                 file_name=f"SNB_Activity_{activity_kind}_Processed.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -13934,23 +13934,55 @@ elif page_uploaded is None:
                 vertical_alignment="center"
             )
             with activity_col:
-                with upload_field("رفع ملف النشاط", "activity_file"):
-                    activity_key = (
-                        f"activity_data_file_{selected_bank}_"
-                        f"{st.session_state.activity_upload_versions[selected_bank]['activity']}"
-                    )
-                    saved = st.session_state.activity_page_uploads[selected_bank]["activity"]
-                    if saved:
-                        uploaded_chip(saved, f"clear_activity_{selected_bank}_activity",
-                                      clear_activity_page_upload, (selected_bank, "activity"))
-                    else:
-                        st.file_uploader(
-                            "رفع ملف النشاط", type=["xlsx", "csv"],
-                            accept_multiple_files=False,
-                            label_visibility="collapsed", key=activity_key,
-                            on_change=save_activity_page_upload,
-                            args=(selected_bank, "activity", activity_key)
+                if selected_bank == "SNB":
+                    # Same one-row glass upload presentation as SNB Promises.
+                    with st.container(key="snb_activity_upload_card", horizontal=True,
+                                      vertical_alignment="center"):
+                        st.markdown("ارفعي ملف النشاط", width="content")
+                        activity_key = (
+                            f"activity_data_file_{selected_bank}_"
+                            f"{st.session_state.activity_upload_versions[selected_bank]['activity']}"
                         )
+                        saved = st.session_state.activity_page_uploads[selected_bank]["activity"]
+                        if saved:
+                            with st.container(key="snb_activity_file_chip", horizontal=True,
+                                              vertical_alignment="center"):
+                                st.markdown(
+                                    f'<span class="snb-act-upload-name">✓ '
+                                    f'{_xml_escape(saved.name)}</span>',
+                                    unsafe_allow_html=True
+                                )
+                                st.button(
+                                    "تغيير", key="snb_activity_file_change",
+                                    on_click=clear_activity_page_upload,
+                                    args=(selected_bank, "activity"), width="content"
+                                )
+                        else:
+                            st.file_uploader(
+                                "رفع ملف النشاط", type=["xlsx", "csv"],
+                                accept_multiple_files=False,
+                                label_visibility="collapsed", key=activity_key,
+                                on_change=save_activity_page_upload,
+                                args=(selected_bank, "activity", activity_key)
+                            )
+                else:
+                    with upload_field("رفع ملف النشاط", "activity_file"):
+                        activity_key = (
+                            f"activity_data_file_{selected_bank}_"
+                            f"{st.session_state.activity_upload_versions[selected_bank]['activity']}"
+                        )
+                        saved = st.session_state.activity_page_uploads[selected_bank]["activity"]
+                        if saved:
+                            uploaded_chip(saved, f"clear_activity_{selected_bank}_activity",
+                                          clear_activity_page_upload, (selected_bank, "activity"))
+                        else:
+                            st.file_uploader(
+                                "رفع ملف النشاط", type=["xlsx", "csv"],
+                                accept_multiple_files=False,
+                                label_visibility="collapsed", key=activity_key,
+                                on_change=save_activity_page_upload,
+                                args=(selected_bank, "activity", activity_key)
+                            )
             with kind_col:
                 with st.container(key="snb_activity_kind_compact"):
                     activity_kind = st.selectbox(
@@ -13989,16 +14021,35 @@ elif page_uploaded is None:
             .st-key-snb_activity_daily_options [data-baseweb="select"]>div,
             .st-key-snb_activity_header_row [data-baseweb="select"] input,
             .st-key-snb_activity_daily_options [data-baseweb="select"] input{
-              background:#f1f3f8!important;color:#222!important;-webkit-text-fill-color:#222!important}
+              color-scheme:light!important;background:#fff!important;color:#222!important;
+              -webkit-text-fill-color:#222!important}
             .st-key-snb_activity_header_row [data-baseweb="select"] span,
             .st-key-snb_activity_daily_options [data-baseweb="select"] span{
               color:#222!important;-webkit-text-fill-color:#222!important}
             body:has(.st-key-snb_activity_header_row):has(.st-key-snb_pr_header)
-              [data-baseweb="popover"] [data-baseweb="menu"]{
-              background:#f1f3f8!important;color:#222!important}
-            .st-key-snb_activity_header_row .st-key-upload_box_activity_file{
+              [data-baseweb="popover"] [data-baseweb="menu"],
+            body:has(.st-key-snb_activity_header_row):has(.st-key-snb_pr_header)
+              [data-baseweb="popover"] [role="listbox"]{
+              color-scheme:light!important;background:#fff!important;color:#222!important}
+            body:has(.st-key-snb_activity_header_row):has(.st-key-snb_pr_header)
+              [data-baseweb="popover"] [role="option"],
+            body:has(.st-key-snb_activity_header_row):has(.st-key-snb_pr_header)
+              [data-baseweb="popover"] [role="option"] *{
+              color:#222!important;-webkit-text-fill-color:#222!important}
+            .st-key-snb_activity_header_row .st-key-snb_activity_upload_card{
+              direction:rtl!important;display:flex!important;align-items:center!important;
+              gap:14px!important;min-height:60px!important;padding:6px 14px!important;
               border-radius:16px!important;background:var(--card)!important;
-              border:1px solid var(--border)!important}
+              border:1px solid var(--border)!important;backdrop-filter:var(--blur)}
+            .st-key-snb_activity_upload_card p{white-space:nowrap;font-family:Cairo,sans-serif!important}
+            .st-key-snb_activity_upload_card [data-testid="stFileUploader"]{flex:1;min-width:140px}
+            .st-key-snb_activity_file_chip{display:flex!important;align-items:center!important;gap:8px}
+            .st-key-snb_activity_file_chip .snb-act-upload-name{
+              color:var(--text)!important;font:700 12px Cairo,sans-serif;overflow:hidden;
+              text-overflow:ellipsis;white-space:nowrap;max-width:280px;display:inline-block}
+            .st-key-snb_activity_file_chip button{
+              background:var(--btn)!important;color:var(--btn-text)!important;
+              border-radius:999px!important;font-family:Cairo,sans-serif!important}
             </style>""",unsafe_allow_html=True)
 
         # STC has its OWN model, review and encrypted file — never SNB.
