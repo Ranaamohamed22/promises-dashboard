@@ -8926,10 +8926,12 @@ def _snb_activity_glass_kpis(covered, successful, unsuccessful, unresolved, peri
     ]
     blocks = []
     for label, number in values:
-        shown = "—" if number is None else f"{int(number):,}"
-        body = (f'<span>{_esc(label)}</span><strong>{shown}</strong><i></i>'
-                '<span class="snb-pr-detail-btn snb-pr-btn-open">👁 عرض التفاصيل</span>')
-        if label == "محتاجة مراجعة":
+        blank_before_upload = covered is None
+        shown = "" if blank_before_upload else ("—" if number is None else f"{int(number):,}")
+        action = ('<span class="snb-pr-detail-btn snb-pr-btn-open">👁 عرض التفاصيل</span>'
+                  if not blank_before_upload else '')
+        body = (f'<span>{_esc(label)}</span><strong>{shown}</strong><i></i>' + action)
+        if label == "محتاجة مراجعة" and not blank_before_upload:
             blocks.append(f'<a href="#snb-activity-review" class="snb-act-kpi">{body}</a>')
         elif detail_frame is not None and collector_col and notes_col:
             key, rating = {
@@ -8998,25 +9000,28 @@ def _snb_activity_glass_kpis(covered, successful, unsuccessful, unresolved, peri
         '<style>'
         '.snb-act-kpi-panel{direction:rtl;border:0;padding:0;background:transparent;font-family:Cairo,sans-serif}'
         '.snb-act-kpi-grid>details{min-width:0}.snb-act-kpi-grid>details>summary{height:100%}'
-        '.snb-act-kpi-grid .snb-act-kpi{height:152px;box-sizing:border-box;position:relative}'
+        '.snb-act-kpi-grid .snb-act-kpi{height:166px;min-height:166px;box-sizing:border-box;position:relative}'
         '.snb-act-kpi-grid .snb-pr-detail-btn{margin:0;position:absolute;bottom:9px;left:50%;transform:translateX(-50%)}'
+        '.snb-act-kpi-grid .snb-act-kpi:hover .snb-pr-btn-open,.snb-act-kpi-grid .snb-pr-details:focus-within .snb-pr-btn-open{opacity:1;visibility:visible}'
+        '.snb-act-kpi-grid .snb-act-kpi .snb-pr-btn-open{opacity:0;visibility:hidden}'
         '.snb-act-kpi-grid .snb-act-kpi:hover .snb-pr-btn-open,.snb-act-kpi-grid .snb-pr-details:focus-within .snb-pr-btn-open{opacity:1;visibility:visible}'
         '.snb-act-kpi-grid .snb-pr-details[open] .snb-pr-btn-open{display:none}'
         '.snb-act-kpi-title{font-weight:800;text-align:right;color:var(--text,#fff);'
         'font-size:16px;margin:0 0 16px}'
         '.snb-act-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}'
-        '.snb-act-kpi{min-height:152px;display:flex;flex-direction:column;align-items:center;'
-        'justify-content:center;gap:12px;text-decoration:none!important;border:1px solid '
-        'rgba(127,214,224,.30);border-radius:18px;background:var(--card,rgba(20,55,75,.78));'
-        'box-shadow:var(--shadow,0 9px 24px #061d3022);color:var(--text,#fff)!important;'
+        '.snb-act-kpi{min-height:166px;display:flex;flex-direction:column;align-items:center;'
+        'justify-content:flex-start;gap:4px;padding:14px 8px;text-decoration:none!important;border:1px solid '
+        'var(--border);border-radius:18px;background:var(--card);'
+        'box-shadow:var(--shadow);color:var(--text)!important;'
         'transition:transform .18s,box-shadow .18s,border-color .18s}'
         '.snb-act-kpi:hover,.snb-act-kpi:focus-visible{transform:translateY(-7px) scale(1.02);'
         'border-color:#5be39a;box-shadow:0 0 24px rgba(91,227,154,.45)}'
-        '.snb-act-kpi span{font-size:11px;color:rgba(255,255,255,.7)}'
-        '.snb-act-kpi strong{font-size:48px;color:var(--text,#fff);line-height:1.1}'
-        '.snb-act-kpi i{height:3px;width:32px;background:#5be39a;border-radius:5px}'
-        '.snb-act-kpi:nth-child(1) i,.snb-act-kpi:nth-child(4) i{background:#fff}'
-        '.snb-act-kpi:nth-child(3) i{background:#7fd6e0}'
+        '.snb-act-kpi>span:first-child{font-size:14px;font-weight:800;color:var(--text);line-height:1.5;text-align:center}'
+        '.snb-act-kpi strong{font-size:clamp(25px,4vw,44px);font-weight:800;color:var(--text);line-height:1.2}'
+        '.snb-act-kpi i{height:3px;width:28px;background:#5be39a;border-radius:3px}'
+        '.snb-act-kpi-grid>details:nth-child(2) i{background:#7fd6e0}'
+        '.snb-act-kpi-grid>details:nth-child(3) i{background:#b9f2d8}'
+        '.snb-act-kpi-grid>*:nth-child(4) i{background:#ffffff}'
         '@media(max-width:650px){.snb-act-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}'
         '</style><section class="snb-act-kpi-panel"><div class="snb-act-kpi-grid">'+''.join(blocks)+'</div></section>'
     )
@@ -14017,12 +14022,18 @@ elif page_uploaded is None:
         # Activity page only: keep the select controls light in every browser theme.
         if selected_bank == "SNB":
             st.markdown("""<style>
+            .st-key-snb_activity_header_row [data-baseweb="select"],
+            .st-key-snb_activity_daily_options [data-baseweb="select"],
+            .st-key-snb_activity_header_row [data-baseweb="select"] *,
+            .st-key-snb_activity_daily_options [data-baseweb="select"] *,
             .st-key-snb_activity_header_row [data-baseweb="select"]>div,
             .st-key-snb_activity_daily_options [data-baseweb="select"]>div,
             .st-key-snb_activity_header_row [data-baseweb="select"] input,
             .st-key-snb_activity_daily_options [data-baseweb="select"] input{
               color-scheme:light!important;background:#fff!important;color:#222!important;
               -webkit-text-fill-color:#222!important}
+            .st-key-snb_activity_header_row [data-baseweb="select"] svg,
+            .st-key-snb_activity_daily_options [data-baseweb="select"] svg{fill:#222!important;color:#222!important}
             .st-key-snb_activity_header_row [data-baseweb="select"] span,
             .st-key-snb_activity_daily_options [data-baseweb="select"] span{
               color:#222!important;-webkit-text-fill-color:#222!important}
@@ -14034,8 +14045,13 @@ elif page_uploaded is None:
             body:has(.st-key-snb_activity_header_row):has(.st-key-snb_pr_header)
               [data-baseweb="popover"] [role="option"],
             body:has(.st-key-snb_activity_header_row):has(.st-key-snb_pr_header)
+              [data-baseweb="popover"] *,
+            body:has(.st-key-snb_activity_header_row):has(.st-key-snb_pr_header)
               [data-baseweb="popover"] [role="option"] *{
               color:#222!important;-webkit-text-fill-color:#222!important}
+            body:has(.st-key-snb_activity_header_row):has(.st-key-snb_pr_header)
+              [data-baseweb="popover"],body:has(.st-key-snb_activity_header_row):has(.st-key-snb_pr_header)
+              [data-baseweb="popover"] input{color-scheme:light!important;background:#fff!important;color:#222!important}
             .st-key-snb_activity_header_row .st-key-snb_activity_upload_card{
               direction:rtl!important;display:flex!important;align-items:center!important;
               gap:14px!important;min-height:60px!important;padding:6px 14px!important;
@@ -14047,9 +14063,25 @@ elif page_uploaded is None:
             .st-key-snb_activity_file_chip .snb-act-upload-name{
               color:var(--text)!important;font:700 12px Cairo,sans-serif;overflow:hidden;
               text-overflow:ellipsis;white-space:nowrap;max-width:280px;display:inline-block}
+            html body .stApp .st-key-snb_activity_header_row .st-key-snb_activity_upload_card{
+              height:62px!important;min-height:62px!important;max-height:62px!important;
+              flex-wrap:nowrap!important;overflow:hidden!important;box-sizing:border-box!important}
+            html body .stApp .st-key-snb_activity_file_chip{
+              flex-wrap:nowrap!important;gap:7px!important;min-height:0!important;
+              align-items:center!important;max-height:40px!important}
             .st-key-snb_activity_file_chip button{
-              background:var(--btn)!important;color:var(--btn-text)!important;
-              border-radius:999px!important;font-family:Cairo,sans-serif!important}
+              background:rgba(91,227,154,.12)!important;color:#5be39a!important;
+              border:1px solid rgba(91,227,154,.65)!important;
+              border-radius:999px!important;font-family:Cairo,sans-serif!important;
+              font-size:11px!important;font-weight:800!important;
+              height:28px!important;min-height:28px!important;padding:2px 10px!important;
+              width:auto!important;min-width:0!important;white-space:nowrap!important;
+              box-shadow:none!important}
+            .st-key-snb_activity_file_chip button p{font-size:11px!important;color:#5be39a!important}
+            .st-key-snb_activity_upload_card [data-testid="stHorizontalBlock"]{
+              flex-wrap:nowrap!important;align-items:center!important}
+            .st-key-snb_activity_upload_card [data-testid="stFileUploader"]{
+              max-height:44px!important;overflow:hidden!important}
             </style>""",unsafe_allow_html=True)
 
         # STC has its OWN model, review and encrypted file — never SNB.
