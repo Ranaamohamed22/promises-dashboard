@@ -8944,7 +8944,7 @@ def _snb_activity_glass_kpis(covered, successful, unsuccessful, unresolved, peri
 
 
 def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, period_label,
-                                   product_col=None, upload_digest=""):
+                                   product_col=None, upload_digest="", preview=False):
     """SNB-only visualizations over the already approved, deduplicated period rows."""
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
@@ -8958,12 +8958,13 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
     options = sorted(all_collectors.unique().tolist())
     filter_key = "snb_activity_visual_collectors"
     token_key = "snb_activity_visual_upload_digest"
-    if st.session_state.get(token_key) != upload_digest:
-        st.session_state[token_key] = upload_digest
-        st.session_state[filter_key] = []
-    st.session_state[filter_key] = [
-        name for name in st.session_state.get(filter_key, []) if name in options
-    ]
+    if not preview:
+        if st.session_state.get(token_key) != upload_digest:
+            st.session_state[token_key] = upload_digest
+            st.session_state[filter_key] = []
+        st.session_state[filter_key] = [
+            name for name in st.session_state.get(filter_key, []) if name in options
+        ]
 
     st.markdown('<div id="snb-activity-dashboard"></div>', unsafe_allow_html=True)
     st.markdown(
@@ -9090,18 +9091,23 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
 """,unsafe_allow_html=True)
 
     with st.container(key="snb_visual_board"):
-        kpi_slot = st.container()
-        st.markdown("**فلتر المحصل (اختيار أكثر من محصل)**")
-        selected_names = st.multiselect(
-            "🔍 ابحثي عن محصل…", options,
-            placeholder="اختاري محصل أو أكثر · بدون اختيار = الكل",
-            label_visibility="collapsed", key=filter_key
-        )
-        if selected_names:
-            def _clear_snb_visual_filter():
-                st.session_state[filter_key] = []
-            st.button("✕ مسح الاختيار", key="snb_visual_clear_filter",
-                      on_click=_clear_snb_visual_filter)
+        if preview:
+            selected_names = [
+                name for name in st.session_state.get(filter_key, []) if name in options
+            ]
+        else:
+            kpi_slot = st.container()
+            st.markdown("**فلتر المحصل (اختيار أكثر من محصل)**")
+            selected_names = st.multiselect(
+                "🔍 ابحثي عن محصل…", options,
+                placeholder="اختاري محصل أو أكثر · بدون اختيار = الكل",
+                label_visibility="collapsed", key=filter_key
+            )
+            if selected_names:
+                def _clear_snb_visual_filter():
+                    st.session_state[filter_key] = []
+                st.button("✕ مسح الاختيار", key="snb_visual_clear_filter",
+                          on_click=_clear_snb_visual_filter)
         frame = result.loc[all_collectors.isin(selected_names)].copy() if selected_names else result.copy()
         names = (frame[collector_col].fillna("(بدون اسم)").astype(str)
                  .str.strip().replace("", "(بدون اسم)"))
@@ -9113,11 +9119,12 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
         total = len(frame)
         pending = total - int((rated == "ناجحة").sum()) - int((rated == "غير ناجحة").sum())
 
-        with kpi_slot:
-            st.markdown(_snb_activity_glass_kpis(
-                total, int((rated == "ناجحة").sum()),
-                int((rated == "غير ناجحة").sum()), pending, period_label
-            ), unsafe_allow_html=True)
+        if not preview:
+            with kpi_slot:
+                st.markdown(_snb_activity_glass_kpis(
+                    total, int((rated == "ناجحة").sum()),
+                    int((rated == "غير ناجحة").sum()), pending, period_label
+                ), unsafe_allow_html=True)
 
         waste_detail, waste_summary = _snb_wasted_time_reports(
             frame, collector_col, notes_col, activity_kind=kind
@@ -9209,7 +9216,8 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
                     st.markdown(custom, unsafe_allow_html=True)
                 else:
                     st.info("—")
-                st.markdown(_activity_details_html(title, detail, key), unsafe_allow_html=True)
+                if not preview:
+                    st.markdown(_activity_details_html(title, detail, key), unsafe_allow_html=True)
 
         def short_name(name):
             value = str(name).strip()
@@ -9232,7 +9240,7 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
         custom2 = '<div class="snb-v-split-list">' + "".join(
             f'<div class="snb-v-split-row" style="width:{max(45,100*count/max(1,int(top2.max()))):.1f}%">'
             f'<span>{html_escape(short_name(name))}</span><b>'
-            f'{int(unsuccessful.get(name,0))} / {int(success.get(name,0))}'
+            f'{"— / —" if preview else str(int(unsuccessful.get(name,0))) + " / " + str(int(success.get(name,0)))}'
             '</b></div>'
             for name,count in top2.items()
         ) + ('<div class="snb-v-split-legend"><span>● ناجحة (من الموديل)</span>'
@@ -9541,7 +9549,7 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
             '<thead><tr><th>المحصل</th><th>المكالمات</th><th>نسبة الناجحة</th>'
             '<th>الوقت المهدر</th><th>أول مكالمة</th><th>آخر مكالمة</th></tr></thead><tbody>'
             +rows_html+'</tbody></table></div>'
-            +_activity_details_html("ملخص لكل محصل",summary,"collectors")
+            +(_activity_details_html("ملخص لكل محصل",summary,"collectors") if not preview else "")
             +'</details>'
         )
         st.markdown(summary_html, unsafe_allow_html=True)
@@ -9589,11 +9597,12 @@ overflow:hidden!important;opacity:0!important;pointer-events:none!important}
             fragment += (figure.to_html(full_html=False,include_plotlyjs="cdn")
                          if figure is not None else (custom or "—")) + '</section>'
         fragment += "</body></html>"
-        st.download_button(
-            "تحميل داشبورد النشاط HTML",fragment.encode("utf-8"),
-            file_name="SNB_Activity_Dashboard.html",mime="text/html",
-            key="activity_html_SNB_visual"
-        )
+        if not preview:
+            st.download_button(
+                "تحميل داشبورد النشاط HTML",fragment.encode("utf-8"),
+                file_name="SNB_Activity_Dashboard.html",mime="text/html",
+                key="activity_html_SNB_visual"
+            )
 
 
 def _ejada_activity_kpis(bank, covered, successful=None, unsuccessful=None, unresolved=0,
@@ -11312,8 +11321,7 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
             model_mapping, manual_decisions,
             approved_special_keys=approved_special_keys,
         )
-        if not slash_reviewed:
-            return
+        # Keep both original review lists visible on the same page.
         # Special-review rows use their own row-level manual decisions.
         # Skip repeat note-level review for those rows.
         ordinary_notes = selected.loc[
@@ -11328,8 +11336,22 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
             manual_decisions,
             conflicted=conflicted_notes
         )
-        if not fully_reviewed:
-            # Don't issue a report or download with unknown call evaluations.
+        if not fully_reviewed or not slash_reviewed:
+            # Visual preview only: same established model and duration functions.
+            # Never make an unresolved report or Excel available for download.
+            preview_result = _snb_add_evaluation(
+                selected, stats["notes"], model_mapping,
+                manual_decisions, {}, row_decisions=slash_row_decisions
+            )
+            preview_result = _snb_add_call_duration(
+                preview_result, stats["collector"]
+            )
+            _snb_activity_visual_dashboard(
+                preview_result, stats["collector"], stats["notes"], activity_kind,
+                scope, product_col=stats["product"],
+                upload_digest=hashlib.sha256(activity_upload.getvalue()).hexdigest(),
+                preview=True
+            )
             return
 
         # Preserve a meaningful model-similarity percentage for reviewed notes.
