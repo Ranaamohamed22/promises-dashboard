@@ -11672,9 +11672,42 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                 else "Wasted_Time_Daily"
             )
             export_final = _snb_export_visible_columns(final)
+            # Export-only per-collector call totals from the same approved rows.
+            # The denominator is ALL calls by that collector, not only rated calls.
+            collector_names = (
+                result[stats["collector"]].fillna("").astype(str).str.strip()
+                .replace("", "(بدون اسم)")
+            )
+            call_ratings = result["تقييم المكالمات"].fillna("").astype(str).str.strip()
+            collector_calls = pd.DataFrame({
+                "المحصل": collector_names,
+                "_unsuccessful": call_ratings.eq("غير ناجحة").astype(int),
+                "_successful": call_ratings.eq("ناجحة").astype(int),
+            })
+            collector_call_summary = (
+                collector_calls.groupby("المحصل", dropna=False, sort=True)
+                .agg(
+                    **{
+                        "إجمالي المكالمات": ("_unsuccessful", "size"),
+                        "المكالمات الناجحة": ("_successful", "sum"),
+                        "المكالمات غير الناجحة": ("_unsuccessful", "sum"),
+                    }
+                ).reset_index()
+            )
+            collector_call_summary["نسبة المكالمات غير الناجحة"] = (
+                collector_call_summary["المكالمات غير الناجحة"]
+                .div(collector_call_summary["إجمالي المكالمات"].replace(0, float("nan")))
+                .fillna(0.0)
+            )
+            collector_call_summary = collector_call_summary.sort_values(
+                ["إجمالي المكالمات", "المحصل"], ascending=[False, True], kind="stable"
+            ).reset_index(drop=True)
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
                 export_final.to_excel(writer, sheet_name="Activity", index=False)
+                collector_call_summary.to_excel(
+                    writer, sheet_name="ملخص مكالمات المحصلين", index=False
+                )
                 _snb_export_visible_columns(
                     time_notes
                 ).to_excel(
@@ -11718,6 +11751,18 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                         writer, sheet_name="Weekly_Collector_Activity", index=False
                     )
                 _style_snb_activity_workbook(writer.book)
+                # A numeric 0–1 ratio with native Excel percentage display.
+                percentage_sheet = writer.book["ملخص مكالمات المحصلين"]
+                percentage_sheet.sheet_view.rightToLeft = True
+                percentage_sheet.freeze_panes = "A2"
+                percentage_col = collector_call_summary.columns.get_loc(
+                    "نسبة المكالمات غير الناجحة"
+                ) + 1
+                percentage_sheet.column_dimensions[
+                    get_column_letter(percentage_col)
+                ].width = 32
+                for row_idx in range(2, percentage_sheet.max_row + 1):
+                    percentage_sheet.cell(row=row_idx, column=percentage_col).number_format = "0.0%"
             # Keep the original after-review gating; render only the approved
             # workbook in the existing top-row placeholder.
             with _snb_activity_download_slot.container():
