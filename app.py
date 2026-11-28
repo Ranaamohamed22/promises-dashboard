@@ -8925,9 +8925,10 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
             label_visibility="collapsed", key=filter_key
         )
         if selected_names:
-            if st.button("✕ مسح الاختيار", key="snb_visual_clear_filter"):
+            def _clear_snb_visual_filter():
                 st.session_state[filter_key] = []
-                st.rerun()
+            st.button("✕ مسح الاختيار", key="snb_visual_clear_filter",
+                      on_click=_clear_snb_visual_filter)
         frame = result.loc[all_collectors.isin(selected_names)].copy() if selected_names else result.copy()
         names = (frame[collector_col].fillna("(بدون اسم)").astype(str)
                  .str.strip().replace("", "(بدون اسم)"))
