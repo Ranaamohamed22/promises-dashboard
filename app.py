@@ -8911,7 +8911,8 @@ def _snb_activity_short_name(name):
                    "", original, flags=re.IGNORECASE).strip() or original)
 
 
-def _snb_activity_glass_kpis(covered, successful, unsuccessful, unresolved, period=""):
+def _snb_activity_glass_kpis(covered, successful, unsuccessful, unresolved, period="",
+                             detail_frame=None, collector_col=None, notes_col=None):
     """SNB activity KPI presentation only; calculations remain in existing helpers."""
     from html import escape as _esc
     period = period.replace("الفترة الأولى", "الفترة الأولى (02:00 – 12:00)").replace(
@@ -8926,15 +8927,77 @@ def _snb_activity_glass_kpis(covered, successful, unsuccessful, unresolved, peri
     blocks = []
     for label, number in values:
         shown = "—" if number is None else f"{int(number):,}"
-        tag = 'a href="#snb-activity-review"' if label == "محتاجة مراجعة" else 'div'
-        close_tag = "a" if label == "محتاجة مراجعة" else "div"
-        blocks.append(
-            f'<{tag} class="snb-act-kpi"><span>{_esc(label)}</span>'
-            f'<strong>{shown}</strong><i></i></{close_tag}>'
-        )
+        body = (f'<span>{_esc(label)}</span><strong>{shown}</strong><i></i>'
+                '<span class="snb-pr-detail-btn snb-pr-btn-open">👁 عرض التفاصيل</span>')
+        if label == "محتاجة مراجعة":
+            blocks.append(f'<a href="#snb-activity-review" class="snb-act-kpi">{body}</a>')
+        elif detail_frame is not None and collector_col and notes_col:
+            key, rating = {
+                "إجمالي المكالمات": ("91", None),
+                "ناجحة": ("92", "ناجحة"),
+                "غير ناجحة": ("93", "غير ناجحة"),
+            }[label]
+            rows = detail_frame
+            if rating:
+                rows = rows.loc[rows["تقييم المكالمات"].astype(str).str.strip().eq(rating)]
+            header = '<tr><th>#</th><th>المحصل</th><th>الإفادة</th><th>وقت المكالمة</th><th>الحالة</th></tr>'
+            lines = []
+            for i, (_, record) in enumerate(rows.head(50).iterrows(), 1):
+                state = str(record.get("تقييم المكالمات", "")).strip()
+                row_class = "st-ok" if state == "ناجحة" else ("st-bad" if state == "غير ناجحة" else "")
+                chip = ("ok" if row_class == "st-ok" else "bad")
+                stamp = record.get("__ejada_parsed_created")
+                when = pd.to_datetime(stamp, errors="coerce")
+                time_text = when.strftime("%Y-%m-%d %H:%M") if pd.notna(when) else "—"
+                lines.append(
+                    f'<tr class="{row_class}"><td>{i}</td>'
+                    f'<td>{_esc(_snb_activity_short_name(record.get(collector_col,"—")))}</td>'
+                    f'<td>{_esc(str(record.get(notes_col,"—")))}</td>'
+                    f'<td class="snb-m-date">{_esc(time_text)}</td>'
+                    f'<td><span class="snb-m-chip {chip}">{_esc(state or "—")}</span></td></tr>'
+                )
+            checked = "all" if rating is None else ("ok" if rating == "ناجحة" else "bad")
+            radios = "".join(
+                f'<input class="f-{v}" type="radio" name="snb-kpi-filter-{key}" '
+                f'id="snb-kpi-{key}-{v}" {"checked" if v == checked else ""}>'
+                for v in ("all", "ok", "bad")
+            )
+            seg = (
+                f'<div class="snb-m-seg">'
+                f'<label class="la" for="snb-kpi-{key}-all">الكل</label>'
+                f'<label class="lo" for="snb-kpi-{key}-ok">ناجحة</label>'
+                f'<label class="lb" for="snb-kpi-{key}-bad">غير ناجحة</label></div>'
+            )
+            note = (f'<p class="snb-pr-note">أول 50 صف من {len(rows):,} — الباقي في ملف Excel</p>'
+                    if len(rows) > 50 else "")
+            modal = (
+                '<div class="snb-m-panel"><div class="snb-m-box">' + radios
+                + '<div class="snb-m-head"><span class="snb-m-ic">📞</span><div class="snb-m-t">'
+                + f'<h4>{_esc(label)}</h4>'
+                + '<span>تفاصيل الصفوف من الملف المحمّل · قراءة فقط</span></div>'
+                + f'<span class="snb-m-count">{len(rows):,} مكالمة</span>'
+                + f'<a class="snb-m-dl" href="#" role="button" data-snb-activity-download="{key}">⬇ تحميل Excel</a>'
+                + '</div>' + seg + '<div class="snb-m-tblwrap">'
+                + '<table class="snb-m-tbl"><thead>' + header + '</thead><tbody>'
+                + "".join(lines) + '</tbody></table>' + note
+                + '</div></div></div>'
+            )
+            blocks.append(
+                '<details class="snb-pr-details snb-act-kpi-cell"><summary>'
+                f'<article class="snb-act-kpi">{body}</article>'
+                '<span class="snb-m-backdrop"></span><span class="snb-m-close">✕</span>'
+                '</summary>' + modal + '</details>'
+            )
+        else:
+            blocks.append(f'<div class="snb-act-kpi">{body}</div>')
     return (
         '<style>'
         '.snb-act-kpi-panel{direction:rtl;border:0;padding:0;background:transparent;font-family:Cairo,sans-serif}'
+        '.snb-act-kpi-grid>details{min-width:0}.snb-act-kpi-grid>details>summary{height:100%}'
+        '.snb-act-kpi-grid .snb-act-kpi{height:152px;box-sizing:border-box;position:relative}'
+        '.snb-act-kpi-grid .snb-pr-detail-btn{margin:0;position:absolute;bottom:9px;left:50%;transform:translateX(-50%)}'
+        '.snb-act-kpi-grid .snb-act-kpi:hover .snb-pr-btn-open,.snb-act-kpi-grid .snb-pr-details:focus-within .snb-pr-btn-open{opacity:1;visibility:visible}'
+        '.snb-act-kpi-grid .snb-pr-details[open] .snb-pr-btn-open{display:none}'
         '.snb-act-kpi-title{font-weight:800;text-align:right;color:var(--text,#fff);'
         'font-size:16px;margin:0 0 16px}'
         '.snb-act-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}'
@@ -9105,6 +9168,7 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
 </style>
 """,unsafe_allow_html=True)
 
+    _activity_downloads = {}
     with st.container(key="snb_visual_board"):
         if preview:
             selected_names = [
@@ -9139,8 +9203,27 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
             with kpi_slot:
                 st.markdown(_snb_activity_glass_kpis(
                     total, int((rated == "ناجحة").sum()),
-                    int((rated == "غير ناجحة").sum()), pending, period_label
+                    int((rated == "غير ناجحة").sum()), pending, period_label,
+                    detail_frame=frame, collector_col=collector_col, notes_col=notes_col
                 ), unsafe_allow_html=True)
+            # Existing delegated native Excel downloads, scoped to the filtered calls.
+            # Only after all reviews are approved (preview=False).
+            for _key, _rating in (("91", None), ("92", "ناجحة"), ("93", "غير ناجحة")):
+                _subset = frame if _rating is None else frame.loc[rated.eq(_rating)]
+                _records = []
+                for _num, (_, _rec) in enumerate(_subset.iterrows(), 1):
+                    _dt = pd.to_datetime(_rec.get(stamp), errors="coerce")
+                    _records.append({
+                        "#": _num, "المحصل": str(_rec.get(collector_col,"—")),
+                        "الإفادة": str(_rec.get(notes_col,"—")),
+                        "وقت المكالمة": _dt.strftime("%Y-%m-%d %H:%M") if pd.notna(_dt) else "—",
+                        "الحالة": str(_rec.get("تقييم المكالمات","—")),
+                    })
+                _data = pd.DataFrame(_records, columns=["#","المحصل","الإفادة","وقت المكالمة","الحالة"])
+                _bytes = io.BytesIO()
+                with pd.ExcelWriter(_bytes, engine="openpyxl") as _writer:
+                    _data.to_excel(_writer, sheet_name="التفاصيل", index=False)
+                _activity_downloads[_key] = _bytes.getvalue()
 
         waste_detail, waste_summary = _snb_wasted_time_reports(
             frame, collector_col, notes_col, activity_kind=kind
@@ -9174,7 +9257,7 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
 
         # Reuse the promise page's HTML details/summary/modal class structure.
         # Each card gets the same snb-pr-details / snb-m-backdrop / snb-m-close.
-        _activity_downloads = {}
+        # KPI export entries are already registered in the same download transport.
 
         def _activity_modal_html(title, detail, key):
             detail = table(detail).reset_index(drop=True)
