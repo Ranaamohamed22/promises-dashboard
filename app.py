@@ -2828,7 +2828,9 @@ _snb_overview_page = (st.session_state.current_page == "Overview"
                       and st.session_state.selected_bank == "SNB")
 _snb_promises_page = (st.session_state.current_page == "Promises"
                       and st.session_state.selected_bank == "SNB")
-if _snb_promises_page:
+_snb_activity_page = (st.session_state.current_page == "Activity"
+                      and st.session_state.selected_bank == "SNB")
+if _snb_promises_page or _snb_activity_page:
     with st.container(key="snb_pr_header", horizontal=True, vertical_alignment="center"):
         badge = """<div dir="ltr" style="position:relative;padding:4px 6px;line-height:1">
     <div style="font-family:'Cairo',sans-serif;font-size:40px;font-weight:800;letter-spacing:2px;background:linear-gradient(180deg,var(--snb-start),var(--snb-end));-webkit-background-clip:text;background-clip:text;color:transparent">SNB</div>
@@ -2842,13 +2844,20 @@ if _snb_promises_page:
             f'<div class="snb-pr-brand">{badge}<i aria-hidden="true"></i>{logo}</div>',
             unsafe_allow_html=True, width="stretch",
         )
-        files = st.session_state.get("page_files", {}).get("SNB", {}).get("Promises")
-        latest = st.session_state.get("snb_promises_upload_time") if files else None
+        if _snb_activity_page:
+            files = st.session_state.get("activity_page_uploads", {}).get("SNB", {}).get("activity")
+            latest = None
+        else:
+            files = st.session_state.get("page_files", {}).get("SNB", {}).get("Promises")
+            latest = st.session_state.get("snb_promises_upload_time") if files else None
         date_text = latest.strftime("%Y-%m-%d %H:%M") if latest else "—"
         st.markdown(
             f'<span class="snb-pr-update"><span aria-hidden="true">▦</span> آخر تحديث للملفات'
             f' <b dir="ltr">{date_text}</b></span>', unsafe_allow_html=True, width="content",
         )
+        if _snb_activity_page:
+            st.button("إدارة موديل النشاط", key="snb_act_manage_model", width="content",
+                      on_click=set_page, args=("ModelManagement",))
         st.button("تغيير البنك ⌄", key="snb_pr_change_bank", width="content",
                   on_click=set_page, args=("Home",))
 elif _snb_overview_page:
@@ -2922,8 +2931,8 @@ def _render_ejada_main_navigation():
                     type="primary" if st.session_state.current_page == page else "secondary"
                 )
 
-if _snb_overview_page or _snb_promises_page:
-    with st.container(key="snb_pr_navigation" if _snb_promises_page else "snb_ov_navigation"):
+if _snb_overview_page or _snb_promises_page or _snb_activity_page:
+    with st.container(key="snb_pr_navigation" if (_snb_promises_page or _snb_activity_page) else "snb_ov_navigation"):
         _render_ejada_main_navigation()
 elif st.session_state.current_page != 'Home':
     # A bank is selected on Home; its reports stay grouped behind that choice.
@@ -9078,10 +9087,10 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
                                     config={"displayModeBar":False},
                                     key=f"snb_visual_chart_{key}")
                 elif custom is not None:
-                    st.html(custom)
+                    st.markdown(custom, unsafe_allow_html=True)
                 else:
                     st.info("—")
-                st.html(_activity_details_html(title, detail, key))
+                st.markdown(_activity_details_html(title, detail, key), unsafe_allow_html=True)
 
         top = calls.head(10)
         fig1 = fig_base()
@@ -9335,7 +9344,7 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
                     if row["المحصل"]=="الإجمالي" else [""]*len(row),axis=1
                 ),hide_index=True,use_container_width=True
             )
-            st.html(_activity_details_html("ملخص لكل محصل", summary, "collectors"))
+            st.markdown(_activity_details_html("ملخص لكل محصل", summary, "collectors"), unsafe_allow_html=True)
         # Same hidden-native-button transport and click delegation as promises tab.
         if _activity_downloads:
             with st.container(key="snb_activity_hidden_downloads"):
@@ -11127,16 +11136,12 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
             )
             return
 
-        excluded_note = (
-            f'المستبعد بعد نهاية الفترة: {excluded_after_shift:,} | '
-            if excluded_after_shift else ""
-        )
         st.markdown(
             f'<p style="color:{label_color};font-weight:800;direction:rtl;'
             'text-align:right;font-size:15px;line-height:1.9;">'
             f'صفوف الملف: {stats["original"]:,} | '
             f'التكرارات المحذوفة: {stats["duplicates"]:,} | '
-            f'بعد الفترة: {len(result):,} | {excluded_note}'
+            f'بعد الفترة: {len(result):,} | '
             f'ناجحة: {successful:,} | غير ناجحة: {unsuccessful:,}'
             '</p>',
             unsafe_allow_html=True
