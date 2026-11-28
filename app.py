@@ -9123,22 +9123,29 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
                     st.info("—")
                 st.markdown(_activity_details_html(title, detail, key), unsafe_allow_html=True)
 
+        def short_name(name):
+            clean = re.sub(r"(?i)\\bSNB\\s*II\\s*NPL\\s*II\\b", "", str(name))
+            clean = re.sub(r"(?i)^\\s*(?:SNB|NPL|II|team)\\s*[-|:]?\\s*", "", clean).strip()
+            return clean or str(name)
+
         top = calls.head(10)
         fig1 = fig_base()
         fig1.add_trace(go.Bar(x=top.index.tolist(),y=top.tolist(),marker_color=colors[0],
                               text=top.tolist(),textposition="outside"))
-        fig1.update_layout(margin=dict(l=7,r=7,t=20,b=35))
+        fig1.update_layout(margin=dict(l=7,r=7,t=20,b=35), bargap=.34)
+        fig1.update_xaxes(tickmode="array",tickvals=top.index.tolist(),
+                          ticktext=[short_name(n) for n in top.index],tickangle=0,autorange="reversed")
         d1 = pd.DataFrame({"المحصل":calls.index,"عدد المكالمات":calls.values})
 
-        top2 = calls.head(4)
-        fig2 = fig_base()
-        for title,vals,color in [
-            ("ناجحة",[int(success.get(n,0)) for n in top2.index],colors[0]),
-            ("غير ناجحة",[int(unsuccessful.get(n,0)) for n in top2.index],colors[1])
-        ]:
-            fig2.add_trace(go.Bar(x=top2.index.tolist(),y=vals,name=title,marker_color=color))
-        fig2.update_layout(barmode="stack",showlegend=True,
-                           legend=dict(orientation="h",y=-.35))
+        top2 = calls.head(len(selected_names) if selected_names else 4)
+        custom2 = '<div class="snb-v-split-list">' + "".join(
+            f'<div class="snb-v-split-row" style="width:{max(45,100*count/max(1,int(top2.max()))):.1f}%">'
+            f'<span>{html_escape(short_name(name))}</span><b>'
+            f'{int(unsuccessful.get(name,0))} / {int(success.get(name,0))}'
+            '</b></div>'
+            for name,count in top2.items()
+        ) + ('<div class="snb-v-split-legend"><span>● ناجحة (من الموديل)</span>'
+             '<span>● غير ناجحة (من الموديل)</span></div></div>')
         d2 = pd.DataFrame({
             "المحصل":calls.index,
             "ناجحة":[int(success.get(n,0)) for n in calls.index],
@@ -9157,7 +9164,7 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
         })
         custom3 = '<div class="snb-v-rank-list">' + "".join(
             f'<div class="snb-v-rank-row"><span class="snb-v-rank">{i+1}</span>'
-            f'<span class="snb-v-rank-name">{html_escape(str(name))}</span>'
+            f'<span class="snb-v-rank-name">{html_escape(short_name(name))}</span>'
             f'<b>{int(value)} مكالمة</b>'
             f'<span class="snb-v-ring" style="--part:{100*value/max(1,full_unsuccessful_total):.3f}%"></span>'
             f'<small>{100*value/max(1,full_unsuccessful_total):.1f}%</small></div>'
@@ -9166,7 +9173,7 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
         rank4 = waste.sort_values(ascending=False)
         d4 = pd.DataFrame({"المحصل":rank4.index,"الوقت المهدر (د)":rank4.round(2).values})
         custom4 = '<div class="snb-v-heat-grid">' + "".join(
-            f'<div class="snb-v-heat"><small>#{i+1} · {html_escape(str(name))}</small>'
+            f'<div class="snb-v-heat"><small>#{i+1} · {html_escape(short_name(name))}</small>'
             f'<strong style="color:{colors[0] if i<3 else colors[1]}">{value:.0f} <small>د</small></strong>'
             f'<div class="snb-v-track"><i style="background:{colors[0] if i<3 else colors[1]};'
             f'width:{100*value/max(1,float(rank4.max())):.2f}%"></i></div></div>'
@@ -9177,23 +9184,38 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
                   .dropna(subset=["الوقت"]).groupby("المحصل")["الوقت"].min().sort_values())
         last_times = (pd.DataFrame({"المحصل":names,"الوقت":timestamps})
                       .dropna(subset=["الوقت"]).groupby("المحصل")["الوقت"].max())
-        fig5 = fig_base()
+        custom5 = '<div class="snb-v-time-empty">—</div>'
         if not firsts.empty:
-            if selected_names:
-                left_name, left_time = firsts.index[0], firsts.iloc[0]
-                right_name, right_time = last_times.idxmax(), last_times.max()
-            else:
-                left_name, left_time = firsts.index[0], firsts.iloc[0]
-                right_name, right_time = firsts.index[-1], firsts.iloc[-1]
-            hour = lambda dt: dt.hour + dt.minute/60 + dt.second/3600
-            fig5.add_trace(go.Scatter(
-                x=[hour(left_time),hour(right_time)],y=[0,0],mode="lines+markers+text",
-                text=[f"{left_name}<br>{left_time:%H:%M}",f"{right_name}<br>{right_time:%H:%M}"],
-                textposition="top center",marker=dict(size=16,color=colors[:2]),
-                line=dict(color=colors[0],width=14)
-            ))
-            fig5.update_yaxes(visible=False,range=[-.8,.8])
-            fig5.update_xaxes(title="الساعة")
+            first_name, first_time = firsts.index[0], firsts.iloc[0]
+            last_name, last_time = (
+                (last_times.idxmax(),last_times.max()) if selected_names
+                else (firsts.index[-1],firsts.iloc[-1])
+            )
+            time_difference = max(0,int((last_time-first_time).total_seconds()//60))
+            tick_times = list(range(first_time.hour,last_time.hour+2))
+            tick_times = [h for h in tick_times if 0 <= h <= 23]
+            scale_start = first_time.floor("h")
+            scale_end = max(last_time.ceil("h"),scale_start+pd.Timedelta(hours=1))
+            span = max(1,(scale_end-scale_start).total_seconds())
+            left_pos = 100*(first_time-scale_start).total_seconds()/span
+            right_pos = 100*(last_time-scale_start).total_seconds()/span
+            ticks = "".join(
+                f'<span>{h:02d}:00</span>' for h in tick_times
+            )
+            first_caption = "أول مكالمة" if selected_names else "أول محصل بدأ"
+            last_caption = "آخر مكالمة" if selected_names else "آخر محصل بدأ"
+            difference_caption = "أول وآخر مكالمة" if selected_names else "أول وآخر بداية"
+            custom5 = (
+                '<div class="snb-v-timeline">'
+                f'<div class="snb-v-times"><b>{first_time:%H:%M}</b><b>{last_time:%H:%M}</b></div>'
+                '<div class="snb-v-time-track">'
+                f'<i style="left:{left_pos:.1f}%"></i><i style="left:{right_pos:.1f}%"></i>'
+                '</div><div class="snb-v-time-ticks">'+ticks+'</div>'
+                f'<div class="snb-v-time-captions"><span>{first_caption}: {html_escape(short_name(first_name))}</span>'
+                f'<span>{last_caption}: {html_escape(short_name(last_name))}</span></div>'
+                f'<small>الفرق بين {difference_caption}: {time_difference//60} ساعة و {time_difference%60} دقيقة</small>'
+                '</div>'
+            )
         d5 = pd.DataFrame({"المحصل":firsts.index,
                            "وقت أول مكالمة":firsts.dt.strftime("%H:%M:%S").values})
 
@@ -9327,10 +9349,10 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
 
         cards = [
             ("المكالمات لكل محصل (أعلى 10)",fig1,d1,None),
-            ("ناجحة / غير ناجحة لكل محصل",fig2,d2,None),
+            ("ناجحة / غير ناجحة لكل محصل",None,d2,custom2),
             ("أكتر المحصلين مكالمات غير ناجحة (أعلى 8)",None,d3,custom3),
             ("أكتر المحصلين وقت مهدر (أعلى 8)",None,d4,custom4),
-            ("مين بدأ الأول ومين بدأ الآخر",fig5,d5,None),
+            ("مين بدأ الأول ومين بدأ الآخر",None,d5,custom5),
             ("المكالمات بالساعة",fig6,d6,None),
             ("فجوات طويلة (أكتر من 30 دقيقة)",fig7,d7,None),
             (f"حالات المكالمات ({total})",fig8,d8,None),
