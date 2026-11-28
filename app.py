@@ -9057,6 +9057,33 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
 </style>
 """,unsafe_allow_html=True)
 
+    st.markdown("""
+<style>
+/* Only SNB Activity: uploader/filter and export visual refinements */
+.st-key-snb_visual_board [data-testid="stMultiSelect"] [data-baseweb="select"]>div{
+ background:rgba(255,255,255,.95)!important;border:1px solid rgba(127,214,224,.75)!important;
+ border-radius:9px!important;color:#0e2a47!important;min-height:42px}
+.st-key-snb_visual_board [data-testid="stMultiSelect"] [data-baseweb="tag"]{
+ background:#b9f2d8!important;color:#0e2a47!important;border-radius:99px!important}
+.st-key-snb_visual_board [data-testid="stMultiSelect"] [data-baseweb="tag"] *{
+ color:#0e2a47!important}
+.st-key-snb_visual_board [class*="st-key-snb_visual_clear_filter"] button{
+ background:transparent!important;color:#7fd6e0!important;border:1px solid #7fd6e0!important;
+ border-radius:99px!important}
+body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"]{
+ background:#103b4c!important;border:1px solid #5be39a!important;color:#fff!important}
+.st-key-download_snb_activity_processed button{
+ background:#fff!important;color:#0a7a3f!important;border-radius:11px!important;
+ font-family:Cairo,sans-serif!important;font-weight:800!important}
+.st-key-download_snb_activity_processed button *{color:#0a7a3f!important}
+.st-key-snb_activity_work_area [data-testid="stExpander"]{
+ border:1px solid rgba(91,227,154,.4)!important;border-radius:17px!important;
+ background:linear-gradient(115deg,rgba(28,61,84,.85),rgba(22,110,80,.5))!important}
+.st-key-snb_activity_work_area [data-testid="stAlert"]{
+ border-radius:10px!important}
+</style>
+""",unsafe_allow_html=True)
+
     with st.container(key="snb_visual_board"):
         kpi_slot = st.container()
         st.markdown("**فلتر المحصل (اختيار أكثر من محصل)**")
