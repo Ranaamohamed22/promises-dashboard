@@ -11699,11 +11699,24 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
             prior = st.session_state.get("snb_weekly_excel_download")
             if prior and prior.get("signature") != weekly_export_signature:
                 st.session_state.pop("snb_weekly_excel_download", None)
-        if st.button(
-            "📦 تجهيز ملفات Excel للنشاط",
+        prepare_requested = st.button(
+            "📦 إعادة تجهيز ملفات Excel للنشاط" if activity_kind == "أسبوعي"
+            else "📦 تجهيز ملفات Excel للنشاط",
             key="snb_activity_prepare_excel",
-            help="تجهيز ملف النشاط الكامل وملف Activity وتفاصيل المحصلين عند الطلب فقط",
-        ):
+            help="تجهيز ملف النشاط الكامل وملف Activity وتفاصيل المحصلين",
+        )
+        # Weekly: immediately prepare the approved workbook on the first
+        # successful review. Do not make its download depend on a second click.
+        # Reuse the stored workbook on subsequent Streamlit reruns.
+        cached_weekly = (
+            st.session_state.get("snb_weekly_excel_download")
+            if activity_kind == "أسبوعي" else None
+        )
+        must_build_weekly = (
+            activity_kind == "أسبوعي"
+            and (not cached_weekly or cached_weekly.get("signature") != weekly_export_signature)
+        )
+        if must_build_weekly or prepare_requested:
             weekly_report = activity_kind == "أسبوعي"
             details_sheet = (
                 "Wasted_Time_Details_Weekly" if weekly_report
@@ -11822,11 +11835,12 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key="download_snb_activity_processed", on_click="ignore"
                     )
-        # Weekly: show the actual download in the report itself AND in the
-        # top-row download position, even after a rerun.
+        # Weekly: render a real download directly below the ready status,
+        # independently of the prepare-button click on any rerun.
         if activity_kind == "أسبوعي":
             ready_excel = st.session_state.get("snb_weekly_excel_download")
             if ready_excel and ready_excel.get("signature") == weekly_export_signature:
+                st.success("✅ ملف النشاط الأسبوعي جاهز — اضغطي «تحميل نشاط SNB» لتنزيل Excel.")
                 st.download_button(
                     "تحميل نشاط SNB",
                     data=ready_excel["data"],
