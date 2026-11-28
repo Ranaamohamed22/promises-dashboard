@@ -9453,16 +9453,62 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
                 "آخر مكالمة":timestamps.max().strftime("%H:%M") if timestamps.notna().any() else "—",
             }])
             visible_summary = pd.concat([visible_summary,overall],ignore_index=True)
-        suffix = (f"{len(selected_names)} محصلين مختارين" if selected_names
-                  else f"أعلى 10 من {len(calls)}")
-        with st.expander(f"١٢. ملخص لكل محصل ({suffix})",expanded=False):
-            st.dataframe(
-                visible_summary.style.apply(
-                    lambda row: ["color: #5be39a; font-weight: bold"]*len(row)
-                    if row["المحصل"]=="الإجمالي" else [""]*len(row),axis=1
-                ),hide_index=True,use_container_width=True
-            )
-            st.markdown(_activity_details_html("ملخص لكل محصل", summary, "collectors"), unsafe_allow_html=True)
+        def _collector_plural(n):
+            if n == 1:
+                return "محصل واحد"
+            if n == 2:
+                return "محصلين"
+            return f"{n} محصلين"
+
+        suffix = (_collector_plural(len(selected_names))+" مختارين" if selected_names
+                  else _collector_plural(len(calls)))
+        rows_html = ""
+        for _, entry in visible_summary.iterrows():
+            is_total = str(entry["المحصل"]) == "الإجمالي"
+            def number_format(value):
+                if value == "—" or pd.isna(value):
+                    return "—"
+                return f"{value}"
+            style_class = " snb-v-total" if is_total else ""
+            cols = [
+                short_name(entry["المحصل"]) if not is_total else "الإجمالي",
+                number_format(entry["المكالمات"]),
+                f'{entry["نسبة الناجحة"]}%',
+                f'{entry["الوقت المهدر"]} د',
+                str(entry["أول مكالمة"]),str(entry["آخر مكالمة"])
+            ]
+            rows_html += '<tr class="snb-v-srow'+style_class+'">' + "".join(
+                f"<td>{html_escape(str(val))}</td>" for val in cols
+            ) + "</tr>"
+        summary_html = (
+            '<style>'
+            '.snb-v-summary{direction:rtl;border:1px solid rgba(127,214,224,.3);'
+            'background:linear-gradient(115deg,rgba(29,63,84,.85),rgba(22,101,78,.6));'
+            'border-radius:15px;margin-top:14px;padding:14px;font-family:Cairo,sans-serif}'
+            '.snb-v-summary>summary{cursor:pointer;list-style:none;display:flex;align-items:center;'
+            'justify-content:space-between;font-size:15px;font-weight:800;color:var(--text,#fff)}'
+            '.snb-v-summary>summary::-webkit-details-marker{display:none}'
+            '.snb-v-summary>summary:after{content:"إظهار ⌄";color:#7fd6e0;font-size:11px;'
+            'padding:5px 11px;border:1px solid #7fd6e077;border-radius:25px}'
+            '.snb-v-summary[open]>summary:after{content:"إخفاء ⌃"}'
+            '.snb-v-summary[open]{border-color:#5be39a;box-shadow:0 0 13px #5be39a55}'
+            '.snb-v-table-wrap{overflow-x:auto;padding-top:15px}'
+            '.snb-v-table{width:100%;border-collapse:collapse;color:var(--text,#fff);'
+            'font:11px Cairo,sans-serif;white-space:nowrap}'
+            '.snb-v-table th,.snb-v-table td{padding:10px 8px;text-align:right;border-bottom:1px solid #ffffff22}'
+            '.snb-v-table th{color:#b4d5dc;font-weight:700}'
+            '.snb-v-total{color:#5be39a;font-weight:800}'
+            '</style>'
+            '<details class="snb-v-summary"><summary>١٢. ملخص لكل محصل ('
+            +html_escape(suffix)
+            +')</summary><div class="snb-v-table-wrap"><table class="snb-v-table">'
+            '<thead><tr><th>المحصل</th><th>المكالمات</th><th>نسبة الناجحة</th>'
+            '<th>الوقت المهدر</th><th>أول مكالمة</th><th>آخر مكالمة</th></tr></thead><tbody>'
+            +rows_html+'</tbody></table></div>'
+            +_activity_details_html("ملخص لكل محصل",summary,"collectors")
+            +'</details>'
+        )
+        st.markdown(summary_html, unsafe_allow_html=True)
         # Same hidden-native-button transport and click delegation as promises tab.
         if _activity_downloads:
             with st.container(key="snb_activity_hidden_downloads"):
