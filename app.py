@@ -9154,7 +9154,7 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
 
         def _activity_modal_html(title, detail, key):
             detail = table(detail).reset_index(drop=True)
-            heading = re.sub(r"\\s*\\(أعلى \\d+\\)$", "", title)
+            heading = re.sub(r"\s*\(أعلى \d+\)$", "", title)
             unit = "محصل" if str(key)=="1" else "صف"
             excel = io.BytesIO()
             with pd.ExcelWriter(excel, engine="openpyxl") as writer:
