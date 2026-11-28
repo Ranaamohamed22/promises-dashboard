@@ -8882,6 +8882,328 @@ border-radius:16px;padding:22px;font-family:Tahoma,Arial,sans-serif;text-align:r
     return fragment, document
 
 
+
+def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, period_label,
+                                   product_col=None, upload_digest=""):
+    """SNB-only visualizations over the already approved, deduplicated period rows."""
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    from html import escape as html_escape
+
+    stamp = "__ejada_parsed_created"
+    colors = ["#5be39a", "#7fd6e0", "#2fb3a6", "#b9f2d8"]
+    all_collectors = (result[collector_col].fillna("(بدون اسم)").astype(str)
+                      .str.strip().replace("", "(بدون اسم)"))
+    options = sorted(all_collectors.unique().tolist())
+    filter_key = "snb_activity_visual_collectors"
+    token_key = "snb_activity_visual_upload_digest"
+    if st.session_state.get(token_key) != upload_digest:
+        st.session_state[token_key] = upload_digest
+        st.session_state[filter_key] = []
+    st.session_state[filter_key] = [
+        name for name in st.session_state.get(filter_key, []) if name in options
+    ]
+
+    st.markdown('<div id="snb-activity-dashboard"></div>', unsafe_allow_html=True)
+    st.markdown(
+        '<style>'
+        '.st-key-snb_visual_board [data-testid="stVerticalBlockBorderWrapper"]'
+        '{border:1px solid rgba(127,214,224,.28);border-radius:16px;'
+        'background:linear-gradient(120deg,rgba(26,61,83,.72),rgba(17,111,80,.3));}'
+        '.st-key-snb_visual_board [data-testid="stPlotlyChart"]{width:100%}'
+        '.st-key-snb_visual_board .stMarkdown h4{font-size:15px;text-align:right;direction:rtl}'
+        '</style>', unsafe_allow_html=True
+    )
+
+    with st.container(key="snb_visual_board"):
+        st.markdown("### لوحة مؤشرات النشاط | SNB")
+        st.caption(period_label)
+        st.markdown("**فلتر المحصل (اختيار أكتر من محصل)**")
+        selected_names = st.multiselect(
+            "🔍 ابحثي عن محصل…", options,
+            placeholder="اختاري محصل أو أكثر · بدون اختيار = الكل",
+            label_visibility="collapsed", key=filter_key
+        )
+        if selected_names:
+            if st.button("✕ مسح الاختيار", key="snb_visual_clear_filter"):
+                st.session_state[filter_key] = []
+                st.rerun()
+        frame = result.loc[all_collectors.isin(selected_names)].copy() if selected_names else result.copy()
+        names = (frame[collector_col].fillna("(بدون اسم)").astype(str)
+                 .str.strip().replace("", "(بدون اسم)"))
+        timestamps = pd.to_datetime(frame[stamp], errors="coerce")
+        rated = frame["تقييم المكالمات"].fillna("").astype(str).str.strip()
+        calls = names.value_counts()
+        success = names[rated == "ناجحة"].value_counts()
+        unsuccessful = names[rated == "غير ناجحة"].value_counts()
+        total = len(frame)
+        pending = total - int((rated == "ناجحة").sum()) - int((rated == "غير ناجحة").sum())
+
+        kpi_cols = st.columns(4 if pending else 3)
+        indicators = [
+            ("إجمالي المكالمات المغطاة", total),
+            ("المكالمات الناجحة", int((rated == "ناجحة").sum())),
+            ("المكالمات غير الناجحة", int((rated == "غير ناجحة").sum())),
+        ]
+        if pending:
+            indicators.append(("تحتاج مراجعة", pending))
+        for col, (label, value) in zip(kpi_cols, indicators):
+            with col:
+                st.metric(label, f"{value:,}")
+        if pending:
+            st.info("راجعي الإفادات غير المعتمدة في قوائم المراجعة الأصلية أسفل المؤشرات.")
+
+        waste_detail, waste_summary = _snb_wasted_time_reports(
+            frame, collector_col, notes_col, activity_kind=kind
+        )
+        waste = (waste_detail.groupby("المحصل")["الوقت المهدر (دقائق)"].sum()
+                 if not waste_detail.empty else pd.Series(dtype=float))
+        def table(data):
+            return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
+
+        def fig_base(height=238):
+            fig = go.Figure()
+            fig.update_layout(
+                height=height, margin=dict(l=9,r=9,t=16,b=28),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#e6f9f6", family="Arial", size=11),
+                showlegend=False, hovermode="closest"
+            )
+            fig.update_xaxes(showgrid=False, zeroline=False, tickfont=dict(size=9))
+            fig.update_yaxes(showgrid=False, zeroline=False, tickfont=dict(size=9))
+            return fig
+
+        def horizontal(labels, values, color="#7fd6e0"):
+            fig = fig_base()
+            fig.add_trace(go.Bar(
+                x=list(values)[::-1], y=list(labels)[::-1], orientation="h",
+                marker_color=color, text=list(values)[::-1],
+                textposition="outside", cliponaxis=False
+            ))
+            fig.update_layout(margin=dict(l=6,r=35,t=8,b=8))
+            return fig
+
+        def open_card(number, title, figure, detail, key, custom=None):
+            with st.container(border=True):
+                st.markdown(f"**{number}. {title}**")
+                if figure is not None:
+                    st.plotly_chart(figure, use_container_width=True, config={"displayModeBar":False},
+                                    key=f"snb_visual_chart_{key}")
+                elif custom is not None:
+                    st.html(custom)
+                else:
+                    st.info("—")
+                with st.popover("◉ عرض التفاصيل", use_container_width=False):
+                    st.caption("Excel بتحمّل صفوف الكارت ده بس · قراءة فقط")
+                    detail = table(detail).reset_index(drop=True)
+                    st.dataframe(detail, hide_index=True, use_container_width=True)
+                    workbook = io.BytesIO()
+                    with pd.ExcelWriter(workbook, engine="openpyxl") as writer:
+                        detail.to_excel(writer, sheet_name="Details", index=False)
+                        writer.book.active.sheet_view.showGridLines = True
+                    st.download_button(
+                        "⬇ تحميل Excel", data=workbook.getvalue(),
+                        file_name=f"SNB_Activity_Card_{key}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"snb_visual_export_{key}"
+                    )
+
+        top = calls.head(10)
+        fig1 = fig_base()
+        fig1.add_trace(go.Bar(x=top.index.tolist(),y=top.tolist(),marker_color=colors[0],
+                              text=top.tolist(),textposition="outside"))
+        fig1.update_layout(margin=dict(l=7,r=7,t=20,b=35))
+        d1 = pd.DataFrame({"المحصل":calls.index,"عدد المكالمات":calls.values})
+
+        top2 = calls.head(4)
+        fig2 = fig_base()
+        for title,vals,color in [
+            ("ناجحة",[int(success.get(n,0)) for n in top2.index],colors[0]),
+            ("غير ناجحة",[int(unsuccessful.get(n,0)) for n in top2.index],colors[1])
+        ]:
+            fig2.add_trace(go.Bar(x=top2.index.tolist(),y=vals,name=title,marker_color=color))
+        fig2.update_layout(barmode="stack",showlegend=True,
+                           legend=dict(orientation="h",y=-.35))
+        d2 = pd.DataFrame({
+            "المحصل":calls.index,
+            "ناجحة":[int(success.get(n,0)) for n in calls.index],
+            "غير ناجحة":[int(unsuccessful.get(n,0)) for n in calls.index],
+            "% ناجحة":[round(100*success.get(n,0)/calls[n],1) for n in calls.index]
+        })
+
+        rank3 = unsuccessful.sort_values(ascending=False)
+        fig3 = horizontal(rank3.head(8).index,rank3.head(8).values,colors[1])
+        d3 = pd.DataFrame({
+            "المحصل":rank3.index,"غير ناجحة":rank3.values,
+            "% من إجمالي غير الناجحة":[
+                round(100*x/max(1,int(unsuccessful.sum())),1) for x in rank3.values
+            ]
+        })
+        rank4 = waste.sort_values(ascending=False)
+        fig4 = horizontal(rank4.head(8).index,rank4.head(8).round(1).values,colors[1])
+        d4 = pd.DataFrame({"المحصل":rank4.index,"الوقت المهدر (د)":rank4.round(2).values})
+
+        firsts = (pd.DataFrame({"المحصل":names,"الوقت":timestamps})
+                  .dropna(subset=["الوقت"]).groupby("المحصل")["الوقت"].min().sort_values())
+        last_times = (pd.DataFrame({"المحصل":names,"الوقت":timestamps})
+                      .dropna(subset=["الوقت"]).groupby("المحصل")["الوقت"].max())
+        fig5 = fig_base()
+        if not firsts.empty:
+            if selected_names:
+                left_name, left_time = firsts.index[0], firsts.iloc[0]
+                right_name, right_time = last_times.idxmax(), last_times.max()
+            else:
+                left_name, left_time = firsts.index[0], firsts.iloc[0]
+                right_name, right_time = firsts.index[-1], firsts.iloc[-1]
+            hour = lambda dt: dt.hour + dt.minute/60 + dt.second/3600
+            fig5.add_trace(go.Scatter(
+                x=[hour(left_time),hour(right_time)],y=[0,0],mode="lines+markers+text",
+                text=[f"{left_name}<br>{left_time:%H:%M}",f"{right_name}<br>{right_time:%H:%M}"],
+                textposition="top center",marker=dict(size=16,color=colors[:2]),
+                line=dict(color=colors[0],width=14)
+            ))
+            fig5.update_yaxes(visible=False,range=[-.8,.8])
+            fig5.update_xaxes(title="الساعة")
+        d5 = pd.DataFrame({"المحصل":firsts.index,
+                           "وقت أول مكالمة":firsts.dt.strftime("%H:%M:%S").values})
+
+        hourly = timestamps.dropna().dt.hour.value_counts().sort_index()
+        fig6 = fig_base()
+        fig6.add_trace(go.Scatter(x=hourly.index.tolist(),y=hourly.tolist(),
+                                  mode="lines+markers+text",fill="tozeroy",
+                                  text=hourly.tolist(),textposition="top center",
+                                  line=dict(color=colors[0],width=3),
+                                  fillcolor="rgba(91,227,154,.26)"))
+        fig6.update_xaxes(autorange="reversed",dtick=1)
+        d6 = pd.DataFrame({"الساعة":hourly.index,"عدد المكالمات":hourly.values})
+
+        gap_frame = pd.DataFrame({"المحصل":names,"الوقت":timestamps}).dropna()
+        gap_frame["اليوم"] = gap_frame["الوقت"].dt.normalize()
+        gap_frame = gap_frame.sort_values(["المحصل","الوقت"])
+        gap_frame["السابق"] = gap_frame.groupby(["المحصل","اليوم"])["الوقت"].shift()
+        gap_frame["الفاصل"] = [
+            max(0,(current-previous).total_seconds()/60 - _break_overlap_minutes_for_report(previous,current))
+            if pd.notna(previous) else 0
+            for previous,current in zip(gap_frame["السابق"],gap_frame["الوقت"])
+        ]
+        gaps = gap_frame.loc[gap_frame["الفاصل"]>30].groupby("المحصل")["الفاصل"]
+        gap_counts = gaps.size().sort_values(ascending=False)
+        fig7 = horizontal(gap_counts.head(5).index,gap_counts.head(5).values)
+        d7 = pd.DataFrame({"المحصل":gap_counts.index,"عدد الفجوات":gap_counts.values,
+                           "أطول فجوة (د)":[round(gaps.max().get(n,0),1) for n in gap_counts.index]})
+
+        state_col = _snb_find_column(frame,"Main State","الحالة")
+        cls_col = _snb_find_column(frame,"Classification","التصنيف")
+        def counts_with_percent(column,label):
+            values = (frame[column].fillna("غير محدد").astype(str).value_counts()
+                      if column else pd.Series(dtype=int))
+            return pd.DataFrame({label:values.index,"عدد المكالمات":values.values,
+                                 "%":[round(100*v/max(1,total),1) for v in values.values]})
+        d8 = counts_with_percent(state_col,"الحالة")
+        fig8 = horizontal(d8["الحالة"].tolist(),d8["عدد المكالمات"].tolist(),colors[0])
+        d9 = counts_with_percent(cls_col,"التصنيف")
+        fig9 = fig_base()
+        fig9.add_trace(go.Scatter(
+            x=d9["عدد المكالمات"],y=d9["التصنيف"],mode="markers+text",
+            text=[f"{v} · {p}%" for v,p in zip(d9["عدد المكالمات"],d9["%"])],
+            textposition="middle right",marker=dict(color=colors[2],size=13)
+        ))
+        fig9.update_layout(margin=dict(l=6,r=70,t=8,b=8))
+
+        if product_col and product_col in frame:
+            products = frame[product_col].fillna("").astype(str).str.upper().str.strip()
+            products = products.map(lambda item: "CC+PF" if item in ("CC","PF","CC+PF") else
+                                   "RF" if item=="RF" else "أخرى")
+            pv = products.value_counts()
+        else:
+            pv = pd.Series(dtype=int)
+        d10 = pd.DataFrame({"المنتج":pv.index,"عدد المكالمات":pv.values,
+                            "%":[round(100*v/max(1,total),1) for v in pv.values]})
+        fig10 = fig_base()
+        if not pv.empty:
+            fig10.add_trace(go.Pie(labels=pv.index,values=pv.values,hole=.68,
+                                   marker=dict(colors=colors[:len(pv)]),
+                                   textinfo="percent",sort=False))
+            fig10.update_layout(annotations=[dict(text=f"<b>{total}</b><br>مكالمة",
+                                                  x=.5,y=.5,showarrow=False,font=dict(size=18))])
+
+        debtor_col = _snb_find_column(frame,"Debitor","Debtor","رقم العميل","رقم الهوية")
+        repeat = (frame[debtor_col].fillna("").astype(str).value_counts()
+                  if debtor_col else pd.Series(dtype=int))
+        repeat = repeat.loc[repeat.index!=""]
+        customer_values = [(repeat==1).sum(),(repeat==2).sum(),(repeat>=3).sum()]
+        d11 = pd.DataFrame({"عدد مرات الاتصال":["مرة","مرتين","3 مرات"],
+                            "عدد العملاء":customer_values,
+                            "%":[round(100*v/max(1,len(repeat)),1) for v in customer_values]})
+        custom11 = '<div style="display:flex;gap:8px;direction:rtl;padding:36px 5px;">' + "".join(
+            f'<div style="flex:1;text-align:center;background:#ffffff10;border-radius:12px;padding:14px 2px;">'
+            f'<small>{html_escape(str(row["عدد مرات الاتصال"]))}</small><h1 style="color:{colors[i]};">'
+            f'{int(row["عدد العملاء"])}</h1><b>{row["%"]}%</b></div>'
+            for i,(_,row) in enumerate(d11.iterrows())
+        ) + '</div>'
+
+        cards = [
+            ("المكالمات لكل محصل (أعلى 10)",fig1,d1,None),
+            ("ناجحة / غير ناجحة لكل محصل",fig2,d2,None),
+            ("أكتر المحصلين مكالمات غير ناجحة (أعلى 8)",fig3,d3,None),
+            ("أكتر المحصلين وقت مهدر (أعلى 8)",fig4,d4,None),
+            ("مين بدأ الأول ومين بدأ الآخر",fig5,d5,None),
+            ("المكالمات بالساعة",fig6,d6,None),
+            ("فجوات طويلة (أكتر من 30 دقيقة)",fig7,d7,None),
+            (f"حالات المكالمات ({total})",fig8,d8,None),
+            ("نتيجة المكالمات (التصنيف)",fig9,d9,None),
+            ("المكالمات حسب المنتج",fig10,d10,None),
+            (f"عملاء اتكلمنا معاهم أكتر من مرة ({len(repeat)})",None,d11,custom11)
+        ]
+        for start in range(0,len(cards),3):
+            row = st.columns(3,gap="small")
+            for col,i in zip(row,range(start,min(start+3,len(cards)))):
+                with col:
+                    title,figure,details,custom = cards[i]
+                    open_card(i+1,title,figure,details,i+1,custom)
+
+        summary = pd.DataFrame({
+            "المحصل":calls.index,
+            "المكالمات":calls.values,
+            "نسبة الناجحة":[round(100*success.get(n,0)/calls[n],1) for n in calls.index],
+            "الوقت المهدر":[round(waste.get(n,0),2) for n in calls.index],
+            "أول مكالمة":[firsts.get(n,pd.NaT) for n in calls.index],
+            "آخر مكالمة":[last_times.get(n,pd.NaT) for n in calls.index]
+        })
+        for label in ("أول مكالمة","آخر مكالمة"):
+            summary[label] = pd.to_datetime(summary[label]).dt.strftime("%H:%M").fillna("—")
+        visible_summary = summary if selected_names else summary.head(10)
+        suffix = (f"{len(selected_names)} محصلين مختارين" if selected_names
+                  else f"أعلى 10 من {len(calls)}")
+        with st.expander(f"١٢. ملخص لكل محصل ({suffix})",expanded=False):
+            st.dataframe(visible_summary,hide_index=True,use_container_width=True)
+            with st.popover("◉ عرض التفاصيل"):
+                st.dataframe(summary,hide_index=True,use_container_width=True)
+                workbook = io.BytesIO()
+                with pd.ExcelWriter(workbook,engine="openpyxl") as writer:
+                    summary.to_excel(writer,sheet_name="Collectors",index=False)
+                    writer.book.active.sheet_view.showGridLines = True
+                st.download_button(
+                    "⬇ تحميل Excel",workbook.getvalue(),"SNB_Activity_Collectors.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="snb_visual_collectors_excel"
+                )
+        # The original processed Excel always uses the unfiltered result.
+        fragment = '<html lang="ar" dir="rtl"><meta charset="utf-8"><body style="background:#0e2a47;color:white;">'
+        fragment += f'<h2>لوحة مؤشرات النشاط | SNB</h2><p>{html_escape(period_label)}</p>'
+        for i,(title,figure,detail,custom) in enumerate(cards,1):
+            fragment += f'<section style="padding:16px;margin:12px;border:1px solid #5be39a;border-radius:14px;">'
+            fragment += f'<h3>{i}. {html_escape(title)}</h3>'
+            fragment += (figure.to_html(full_html=False,include_plotlyjs="cdn")
+                         if figure is not None else (custom or "—")) + '</section>'
+        fragment += "</body></html>"
+        st.download_button(
+            "تحميل داشبورد النشاط HTML",fragment.encode("utf-8"),
+            file_name="SNB_Activity_Dashboard.html",mime="text/html",
+            key="activity_html_SNB_visual"
+        )
+
+
 def _ejada_activity_kpis(bank, covered, successful=None, unsuccessful=None, unresolved=0,
                          period=""):
     if not _ejada_activity_dashboard_is_open(bank):
@@ -10549,20 +10871,20 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                 selected, _ = _filter_snb_activity_period(prepared, activity_kind, period)
         manual_decisions = _snb_manual_evaluations(model_upload)
         slash_row_decisions = _snb_slash_row_decisions(activity_upload)
-        if _ejada_activity_dashboard_is_open("SNB"):
-            counts = _snb_kpi_counts(
-                selected, stats["notes"], model_mapping,
-                manual_decisions, slash_row_decisions
-            )
-            scope = activity_kind
-            if activity_kind == "يومي":
-                scope += f" | {names[period]}"
-                if not remove_extra:
-                    scope += " | يشمل الساعة الإضافية"
-            dates = selected["__ejada_parsed_created"].dropna()
-            if not dates.empty:
-                scope += f" | {dates.min():%Y-%m-%d} – {dates.max():%Y-%m-%d}"
-            _ejada_activity_kpis("SNB", *counts, period=scope)
+        dashboard_slot = st.container()
+        counts = _snb_kpi_counts(
+            selected, stats["notes"], model_mapping,
+            manual_decisions, slash_row_decisions
+        )
+        scope = activity_kind
+        if activity_kind == "يومي":
+            scope += f" | {names[period]}"
+        dates = selected["__ejada_parsed_created"].dropna()
+        if not dates.empty:
+            scope += f" | {dates.min():%Y-%m-%d} – {dates.max():%Y-%m-%d}"
+        if counts[3]:
+            with dashboard_slot:
+                _ejada_activity_kpis("SNB", *counts, period=scope)
         approved_special_keys = set(model_mapping) | set(manual_decisions)
         slash_row_decisions, slash_reviewed = _snb_review_slash_rows(
             selected, stats["notes"], activity_upload,
@@ -10601,6 +10923,12 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
         result = _snb_add_call_duration(
             result, stats["collector"]
         )
+        with dashboard_slot:
+            _snb_activity_visual_dashboard(
+                result, stats["collector"], stats["notes"], activity_kind,
+                scope, product_col=stats["product"],
+                upload_digest=hashlib.sha256(activity_upload.getvalue()).hexdigest()
+            )
         successful = int(
             (result["تقييم المكالمات"] == "ناجحة").sum()
         )
