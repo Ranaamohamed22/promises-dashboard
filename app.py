@@ -9059,7 +9059,7 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
         '.st-key-snb_visual_board [data-testid="stPlotlyChart"]{width:100%}'
         '.st-key-snb_visual_board .stMarkdown h4{font-size:15px;text-align:right;direction:rtl}'
         '[class*="st-key-snb_activity_card_"] [data-testid="stVerticalBlockBorderWrapper"]'
-        '{min-height:0;height:100%;max-height:100%;overflow:hidden;position:relative;}'
+        '{height:360px!important;min-height:360px!important;max-height:360px!important;overflow:hidden!important;box-sizing:border-box!important;position:relative;}'
         '[class*="st-key-snb_activity_card_"] [data-testid="stButton"]'
         '{opacity:0;transition:opacity .18s;}'
         '[class*="st-key-snb_activity_card_"]:hover [data-testid="stButton"],'
@@ -9098,9 +9098,17 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
 .st-key-snb_visual_board {direction:rtl}
 .st-key-snb_visual_board [class*="st-key-snb_activity_card_"]{
  border:1px solid rgba(127,214,224,.28)!important;
- border-radius:15px!important;padding:12px!important;min-height:0!important;height:360px!important;max-height:360px!important;
- overflow:hidden!important;box-sizing:border-box!important;
+ border-radius:15px!important;padding:12px!important;min-height:360px!important;height:360px!important;max-height:360px!important;
+ overflow:hidden!important;box-sizing:border-box!important;flex:0 0 auto!important;align-self:stretch!important;
  background:linear-gradient(115deg,rgba(29,63,84,.85),rgba(22,101,78,.6))!important}
+.st-key-snb_visual_board [data-testid="stHorizontalBlock"]:has([class*="st-key-snb_activity_card_"]){
+ align-items:start!important}
+.st-key-snb_visual_board [data-testid="stHorizontalBlock"]:has([class*="st-key-snb_activity_card_"])>[data-testid="stColumn"]{
+ flex:1 1 0!important;min-width:0!important;align-self:stretch!important}
+.st-key-snb_visual_board [class*="st-key-snb_activity_card_"] :is([data-testid="stVerticalBlock"],[data-testid="stVerticalBlockBorderWrapper"]){
+ box-sizing:border-box!important;max-height:360px!important;overflow:hidden!important}
+.st-key-snb_visual_board .snb-v-heat-grid{min-height:0!important;align-content:start!important}
+.st-key-snb_visual_board .snb-v-heat{height:84px!important;max-height:84px!important;overflow:hidden!important}
 .st-key-snb_visual_board [class*="st-key-snb_activity_card_"]:hover{
  border-color:#5be39a!important;box-shadow:0 0 16px rgba(91,227,154,.26)!important;transform:translateY(-4px) rotate(-.5deg)}
 .st-key-snb_visual_board [class*="st-key-snb_activity_card_"] [data-testid="stPlotlyChart"]{
@@ -11710,13 +11718,16 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                         writer, sheet_name="Weekly_Collector_Activity", index=False
                     )
                 _style_snb_activity_workbook(writer.book)
-            st.download_button(
-                "📥 تحميل نشاط SNB",
-                data=output.getvalue(),
-                file_name=f"SNB_Activity_{activity_kind}_Processed.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="download_snb_activity_processed", on_click="ignore"
-            )
+            # Keep the original after-review gating; render only the approved
+            # workbook in the existing top-row placeholder.
+            with _snb_activity_download_slot.container():
+                st.download_button(
+                    "تحميل نشاط SNB",
+                    data=output.getvalue(),
+                    file_name=f"SNB_Activity_{activity_kind}_Processed.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="download_snb_activity_processed", on_click="ignore"
+                )
 
 
 selected_bank = st.session_state.selected_bank
@@ -13930,6 +13941,7 @@ elif page_uploaded is None:
         _snb_secret_model_ready = (
             selected_bank == "SNB" and bool(_snb_secret("SNB_MODEL_ENCRYPTED"))
         )
+        _snb_activity_download_slot = None
         with st.container(key="snb_activity_header_row"):
             # Rightmost uploader, compact adjacent activity type, free space left.
             is_stc = selected_bank == "STC"
@@ -14000,6 +14012,9 @@ elif page_uploaded is None:
                     duplicate_slot = st.empty()
             with period_col:
                 shift_selector = st.empty()
+            if not is_stc:
+                with dashboard_col:
+                    _snb_activity_download_slot = st.empty()
             if is_stc:
                 with dashboard_col, st.container(horizontal=True, horizontal_alignment="left", key="activity_toggle_align"):
                     is_open = _ejada_activity_dashboard_is_open(selected_bank)
@@ -14082,6 +14097,15 @@ elif page_uploaded is None:
               flex-wrap:nowrap!important;align-items:center!important}
             .st-key-snb_activity_upload_card [data-testid="stFileUploader"]{
               max-height:44px!important;overflow:hidden!important}
+            .st-key-snb_activity_header_row .st-key-download_snb_activity_processed button{
+              background:#fff!important;color:#0a7a3f!important;
+              border:1px solid #b9f2d8!important;border-radius:999px!important;
+              font:800 13px Cairo,sans-serif!important;white-space:nowrap!important;
+              height:42px!important;padding:7px 17px!important}
+            .st-key-snb_activity_header_row .st-key-download_snb_activity_processed button::before{
+              content:"⬇";margin-inline-end:7px;color:#0a7a3f}
+            .st-key-snb_activity_header_row .st-key-download_snb_activity_processed button *{
+              color:#0a7a3f!important;-webkit-text-fill-color:#0a7a3f!important}
             </style>""",unsafe_allow_html=True)
 
         # STC has its OWN model, review and encrypted file — never SNB.
