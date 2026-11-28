@@ -8366,12 +8366,8 @@ def _filter_snb_activity_period(frame, activity_kind, daily_period,
         start = day_start + pd.Timedelta(hours=start_hour)
         end = day_start + pd.Timedelta(hours=end_hour)
         hour = pd.Timedelta(hours=1)
-        within_shift = (timestamps >= start) & (timestamps < end)
-        extra = (timestamps >= end) & (timestamps < end + hour)
-        if exclude_after_shift:
-            overtime_excluded = int(extra.sum())
-        else:
-            within_shift |= extra
+        within_shift = ((timestamps >= start) if daily_period == "first" else (timestamps > start)) & (timestamps <= end)
+        overtime_excluded = int(((timestamps > end) & timestamps.dt.normalize().eq(day_start)).sum())
         valid = valid.loc[within_shift].copy()
     elif activity_kind == "أسبوعي":
         valid = valid.loc[
@@ -8837,7 +8833,7 @@ def _snb_add_call_duration(frame, collector):
 
 def _ejada_activity_dashboard_is_open(bank):
     """Track whether the Activity KPI and chart dashboard is open per bank."""
-    return bool(st.session_state.get(f"ejada_activity_dashboard_open_{bank}", False))
+    return bank == "SNB" or bool(st.session_state.get(f"ejada_activity_dashboard_open_{bank}", False))
 
 
 def _ejada_toggle_activity_dashboard(bank):
@@ -8852,6 +8848,13 @@ def _activity_dashboard_html(bank, covered, successful, unsuccessful, unresolved
         if value is not None else f'<div class="ea-card"><span>{label}</span><strong>—</strong></div>'
         for label, value in zip(labels, (covered, successful, unsuccessful))
     )
+    if bank == "SNB" and unresolved:
+        cards += (
+            '<a class="ea-card" href="#snb-activity-review" '
+            'style="text-decoration:none;cursor:pointer;background:#123c49;'
+            'border-color:#5be39a;color:#eafbf7">'
+            f'<span>تحتاج مراجعة</span><strong>{int(unresolved):,}</strong></a>'
+        )
     chart = ""
     if covered and successful is not None and unsuccessful is not None:
         bars = []
@@ -8884,6 +8887,503 @@ border-radius:16px;padding:22px;font-family:Tahoma,Arial,sans-serif;text-align:r
                 '<style>body{max-width:1050px;margin:24px auto;padding:0 12px;background:var(--card)}</style>'
                 f'</head><body>{fragment}</body></html>')
     return fragment, document
+
+
+
+def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, period_label,
+                                   product_col=None, upload_digest=""):
+    """SNB-only visualizations over the already approved, deduplicated period rows."""
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    from html import escape as html_escape
+    import math
+
+    stamp = "__ejada_parsed_created"
+    colors = ["#5be39a", "#7fd6e0", "#2fb3a6", "#b9f2d8"]
+    all_collectors = (result[collector_col].fillna("(بدون اسم)").astype(str)
+                      .str.strip().replace("", "(بدون اسم)"))
+    options = sorted(all_collectors.unique().tolist())
+    filter_key = "snb_activity_visual_collectors"
+    token_key = "snb_activity_visual_upload_digest"
+    if st.session_state.get(token_key) != upload_digest:
+        st.session_state[token_key] = upload_digest
+        st.session_state[filter_key] = []
+    st.session_state[filter_key] = [
+        name for name in st.session_state.get(filter_key, []) if name in options
+    ]
+
+    st.markdown('<div id="snb-activity-dashboard"></div>', unsafe_allow_html=True)
+    st.markdown(
+        '<style>'
+        '.st-key-snb_visual_board [data-testid="stVerticalBlockBorderWrapper"]'
+        '{border:1px solid rgba(127,214,224,.28);border-radius:16px;'
+        'background:linear-gradient(120deg,rgba(26,61,83,.72),rgba(17,111,80,.3));}'
+        '.st-key-snb_visual_board [data-testid="stPlotlyChart"]{width:100%}'
+        '.st-key-snb_visual_board .stMarkdown h4{font-size:15px;text-align:right;direction:rtl}'
+        '[class*="st-key-snb_activity_card_"] [data-testid="stVerticalBlockBorderWrapper"]'
+        '{min-height:320px;position:relative;}'
+        '[class*="st-key-snb_activity_card_"] [data-testid="stButton"]'
+        '{opacity:0;transition:opacity .18s;}'
+        '[class*="st-key-snb_activity_card_"]:hover [data-testid="stButton"],'
+        '[class*="st-key-snb_activity_card_"]:focus-within [data-testid="stButton"]'
+        '{opacity:1;}'
+        '[class*="st-key-snb_activity_card_"]:hover [data-testid="stVerticalBlockBorderWrapper"]'
+        '{border-color:#5be39a!important;box-shadow:0 0 12px rgba(91,227,154,.28);}'
+        '.snb-v-rank-list{padding:5px 4px;direction:rtl;}'
+        '.snb-v-rank-row{display:flex;gap:7px;align-items:center;height:31px;font-size:11px;}'
+        '.snb-v-rank{border-radius:50%;background:#43697d;color:#e1fff7;min-width:20px;text-align:center;}'
+        '.snb-v-rank-row:nth-child(-n+3) .snb-v-rank{background:#7fd6e0;color:#0e2a47;}'
+        '.snb-v-rank-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
+        '.snb-v-rank-row b{font-size:11px;white-space:nowrap;}'
+        '.snb-v-ring{height:20px;width:20px;display:inline-block;border-radius:50%;'
+        'background:conic-gradient(#5be39a var(--part),rgba(127,214,224,.28) 0);'
+        'mask:radial-gradient(farthest-side,transparent 55%,#000 60%);}'
+        '.snb-v-rank-row small{min-width:35px;color:#a9c5ce;text-align:left;}'
+        '.snb-v-heat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;direction:rtl;}'
+        '.snb-v-heat{background:rgba(255,255,255,.065);border-radius:9px;padding:9px 7px;'
+        'text-align:center;display:flex;flex-direction:column;gap:2px;}'
+        '.snb-v-heat small{font-size:10px;color:#d2edec;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
+        '.snb-v-heat strong{font-size:23px;line-height:1.15;}'
+        '.snb-v-track{background:rgba(255,255,255,.13);height:4px;border-radius:4px;overflow:hidden;}'
+        '.snb-v-track i{display:block;height:4px;border-radius:4px;}'
+        '.snb-v-donut{text-align:center;direction:rtl;}'
+        '.snb-v-pills{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;}'
+        '.snb-v-pills span{border-radius:6px;padding:4px 7px;background:rgba(255,255,255,.07);font-size:10px;}'
+        '</style>', unsafe_allow_html=True
+    )
+
+    st.markdown("<style>\n.snb-pr-details{min-width:0}\n.snb-pr-details>summary{list-style:none;cursor:pointer;position:relative;display:block}\n.snb-pr-details>summary::-webkit-details-marker{display:none}\n.snb-pr-details>summary>article{transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}\n.snb-pr-details:hover>summary>article{transform:translateY(-4px) rotate(-.5deg);\nbackground:linear-gradient(var(--card),var(--card)) padding-box,linear-gradient(var(--base,#0E2A47),var(--base,#0E2A47)) padding-box,linear-gradient(135deg,#7fd6e0,#5be39a) border-box !important;\nborder-color:transparent !important;box-shadow:0 14px 28px rgba(4,27,51,.45) !important}\n.snb-pr-details[open]:hover>summary>article{transform:none}\n.snb-pr-details[open]:hover>summary{transform:none !important}\n.snb-pr-detail-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:max-content;\nmax-width:100%;margin:9px auto 0;opacity:0;visibility:hidden;\ntransition:opacity .2s ease,visibility .2s ease;background:linear-gradient(135deg,#2fb5a6,#5be39a);\ncolor:#0E2A47;font-size:11px;font-weight:800;padding:5px 15px;border-radius:999px;white-space:nowrap;\nbox-shadow:0 6px 16px rgba(47,181,166,.4);pointer-events:none}\n.snb-pr-details>summary,.snb-pr-details>summary:focus{outline:none}\n.snb-pr-details>summary:focus-visible>article{box-shadow:0 0 0 2px rgba(91,227,154,.7)}\n.snb-pr-details:hover .snb-pr-btn-open,.snb-pr-details:has(>summary:focus-visible) .snb-pr-btn-open{opacity:1;visibility:visible}\n.snb-pr-details[open] .snb-pr-btn-open{display:none}\n@media (hover:none){.snb-pr-details .snb-pr-btn-open{opacity:1;visibility:visible}}\n.snb-m-backdrop,.snb-m-close{display:none}\n.snb-pr-details[open] .snb-m-backdrop{display:block;position:fixed;inset:0;z-index:999995;\nbackground:rgba(2,10,20,.6);backdrop-filter:blur(6px) saturate(1.1)}\n.snb-pr-details[open] .snb-m-close{display:grid;place-items:center;position:fixed;z-index:999998;\ntop:calc(50vh - min(565px,88vh)/2 - 12px);left:calc(50vw - min(730px,94vw)/2 - 12px);\nwidth:32px;height:32px;border-radius:50%;background:rgba(14,42,63,.95);\nborder:1.5px solid rgba(127,214,224,.5);color:#fff;font-size:13px;box-shadow:0 6px 18px rgba(0,0,0,.45)}\n.snb-pr-details[open] .snb-m-close:hover{background:rgba(255,90,90,.2);border-color:rgba(255,120,120,.45);color:#ffb3b3}\n.snb-m-panel{display:none}\n.snb-pr-details[open]>.snb-m-panel{display:grid;place-items:center;position:fixed;inset:0;z-index:999996;\npointer-events:none;padding:18px}\n.snb-m-box{pointer-events:auto;width:min(730px,94vw);height:min(565px,88vh);display:flex;flex-direction:column;gap:13px;\nbackground:linear-gradient(rgba(14,42,63,.97),rgba(9,27,43,.98)) padding-box,linear-gradient(140deg,rgba(127,214,224,.65),rgba(91,227,154,.55) 45%,rgba(127,214,224,.25)) border-box;\nborder:1.5px solid transparent;border-radius:24px;padding:20px 22px;\nfont-family:'Cairo',sans-serif;color:#fff;\nbox-shadow:0 40px 100px rgba(0,0,0,.6),0 0 60px rgba(91,227,154,.05) inset}\n.snb-m-box>input{display:none}\n.snb-m-head{display:flex;align-items:center;gap:12px}\n.snb-m-ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex-shrink:0;\nbackground:linear-gradient(135deg,rgba(47,181,166,.3),rgba(91,227,154,.18));border:1px solid rgba(91,227,154,.4);font-size:17px}\n.snb-m-t h4{font-size:16.5px;font-weight:800;margin:0;color:#fff}\nhtml body .stApp .snb-m-t h4{font-size:16.5px !important;font-weight:800 !important;margin:0 !important;padding:0 !important;line-height:1.4 !important;color:#fff !important;-webkit-text-fill-color:#fff !important;text-align:start !important}\n.snb-m-t span{font-size:11px;color:rgba(255,255,255,.45);display:block;margin-top:1px}\n.snb-m-count{margin-inline-start:auto;font-size:11px;font-weight:800;border-radius:999px;padding:3.5px 12px;\nbackground:rgba(91,227,154,.13);border:1px solid rgba(91,227,154,.4);color:#5be39a;white-space:nowrap}\n.snb-m-seg{display:inline-flex;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);\nborder-radius:999px;padding:3px;gap:2px;width:max-content}\n.snb-m-seg label{font-size:11px;font-weight:700;border-radius:999px;padding:4.5px 14px;cursor:pointer;color:rgba(255,255,255,.6)}\n.snb-m-box>input.f-all:checked~.snb-m-seg .la,.snb-m-box>input.f-ok:checked~.snb-m-seg .lo,\n.snb-m-box>input.f-bad:checked~.snb-m-seg .lb{background:linear-gradient(135deg,#2fb5a6,#5be39a);\ncolor:#0E2A47;font-weight:800;box-shadow:0 3px 10px rgba(47,181,166,.35)}\n.snb-m-box>input.f-ok:checked~.snb-m-tblwrap tr.st-bad{display:none}\n.snb-m-box>input.f-bad:checked~.snb-m-tblwrap tr.st-ok{display:none}\n.snb-m-tblwrap{overflow:auto;flex:1;min-height:0;border-radius:14px;border:1px solid rgba(255,255,255,.08)}\n.snb-m-tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;direction:rtl}\n.snb-m-tbl thead th{position:sticky;top:0;z-index:2;background:rgba(9,27,42,.97);\ncolor:rgba(255,255,255,.55);font-size:10.5px;font-weight:700;text-align:right;padding:10px 12px;\nborder-bottom:1px solid rgba(127,214,224,.28);white-space:nowrap}\n.snb-m-tbl tbody td{padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.05);\ncolor:rgba(255,255,255,.88);white-space:nowrap}\n.snb-m-tbl tbody tr:nth-child(even){background:rgba(255,255,255,.03)}\n.snb-m-tbl tbody tr:hover{background:rgba(91,227,154,.06)}\n.snb-m-tbl td.snb-m-date{direction:ltr;unicode-bidi:embed}\n.snb-m-chip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;border-radius:999px;padding:3px 10px}\n.snb-m-chip::before{content:'';width:5px;height:5px;border-radius:50%}\n.snb-m-chip.ok{background:rgba(91,227,154,.13);color:#5be39a;border:1px solid rgba(91,227,154,.35)}\n.snb-m-chip.ok::before{background:#5be39a;box-shadow:0 0 6px #5be39a}\n.snb-m-chip.bad{background:rgba(127,214,224,.1);color:#7fd6e0;border:1px solid rgba(127,214,224,.32)}\n.snb-m-chip.bad::before{background:#7fd6e0;box-shadow:0 0 6px #7fd6e0}\n.snb-m-tblwrap .snb-pr-note{margin:10px 0 6px}\n.snb-m-tblwrap::-webkit-scrollbar{width:8px;height:8px}\n.snb-m-tblwrap::-webkit-scrollbar-thumb{background:rgba(127,214,224,.25);border-radius:999px}\n.snb-m-tblwrap::-webkit-scrollbar-thumb:hover{background:rgba(127,214,224,.4)}\n.snb-m-tblwrap::-webkit-scrollbar-track{background:transparent}\n.snb-v-details{direction:rtl;position:relative;min-height:28px;font-family:'Cairo',sans-serif}\n.snb-v-details>summary{display:flex;justify-content:center;min-height:28px}\n.snb-v-details .snb-pr-detail-btn{margin:0 auto 0;pointer-events:none}\n[class*=\"st-key-snb_activity_card_\"]:hover .snb-v-details .snb-pr-btn-open,\n[class*=\"st-key-snb_activity_card_\"]:focus-within .snb-v-details .snb-pr-btn-open,\n.snb-v-details:hover .snb-pr-btn-open{opacity:1;visibility:visible}\n.snb-v-details .snb-m-tblwrap{width:100%}\n.snb-v-details .snb-m-dl{display:inline-flex;align-items:center;justify-content:center;\nborder-radius:999px;padding:5px 10px;background:#5be39a;color:#0e2a47;\nfont-family:'Cairo',sans-serif;font-weight:800;font-size:11px;text-decoration:none;white-space:nowrap}\n.snb-v-details .snb-m-dl:hover{background:#7fd6e0;color:#0e2a47}\n.snb-v-details .snb-m-box{box-sizing:border-box}\n.snb-v-details .snb-m-tbl{table-layout:auto}\n.snb-v-details .snb-pr-note{color:rgba(255,255,255,.65);font-size:11px;text-align:center}\n.snb-v-donut .snb-pr-product-gauge{width:320px;height:180px;max-width:100%;position:relative;margin:20px auto 10px}\n.snb-v-donut .snb-pr-product-ring{width:100%;height:100%;overflow:visible;position:absolute;inset:0}\n.snb-v-donut .snb-pr-ring-txt{font-family:'Cairo',sans-serif;font-size:14px;font-weight:800;direction:ltr}\n.snb-v-ring-center{position:absolute;left:0;top:50%;transform:translateY(-50%);\nwidth:100%;font-size:21px;color:var(--text,#fff);text-align:center}\n.snb-v-ring-center small{display:block;font-size:11px;font-weight:400}\n.snb-v-rank-list,.snb-v-heat-grid{min-height:250px}\n@media(max-width:900px){\n.st-key-snb_visual_board [data-testid=\"stHorizontalBlock\"]:has([class*=\"st-key-snb_activity_card_\"]){flex-wrap:wrap}\n.st-key-snb_visual_board [data-testid=\"stHorizontalBlock\"]:has([class*=\"st-key-snb_activity_card_\"])>div{min-width:100%;flex-basis:100%}\n}\n\n</style>",unsafe_allow_html=True)
+
+    with st.container(key="snb_visual_board"):
+        st.markdown("### لوحة مؤشرات النشاط | SNB")
+        st.caption(period_label)
+        st.markdown("**فلتر المحصل (اختيار أكتر من محصل)**")
+        selected_names = st.multiselect(
+            "🔍 ابحثي عن محصل…", options,
+            placeholder="اختاري محصل أو أكثر · بدون اختيار = الكل",
+            label_visibility="collapsed", key=filter_key
+        )
+        if selected_names:
+            def _clear_snb_visual_filter():
+                st.session_state[filter_key] = []
+            st.button("✕ مسح الاختيار", key="snb_visual_clear_filter",
+                      on_click=_clear_snb_visual_filter)
+        frame = result.loc[all_collectors.isin(selected_names)].copy() if selected_names else result.copy()
+        names = (frame[collector_col].fillna("(بدون اسم)").astype(str)
+                 .str.strip().replace("", "(بدون اسم)"))
+        timestamps = pd.to_datetime(frame[stamp], errors="coerce")
+        rated = frame["تقييم المكالمات"].fillna("").astype(str).str.strip()
+        calls = names.value_counts()
+        success = names[rated == "ناجحة"].value_counts()
+        unsuccessful = names[rated == "غير ناجحة"].value_counts()
+        total = len(frame)
+        pending = total - int((rated == "ناجحة").sum()) - int((rated == "غير ناجحة").sum())
+
+        kpi_cols = st.columns(4 if pending else 3)
+        indicators = [
+            ("إجمالي المكالمات المغطاة", total),
+            ("المكالمات الناجحة", int((rated == "ناجحة").sum())),
+            ("المكالمات غير الناجحة", int((rated == "غير ناجحة").sum())),
+        ]
+        if pending:
+            indicators.append(("تحتاج مراجعة", pending))
+        for col, (label, value) in zip(kpi_cols, indicators):
+            with col:
+                st.metric(label, f"{value:,}")
+        if pending:
+            st.info("راجعي الإفادات غير المعتمدة في قوائم المراجعة الأصلية أسفل المؤشرات.")
+
+        waste_detail, waste_summary = _snb_wasted_time_reports(
+            frame, collector_col, notes_col, activity_kind=kind
+        )
+        waste = (waste_detail.groupby("المحصل")["الوقت المهدر (دقائق)"].sum()
+                 if not waste_detail.empty else pd.Series(dtype=float))
+        def table(data):
+            return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
+
+        def fig_base(height=238):
+            fig = go.Figure()
+            fig.update_layout(
+                height=height, margin=dict(l=9,r=9,t=16,b=28),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#e6f9f6", family="Arial", size=11),
+                showlegend=False, hovermode="closest"
+            )
+            fig.update_xaxes(showgrid=False, zeroline=False, tickfont=dict(size=9))
+            fig.update_yaxes(showgrid=False, zeroline=False, tickfont=dict(size=9))
+            return fig
+
+        def horizontal(labels, values, color="#7fd6e0"):
+            fig = fig_base()
+            fig.add_trace(go.Bar(
+                x=list(values)[::-1], y=list(labels)[::-1], orientation="h",
+                marker_color=color, text=list(values)[::-1],
+                textposition="outside", cliponaxis=False
+            ))
+            fig.update_layout(margin=dict(l=6,r=35,t=8,b=8))
+            return fig
+
+        # Reuse the promise page's HTML details/summary/modal class structure.
+        # Each card gets the same snb-pr-details / snb-m-backdrop / snb-m-close.
+        _activity_downloads = {}
+
+        def _activity_modal_html(title, detail, key):
+            detail = table(detail).reset_index(drop=True)
+            excel = io.BytesIO()
+            with pd.ExcelWriter(excel, engine="openpyxl") as writer:
+                detail.to_excel(writer, sheet_name="Details", index=False)
+                writer.book.active.sheet_view.showGridLines = True
+            _activity_downloads[str(key)] = excel.getvalue()
+            columns = detail.columns.tolist()
+            header = "".join(f"<th>{html_escape(str(c))}</th>" for c in columns)
+            rows = "".join(
+                "<tr>" + "".join(
+                    f"<td>{html_escape('—' if pd.isna(v) else str(v))}</td>"
+                    for v in row
+                ) + "</tr>"
+                for row in detail.head(50).itertuples(index=False,name=None)
+            )
+            more = (f'<p class="snb-pr-note">أول 50 صف من {len(detail):,} — الباقي في ملف التنزيل</p>'
+                    if len(detail)>50 else "")
+            return (
+                '<div class="snb-m-panel"><div class="snb-m-box">'
+                '<div class="snb-m-head"><span class="snb-m-ic">📋</span><div class="snb-m-t">'
+                f'<h4>{html_escape(title)}</h4>'
+                '<span>Excel بتحمّل صفوف الكارت ده بس · قراءة فقط</span></div>'
+                f'<span class="snb-m-count">{len(detail):,} صف</span>'
+                f'<a class="snb-m-dl" href="#" role="button" data-snb-activity-download="{key}">⬇ تحميل Excel</a>'
+                '</div><div class="snb-m-tblwrap"><table class="snb-m-tbl"><thead><tr>'
+                + header + '</tr></thead><tbody>' + rows + '</tbody></table>' + more
+                + '</div></div></div>'
+            )
+
+        def _activity_details_html(title, detail, key):
+            # Same HTML component and close/backdrop classes as promises.
+            return (
+                '<details class="snb-pr-details snb-v-details"><summary>'
+                '<span class="snb-pr-detail-btn snb-pr-btn-open">'
+                '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" '
+                'stroke="currentColor" stroke-width="2.4">'
+                '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11-8-11-8z"/>'
+                '<circle cx="12" cy="12" r="3"/></svg>عرض التفاصيل</span>'
+                '<span class="snb-m-backdrop"></span><span class="snb-m-close">✕</span>'
+                '</summary>' + _activity_modal_html(title, detail, key) + '</details>'
+            )
+
+        def open_card(number, title, figure, detail, key, custom=None):
+            with st.container(border=True, key=f"snb_activity_card_{key}"):
+                st.markdown(f"**{number}. {title}**")
+                if figure is not None:
+                    st.plotly_chart(figure, use_container_width=True,
+                                    config={"displayModeBar":False},
+                                    key=f"snb_visual_chart_{key}")
+                elif custom is not None:
+                    st.html(custom)
+                else:
+                    st.info("—")
+                st.html(_activity_details_html(title, detail, key))
+
+        top = calls.head(10)
+        fig1 = fig_base()
+        fig1.add_trace(go.Bar(x=top.index.tolist(),y=top.tolist(),marker_color=colors[0],
+                              text=top.tolist(),textposition="outside"))
+        fig1.update_layout(margin=dict(l=7,r=7,t=20,b=35))
+        d1 = pd.DataFrame({"المحصل":calls.index,"عدد المكالمات":calls.values})
+
+        top2 = calls.head(4)
+        fig2 = fig_base()
+        for title,vals,color in [
+            ("ناجحة",[int(success.get(n,0)) for n in top2.index],colors[0]),
+            ("غير ناجحة",[int(unsuccessful.get(n,0)) for n in top2.index],colors[1])
+        ]:
+            fig2.add_trace(go.Bar(x=top2.index.tolist(),y=vals,name=title,marker_color=color))
+        fig2.update_layout(barmode="stack",showlegend=True,
+                           legend=dict(orientation="h",y=-.35))
+        d2 = pd.DataFrame({
+            "المحصل":calls.index,
+            "ناجحة":[int(success.get(n,0)) for n in calls.index],
+            "غير ناجحة":[int(unsuccessful.get(n,0)) for n in calls.index],
+            "% ناجحة":[round(100*success.get(n,0)/calls[n],1) for n in calls.index]
+        })
+
+        rank3 = unsuccessful.sort_values(ascending=False)
+        all_rated = result["تقييم المكالمات"].fillna("").astype(str).str.strip()
+        full_unsuccessful_total = int((all_rated == "غير ناجحة").sum())
+        d3 = pd.DataFrame({
+            "المحصل":rank3.index,"غير ناجحة":rank3.values,
+            "% من إجمالي غير الناجحة":[
+                round(100*x/max(1,full_unsuccessful_total),1) for x in rank3.values
+            ]
+        })
+        custom3 = '<div class="snb-v-rank-list">' + "".join(
+            f'<div class="snb-v-rank-row"><span class="snb-v-rank">{i+1}</span>'
+            f'<span class="snb-v-rank-name">{html_escape(str(name))}</span>'
+            f'<b>{int(value)} مكالمة</b>'
+            f'<span class="snb-v-ring" style="--part:{100*value/max(1,full_unsuccessful_total):.3f}%"></span>'
+            f'<small>{100*value/max(1,full_unsuccessful_total):.1f}%</small></div>'
+            for i,(name,value) in enumerate(rank3.head(8).items())
+        ) + '</div>'
+        rank4 = waste.sort_values(ascending=False)
+        d4 = pd.DataFrame({"المحصل":rank4.index,"الوقت المهدر (د)":rank4.round(2).values})
+        custom4 = '<div class="snb-v-heat-grid">' + "".join(
+            f'<div class="snb-v-heat"><small>#{i+1} · {html_escape(str(name))}</small>'
+            f'<strong style="color:{colors[0] if i<3 else colors[1]}">{value:.0f} <small>د</small></strong>'
+            f'<div class="snb-v-track"><i style="background:{colors[0] if i<3 else colors[1]};'
+            f'width:{100*value/max(1,float(rank4.max())):.2f}%"></i></div></div>'
+            for i,(name,value) in enumerate(rank4.head(8).items())
+        ) + '</div>'
+
+        firsts = (pd.DataFrame({"المحصل":names,"الوقت":timestamps})
+                  .dropna(subset=["الوقت"]).groupby("المحصل")["الوقت"].min().sort_values())
+        last_times = (pd.DataFrame({"المحصل":names,"الوقت":timestamps})
+                      .dropna(subset=["الوقت"]).groupby("المحصل")["الوقت"].max())
+        fig5 = fig_base()
+        if not firsts.empty:
+            if selected_names:
+                left_name, left_time = firsts.index[0], firsts.iloc[0]
+                right_name, right_time = last_times.idxmax(), last_times.max()
+            else:
+                left_name, left_time = firsts.index[0], firsts.iloc[0]
+                right_name, right_time = firsts.index[-1], firsts.iloc[-1]
+            hour = lambda dt: dt.hour + dt.minute/60 + dt.second/3600
+            fig5.add_trace(go.Scatter(
+                x=[hour(left_time),hour(right_time)],y=[0,0],mode="lines+markers+text",
+                text=[f"{left_name}<br>{left_time:%H:%M}",f"{right_name}<br>{right_time:%H:%M}"],
+                textposition="top center",marker=dict(size=16,color=colors[:2]),
+                line=dict(color=colors[0],width=14)
+            ))
+            fig5.update_yaxes(visible=False,range=[-.8,.8])
+            fig5.update_xaxes(title="الساعة")
+        d5 = pd.DataFrame({"المحصل":firsts.index,
+                           "وقت أول مكالمة":firsts.dt.strftime("%H:%M:%S").values})
+
+        hourly = timestamps.dropna().dt.hour.value_counts().sort_index()
+        fig6 = fig_base()
+        fig6.add_trace(go.Scatter(x=hourly.index.tolist(),y=hourly.tolist(),
+                                  mode="lines+markers+text",fill="tozeroy",
+                                  text=hourly.tolist(),textposition="top center",
+                                  line=dict(color=colors[0],width=3),
+                                  fillcolor="rgba(91,227,154,.26)"))
+        fig6.update_xaxes(autorange="reversed",dtick=1)
+        d6 = pd.DataFrame({"الساعة":hourly.index,"عدد المكالمات":hourly.values})
+
+        gap_frame = pd.DataFrame({"المحصل":names,"الوقت":timestamps}).dropna()
+        gap_frame["اليوم"] = gap_frame["الوقت"].dt.normalize()
+        gap_frame = gap_frame.sort_values(["المحصل","الوقت"])
+        gap_frame["السابق"] = gap_frame.groupby(["المحصل","اليوم"])["الوقت"].shift()
+        gap_frame["الفاصل"] = [
+            max(0,(current-previous).total_seconds()/60 - _break_overlap_minutes_for_report(previous,current))
+            if pd.notna(previous) else 0
+            for previous,current in zip(gap_frame["السابق"],gap_frame["الوقت"])
+        ]
+        gaps = gap_frame.loc[gap_frame["الفاصل"]>30].groupby("المحصل")["الفاصل"]
+        gap_counts = gaps.size().sort_values(ascending=False)
+        fig7 = horizontal(gap_counts.head(5).index,gap_counts.head(5).values)
+        d7 = pd.DataFrame({"المحصل":gap_counts.index,"عدد الفجوات":gap_counts.values,
+                           "أطول فجوة (د)":[round(gaps.max().get(n,0),1) for n in gap_counts.index]})
+
+        state_col = _snb_find_column(frame,"Main State","الحالة")
+        cls_col = _snb_find_column(frame,"Classification","التصنيف")
+        def counts_with_percent(column,label):
+            values = (frame[column].fillna("غير محدد").astype(str).value_counts()
+                      if column else pd.Series(dtype=int))
+            return pd.DataFrame({label:values.index,"عدد المكالمات":values.values,
+                                 "%":[round(100*v/max(1,total),1) for v in values.values]})
+        d8 = counts_with_percent(state_col,"الحالة")
+        fig8 = horizontal(d8["الحالة"].tolist(),d8["عدد المكالمات"].tolist(),colors[0])
+        d9 = counts_with_percent(cls_col,"التصنيف")
+        fig9 = fig_base()
+        for idx, row in d9.iterrows():
+            count = int(row["عدد المكالمات"])
+            fig9.add_shape(type="line", x0=0, x1=count, y0=idx, y1=idx,
+                           line=dict(color=colors[idx % len(colors)], width=2))
+        fig9.add_trace(go.Scatter(
+            x=d9["عدد المكالمات"],y=list(range(len(d9))),mode="markers+text",
+            text=[f"{v} · {p}%" for v,p in zip(d9["عدد المكالمات"],d9["%"])],
+            textposition="middle left",marker=dict(color=[colors[i % len(colors)] for i in range(len(d9))],size=13)
+        ))
+        fig9.update_yaxes(tickmode="array",tickvals=list(range(len(d9))),
+                          ticktext=d9["التصنيف"].tolist(),autorange="reversed")
+        fig9.update_layout(margin=dict(l=6,r=70,t=8,b=8))
+
+        if product_col and product_col in frame:
+            products = frame[product_col].fillna("").astype(str).str.upper().str.strip()
+            products = products.map(lambda item: "CC+PF" if item in ("CC","PF","CC+PF") else
+                                   "RF" if item=="RF" else "أخرى")
+            pv = products.value_counts()
+        else:
+            pv = pd.Series(dtype=int)
+        d10 = pd.DataFrame({"المنتج":pv.index,"عدد المكالمات":pv.values,
+                            "%":[round(100*v/max(1,total),1) for v in pv.values]})
+        # Exact promises-tab circle geometry: 320x180, radius 46, stroke 28,
+        # 6px arc separation, rounded dash ends and identical leader coordinates.
+        _r, _sw, _gap = 46.0, 28.0, 6.0
+        _c = 2 * math.pi * _r
+        _parts = []
+        _values = list(pv.items())
+        _palette = ["#5be39a", "#7fd6e0", "#2fb3a6"]
+        _share_start = 0.0
+        for _i, (_product, _value) in enumerate(_values):
+            _share = float(_value) / max(1, int(pv.sum()))
+            _length = _share * _c
+            _col = _palette[_i % len(_palette)]
+            if _share >= 1:
+                _parts.append(f'<circle cx="160" cy="90" r="{_r}" fill="none" stroke="{_col}" stroke-width="{_sw}"/>')
+            elif _share > 0:
+                _dash = max(_length - _sw - _gap, .01)
+                _offset = _share_start * _c + _sw/2 + _gap/2
+                _parts.append(
+                    f'<circle cx="160" cy="90" r="{_r}" fill="none" stroke="{_col}" '
+                    f'stroke-width="{_sw}" stroke-linecap="round" '
+                    f'stroke-dasharray="{_dash:.3f} {_c:.3f}" '
+                    f'stroke-dashoffset="{-_offset:.3f}" transform="rotate(-90 160 90)"/>'
+                )
+            if _share > 0:
+                _ang = (_share_start + _share / 2) * 2 * math.pi
+                _sn, _cs = math.sin(_ang), -math.cos(_ang)
+                _x1, _y1 = 160 + (_r+_sw/2+3)*_sn, 90+(_r+_sw/2+3)*_cs
+                _x2, _y2 = 160+78*_sn, 90+78*_cs
+                _right = _sn >= 0
+                _x3 = _x2 + (20 if _right else -20)
+                _parts.append(
+                    f'<polyline points="{_x1:.1f},{_y1:.1f} {_x2:.1f},{_y2:.1f} {_x3:.1f},{_y2:.1f}" '
+                    f'fill="none" stroke="{_col}" stroke-width="1.6" '
+                    f'stroke-linecap="round" stroke-linejoin="round"/>'
+                    f'<circle cx="{_x1:.1f}" cy="{_y1:.1f}" r="2.4" fill="{_col}"/>'
+                    f'<text x="{_x3+(4 if _right else -4):.1f}" y="{_y2:.1f}" '
+                    f'text-anchor="{"start" if _right else "end"}" dominant-baseline="central" '
+                    f'class="snb-pr-ring-txt" style="fill:{_col}">{_share:.1%}</text>'
+                )
+            _share_start += _share
+        _ring_svg = (
+            '<svg class="snb-pr-product-ring" viewBox="0 0 320 180">'
+            + "".join(_parts) + '</svg>'
+        )
+        custom10 = (
+            '<div class="snb-v-donut snb-pr-product-section">'
+            '<div class="snb-pr-product-gauge">'
+            + _ring_svg
+            + f'<strong class="snb-v-ring-center">{total:,}<small>مكالمة</small></strong>'
+            + '</div><div class="snb-v-pills">'
+            + "".join(f'<span>{html_escape(str(name))} · {int(value)}</span>'
+                      for name,value in _values)
+            + '</div></div>'
+        )
+
+        debtor_col = _snb_find_column(frame,"Debitor","Debtor","رقم العميل","رقم الهوية")
+        repeat = (frame[debtor_col].fillna("").astype(str).value_counts()
+                  if debtor_col else pd.Series(dtype=int))
+        repeat = repeat.loc[repeat.index!=""]
+        customer_values = [(repeat==1).sum(),(repeat==2).sum(),(repeat>=3).sum()]
+        d11 = pd.DataFrame({"عدد مرات الاتصال":["مرة","مرتين","3 مرات"],
+                            "عدد العملاء":customer_values,
+                            "%":[round(100*v/max(1,len(repeat)),1) for v in customer_values]})
+        custom11 = '<div style="display:flex;gap:8px;direction:rtl;padding:36px 5px;">' + "".join(
+            f'<div style="flex:1;text-align:center;background:#ffffff10;border-radius:12px;padding:14px 2px;">'
+            f'<small>{html_escape(str(row["عدد مرات الاتصال"]))}</small><h1 style="color:{colors[i]};">'
+            f'{int(row["عدد العملاء"])}</h1><b>{row["%"]}%</b></div>'
+            for i,(_,row) in enumerate(d11.iterrows())
+        ) + '</div>'
+
+        cards = [
+            ("المكالمات لكل محصل (أعلى 10)",fig1,d1,None),
+            ("ناجحة / غير ناجحة لكل محصل",fig2,d2,None),
+            ("أكتر المحصلين مكالمات غير ناجحة (أعلى 8)",None,d3,custom3),
+            ("أكتر المحصلين وقت مهدر (أعلى 8)",None,d4,custom4),
+            ("مين بدأ الأول ومين بدأ الآخر",fig5,d5,None),
+            ("المكالمات بالساعة",fig6,d6,None),
+            ("فجوات طويلة (أكتر من 30 دقيقة)",fig7,d7,None),
+            (f"حالات المكالمات ({total})",fig8,d8,None),
+            ("نتيجة المكالمات (التصنيف)",fig9,d9,None),
+            ("المكالمات حسب المنتج",None,d10,custom10),
+            (f"عملاء اتكلمنا معاهم أكتر من مرة ({len(repeat)})",None,d11,custom11)
+        ]
+        for start in range(0,len(cards),3):
+            row = st.columns(3,gap="small")
+            for col,i in zip(row,range(start,min(start+3,len(cards)))):
+                with col:
+                    title,figure,details,custom = cards[i]
+                    open_card(i+1,title,figure,details,i+1,custom)
+
+        summary = pd.DataFrame({
+            "المحصل":calls.index,
+            "المكالمات":calls.values,
+            "نسبة الناجحة":[round(100*success.get(n,0)/calls[n],1) for n in calls.index],
+            "الوقت المهدر":[round(waste.get(n,0),2) for n in calls.index],
+            "أول مكالمة":[firsts.get(n,pd.NaT) for n in calls.index],
+            "آخر مكالمة":[last_times.get(n,pd.NaT) for n in calls.index]
+        })
+        for label in ("أول مكالمة","آخر مكالمة"):
+            summary[label] = pd.to_datetime(summary[label]).dt.strftime("%H:%M").fillna("—")
+        visible_summary = summary if selected_names else summary.head(10)
+        if selected_names:
+            overall = pd.DataFrame([{
+                "المحصل":"الإجمالي",
+                "المكالمات":total,
+                "نسبة الناجحة":round(100*int((rated=="ناجحة").sum())/max(1,total),1),
+                "الوقت المهدر":round(float(waste.sum()),2),
+                "أول مكالمة":timestamps.min().strftime("%H:%M") if timestamps.notna().any() else "—",
+                "آخر مكالمة":timestamps.max().strftime("%H:%M") if timestamps.notna().any() else "—",
+            }])
+            visible_summary = pd.concat([visible_summary,overall],ignore_index=True)
+        suffix = (f"{len(selected_names)} محصلين مختارين" if selected_names
+                  else f"أعلى 10 من {len(calls)}")
+        with st.expander(f"١٢. ملخص لكل محصل ({suffix})",expanded=False):
+            st.dataframe(
+                visible_summary.style.apply(
+                    lambda row: ["color: #5be39a; font-weight: bold"]*len(row)
+                    if row["المحصل"]=="الإجمالي" else [""]*len(row),axis=1
+                ),hide_index=True,use_container_width=True
+            )
+            st.html(_activity_details_html("ملخص لكل محصل", summary, "collectors"))
+        # Same hidden-native-button transport and click delegation as promises tab.
+        if _activity_downloads:
+            with st.container(key="snb_activity_hidden_downloads"):
+                for mid, payload in _activity_downloads.items():
+                    st.download_button(
+                        "تحميل Excel", data=payload,
+                        file_name=f"SNB_Activity_Card_{mid}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"snb_activity_dl_{mid}", on_click="ignore"
+                    )
+            st.html("""
+<style>
+.st-key-snb_activity_hidden_downloads{
+position:absolute!important;width:1px!important;height:1px!important;
+overflow:hidden!important;opacity:0!important;pointer-events:none!important}
+</style>
+<script>
+(() => {
+  if (window.__ejadaActivityDownloadClick) return;
+  window.__ejadaActivityDownloadClick = function(event) {
+    const link = event.target.closest('a[data-snb-activity-download]');
+    if (!link) return;
+    event.preventDefault();
+    const mid = link.getAttribute('data-snb-activity-download');
+    if (!/^(?:\d+|collectors)$/.test(mid)) return;
+    const host = document.querySelector('.st-key-snb_activity_dl_' + mid);
+    const button = host && host.querySelector('button');
+    if (button) button.click();
+  };
+  document.addEventListener('click',window.__ejadaActivityDownloadClick,true);
+})();
+</script>
+""",unsafe_allow_javascript=True)
+
+        # The original processed Excel always uses the unfiltered result.
+        fragment = '<html lang="ar" dir="rtl"><meta charset="utf-8"><body style="background:#0e2a47;color:white;">'
+        fragment += f'<h2>لوحة مؤشرات النشاط | SNB</h2><p>{html_escape(period_label)}</p>'
+        for i,(title,figure,detail,custom) in enumerate(cards,1):
+            fragment += f'<section style="padding:16px;margin:12px;border:1px solid #5be39a;border-radius:14px;">'
+            fragment += f'<h3>{i}. {html_escape(title)}</h3>'
+            fragment += (figure.to_html(full_html=False,include_plotlyjs="cdn")
+                         if figure is not None else (custom or "—")) + '</section>'
+        fragment += "</body></html>"
+        st.download_button(
+            "تحميل داشبورد النشاط HTML",fragment.encode("utf-8"),
+            file_name="SNB_Activity_Dashboard.html",mime="text/html",
+            key="activity_html_SNB_visual"
+        )
 
 
 def _ejada_activity_kpis(bank, covered, successful=None, unsuccessful=None, unresolved=0,
@@ -8979,7 +9479,7 @@ def _style_snb_activity_workbook(workbook):
         last_row, last_col = sheet.max_row, sheet.max_column
         if not last_row or not last_col:
             continue
-        sheet.sheet_view.showGridLines = False
+        sheet.sheet_view.showGridLines = True
         if sheet.title in (
             "Efficiency_Call_Quality", "Collector_Stage_Product",
             "Weekly_Dropoff", "Weekly_Collector_Activity",
@@ -10528,32 +11028,12 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                 period = shift_selector.selectbox("فترة التقرير", list(names), index=list(names).index(suggestion),
                                       format_func=names.get, key="snb_activity_daily_shift")
                 remove_extra = True
-                if period == "second":
-                    stamps = prepared["__ejada_parsed_created"]
-                    report_day = stamps.dt.normalize().max()
-                    overtime_start = report_day + pd.Timedelta(hours=16)
-                    overtime_end = report_day + pd.Timedelta(hours=17)
-                    if ((stamps >= overtime_start) & (stamps < overtime_end)).any():
-                        remove_extra = st.checkbox(
-                            "استبعاد الساعة الزيادة بعد نهاية الفترة (4–5 عصرًا)",
-                            value=True, key="snb_activity_exclude_after_shift")
             # Warn about late notes in the uploaded daily file, without blocking
             # processing or changing the shift boundaries.
             if period in ("first", "second"):
                 stamps = prepared["__ejada_parsed_created"].dropna()
                 if not stamps.empty:
                     report_day = stamps.max().normalize()
-                    cutoff_hour = 12 if period == "first" else 14
-                    cutoff = report_day + pd.Timedelta(hours=cutoff_hour)
-                    late_count = int(((stamps.dt.normalize() == report_day) &
-                                      (stamps >= cutoff)).sum())
-                    if late_count:
-                        cutoff_label = "12 ظهرًا" if period == "first" else "2 ظهرًا"
-                        st.warning(
-                            f"تنبيه: يوجد {late_count:,} إفادة في الملف عند أو بعد "
-                            f"الساعة {cutoff_label} في {names[period]}. "
-                            "التقرير سيستمر بشكل طبيعي، ولن يتم حذف الساعة الأخيرة."
-                        )
             selected, excluded_after_shift = _filter_snb_activity_period(
                 prepared, activity_kind, period, remove_extra)
         else:
@@ -10573,21 +11053,22 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                 selected, _ = _filter_snb_activity_period(prepared, activity_kind, period)
         manual_decisions = _snb_manual_evaluations(model_upload)
         slash_row_decisions = _snb_slash_row_decisions(activity_upload)
-        if _ejada_activity_dashboard_is_open("SNB"):
-            counts = _snb_kpi_counts(
-                selected, stats["notes"], model_mapping,
-                manual_decisions, slash_row_decisions
-            )
-            scope = activity_kind
-            if activity_kind == "يومي":
-                scope += f" | {names[period]}"
-                if not remove_extra:
-                    scope += " | يشمل الساعة الإضافية"
-            dates = selected["__ejada_parsed_created"].dropna()
-            if not dates.empty:
-                scope += f" | {dates.min():%Y-%m-%d} – {dates.max():%Y-%m-%d}"
-            _ejada_activity_kpis("SNB", *counts, period=scope)
+        dashboard_slot = st.container()
+        counts = _snb_kpi_counts(
+            selected, stats["notes"], model_mapping,
+            manual_decisions, slash_row_decisions
+        )
+        scope = activity_kind
+        if activity_kind == "يومي":
+            scope += f" | {names[period]}"
+        dates = selected["__ejada_parsed_created"].dropna()
+        if not dates.empty:
+            scope += f" | {dates.min():%Y-%m-%d} – {dates.max():%Y-%m-%d}"
+        if counts[3]:
+            with dashboard_slot:
+                _ejada_activity_kpis("SNB", *counts, period=scope)
         approved_special_keys = set(model_mapping) | set(manual_decisions)
+        st.markdown('<div id="snb-activity-review"></div>', unsafe_allow_html=True)
         slash_row_decisions, slash_reviewed = _snb_review_slash_rows(
             selected, stats["notes"], activity_upload,
             model_mapping, manual_decisions,
@@ -10625,6 +11106,12 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
         result = _snb_add_call_duration(
             result, stats["collector"]
         )
+        with dashboard_slot:
+            _snb_activity_visual_dashboard(
+                result, stats["collector"], stats["notes"], activity_kind,
+                scope, product_col=stats["product"],
+                upload_digest=hashlib.sha256(activity_upload.getvalue()).hexdigest()
+            )
         successful = int(
             (result["تقييم المكالمات"] == "ناجحة").sum()
         )
@@ -10665,12 +11152,6 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                 "لم أتعرف على عمود Claim/نوع المتنج-التمويل؛ "
                 "يرجى مراجعة أسماء أعمدة ملف النشاط."
             )
-        else:
-            st.caption(
-                f'عمود المنتج المعتمد: {stats["product"]} | '
-                f'عدد القيم التي تم تحويلها إلى CC+PF (من CC أو PF): '
-                f'{stats["combined_products"]:,} (قبل إزالة التكرارات).'
-            )
         if conflicted_notes:
             st.warning(
                 f'موديل النشاط يحتوي على {conflicted_notes} إفادة لها '
@@ -10688,11 +11169,6 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
         st.session_state["ejada_snb_model_coverage"] = {
             "matched": model_matched, "total": len(selected),
         }
-        st.caption(
-            "Notes = الإفادة. 0 = غير ناجحة، 1 = ناجحة. "
-            "مده المكالمه محسوبة بالدقائق بين مكالمتين متتاليتين "
-            "لنفس المحصل؛ أول مكالمة = صفر."
-        )
         final = result.drop(
             columns=["__ejada_parsed_created"], errors="ignore"
         )
@@ -10863,32 +11339,12 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                         writer, sheet_name="Weekly_Collector_Activity", index=False
                     )
                 _style_snb_activity_workbook(writer.book)
-            activity_only = io.BytesIO()
-            with pd.ExcelWriter(activity_only, engine="openpyxl") as writer:
-                export_final.to_excel(writer, sheet_name="Activity", index=False)
-                _style_snb_activity_workbook(writer.book)
-            collectors_workbook = _build_snb_collector_details_xlsx(
-                result, stats["collector"]
-            )
-            st.download_button(
-                "📥 تحميل شيت Activity منفصل", data=activity_only.getvalue(),
-                file_name=f"SNB_Activity_{activity_kind}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="download_snb_activity_only", on_click="ignore"
-            )
             st.download_button(
                 "📥 تحميل نشاط SNB بعد المعالجة",
                 data=output.getvalue(),
                 file_name=f"SNB_Activity_{activity_kind}_Processed.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="download_snb_activity_processed", on_click="ignore"
-            )
-            st.download_button(
-                "📥 تحميل تقرير مفصل لكل محصل (شيت مستقل)",
-                data=collectors_workbook,
-                file_name=f"SNB_Collectors_Details_{activity_kind}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="download_snb_activity_per_collector", on_click="ignore"
             )
 
 
@@ -13141,17 +13597,18 @@ elif page_uploaded is None:
                     duplicate_slot = st.empty()
             with period_col:
                 shift_selector = st.empty()
-            with dashboard_col, st.container(horizontal=True, horizontal_alignment="left", key="activity_toggle_align"):
-                is_open = _ejada_activity_dashboard_is_open(selected_bank)
-                st.button(
-                    "📊 إخفاء الداشبورد" if is_open else "📊 عرض الداشبورد",
-                    key=f"activity_dashboard_toggle_{selected_bank}",
-                    help="فتح وإغلاق لوحة مؤشرات النشاط والشارتات القادمة",
-                    width="content",
-                    type="primary" if is_open else "secondary",
-                    on_click=_ejada_toggle_activity_dashboard,
-                    args=(selected_bank,),
-                )
+            if is_stc:
+                with dashboard_col, st.container(horizontal=True, horizontal_alignment="left", key="activity_toggle_align"):
+                    is_open = _ejada_activity_dashboard_is_open(selected_bank)
+                    st.button(
+                        "📊 إخفاء الداشبورد" if is_open else "📊 عرض الداشبورد",
+                        key=f"activity_dashboard_toggle_{selected_bank}",
+                        help="فتح وإغلاق لوحة مؤشرات النشاط والشارتات القادمة",
+                        width="content",
+                        type="primary" if is_open else "secondary",
+                        on_click=_ejada_toggle_activity_dashboard,
+                        args=(selected_bank,),
+                    )
 
         # STC has its OWN model, review and encrypted file — never SNB.
         if selected_bank == "STC":
