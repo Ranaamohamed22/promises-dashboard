@@ -14037,36 +14037,46 @@ elif page_uploaded is None:
         # Activity page only: keep the select controls light in every browser theme.
         if selected_bank == "SNB":
             st.markdown("""<style>
-            .st-key-snb_activity_header_row [data-baseweb="select"],
-            .st-key-snb_activity_daily_options [data-baseweb="select"],
-            .st-key-snb_activity_header_row [data-baseweb="select"] *,
-            .st-key-snb_activity_daily_options [data-baseweb="select"] *,
-            .st-key-snb_activity_header_row [data-baseweb="select"]>div,
-            .st-key-snb_activity_daily_options [data-baseweb="select"]>div,
-            .st-key-snb_activity_header_row [data-baseweb="select"] input,
-            .st-key-snb_activity_daily_options [data-baseweb="select"] input{
-              color-scheme:light!important;background:#fff!important;color:#222!important;
-              -webkit-text-fill-color:#222!important}
-            .st-key-snb_activity_header_row [data-baseweb="select"] svg,
-            .st-key-snb_activity_daily_options [data-baseweb="select"] svg{fill:#222!important;color:#222!important}
-            .st-key-snb_activity_header_row [data-baseweb="select"] span,
-            .st-key-snb_activity_daily_options [data-baseweb="select"] span{
+            /* Streamlit 1.65 react-aria ComboBox, SNB Activity only. */
+            .st-key-snb_activity_header_row [data-testid="stSelectbox"],
+            .st-key-snb_activity_header_row [data-testid="stSelectbox"] [role="group"],
+            .st-key-snb_activity_header_row [data-testid="stSelectbox"] input,
+            .st-key-snb_activity_daily_options [data-testid="stSelectbox"],
+            .st-key-snb_activity_daily_options [data-testid="stSelectbox"] [role="group"],
+            .st-key-snb_activity_daily_options [data-testid="stSelectbox"] input{
+              color-scheme:light!important}
+            .st-key-snb_activity_header_row [data-testid="stSelectbox"] [role="group"],
+            .st-key-snb_activity_daily_options [data-testid="stSelectbox"] [role="group"]{
+              background:#fff!important}
+            .st-key-snb_activity_header_row [data-testid="stSelectbox"] [role="group"] *:not(svg):not(path),
+            .st-key-snb_activity_header_row [data-testid="stSelectbox"] input,
+            .st-key-snb_activity_daily_options [data-testid="stSelectbox"] [role="group"] *:not(svg):not(path),
+            .st-key-snb_activity_daily_options [data-testid="stSelectbox"] input{
+              color:#222!important;-webkit-text-fill-color:#222!important;background-color:transparent!important}
+            .st-key-snb_activity_header_row [data-testid="stSelectbox"] svg,
+            .st-key-snb_activity_daily_options [data-testid="stSelectbox"] svg{
+              fill:#222!important}
+            body:has(.st-key-snb_activity_upload_card) [data-testid="stSelectboxVirtualDropdown"]{
+              background:#fff!important;color-scheme:light!important}
+            body:has(.st-key-snb_activity_upload_card) [data-testid="stSelectboxVirtualDropdown"] *{
               color:#222!important;-webkit-text-fill-color:#222!important}
-            body:has(.st-key-snb_activity_header_row):has(.st-key-snb_pr_header)
-              [data-baseweb="popover"] [data-baseweb="menu"],
-            body:has(.st-key-snb_activity_header_row):has(.st-key-snb_pr_header)
-              [data-baseweb="popover"] [role="listbox"]{
-              color-scheme:light!important;background:#fff!important;color:#222!important}
-            body:has(.st-key-snb_activity_header_row):has(.st-key-snb_pr_header)
-              [data-baseweb="popover"] [role="option"],
-            body:has(.st-key-snb_activity_header_row):has(.st-key-snb_pr_header)
-              [data-baseweb="popover"] *,
-            body:has(.st-key-snb_activity_header_row):has(.st-key-snb_pr_header)
-              [data-baseweb="popover"] [role="option"] *{
-              color:#222!important;-webkit-text-fill-color:#222!important}
-            body:has(.st-key-snb_activity_header_row):has(.st-key-snb_pr_header)
-              [data-baseweb="popover"],body:has(.st-key-snb_activity_header_row):has(.st-key-snb_pr_header)
-              [data-baseweb="popover"] input{color-scheme:light!important;background:#fff!important;color:#222!important}
+            body:has(.st-key-snb_activity_upload_card) [data-testid="stSelectboxVirtualDropdown"] [role="option"]{
+              background:#fff!important}
+            body:has(.st-key-snb_activity_upload_card) [data-testid="stSelectboxVirtualDropdown"] [role="option"]:hover,
+            body:has(.st-key-snb_activity_upload_card) [data-testid="stSelectboxVirtualDropdown"] [role="option"][aria-selected="true"]{
+              background:#e6f7f0!important}
+            .st-key-snb_activity_header_row .st-key-snb_activity_upload_card{
+              min-width:0!important;width:100%!important}
+            .st-key-snb_activity_header_row [data-testid="stColumn"]:has(.st-key-snb_activity_upload_card){
+              flex:0 0 38%!important;width:38%!important;min-width:0!important}
+            html body .stApp .st-key-snb_activity_file_change button{
+              background:rgba(91,227,154,.14)!important;
+              border:1px solid rgba(91,227,154,.7)!important;
+              border-radius:999px!important;padding:2px 14px!important;
+              min-height:0!important;height:30px!important}
+            html body .stApp .st-key-snb_activity_file_change button,
+            html body .stApp .st-key-snb_activity_file_change button *{
+              color:#5be39a!important}
             .st-key-snb_activity_header_row .st-key-snb_activity_upload_card{
               direction:rtl!important;display:flex!important;align-items:center!important;
               gap:14px!important;min-height:60px!important;padding:6px 14px!important;
