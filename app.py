@@ -8848,6 +8848,13 @@ def _activity_dashboard_html(bank, covered, successful, unsuccessful, unresolved
         if value is not None else f'<div class="ea-card"><span>{label}</span><strong>—</strong></div>'
         for label, value in zip(labels, (covered, successful, unsuccessful))
     )
+    if bank == "SNB" and unresolved:
+        cards += (
+            '<a class="ea-card" href="#snb-activity-review" '
+            'style="text-decoration:none;cursor:pointer;background:#123c49;'
+            'border-color:#5be39a;color:#eafbf7">'
+            f'<span>تحتاج مراجعة</span><strong>{int(unresolved):,}</strong></a>'
+        )
     chart = ""
     if covered and successful is not None and unsuccessful is not None:
         bars = []
@@ -10887,6 +10894,7 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
             with dashboard_slot:
                 _ejada_activity_kpis("SNB", *counts, period=scope)
         approved_special_keys = set(model_mapping) | set(manual_decisions)
+        st.markdown('<div id="snb-activity-review"></div>', unsafe_allow_html=True)
         slash_row_decisions, slash_reviewed = _snb_review_slash_rows(
             selected, stats["notes"], activity_upload,
             model_mapping, manual_decisions,
