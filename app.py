@@ -9124,9 +9124,11 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
                 st.markdown(_activity_details_html(title, detail, key), unsafe_allow_html=True)
 
         def short_name(name):
-            clean = re.sub(r"(?i)\\bSNB\\s*II\\s*NPL\\s*II\\b", "", str(name))
-            clean = re.sub(r"(?i)^\\s*(?:SNB|NPL|II|team)\\s*[-|:]?\\s*", "", clean).strip()
-            return clean or str(name)
+            value = str(name).strip()
+            prefix = "SNB II NPL II"
+            if value.upper().startswith(prefix):
+                value = value[len(prefix):].strip(" -|:")
+            return value or str(name)
 
         top = calls.head(10)
         fig1 = fig_base()
@@ -9240,7 +9242,12 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
         ]
         gaps = gap_frame.loc[gap_frame["الفاصل"]>30].groupby("المحصل")["الفاصل"]
         gap_counts = gaps.size().sort_values(ascending=False)
-        fig7 = horizontal(gap_counts.head(5).index,gap_counts.head(5).values)
+        custom7 = '<div class="snb-v-horizontal-list">' + "".join(
+            f'<div class="snb-v-hrow"><span>{html_escape(short_name(name))}</span>'
+            f'<div class="snb-v-hbar"><i style="width:{100*value/max(1,int(gap_counts.max())):.1f}%"></i></div>'
+            f'<b>{int(value)} مرات</b></div>'
+            for name,value in gap_counts.head(5).items()
+        ) + '<small>فجوة = أكثر من 30 دقيقة بين مكالمتين ورا بعض</small></div>'
         d7 = pd.DataFrame({"المحصل":gap_counts.index,"عدد الفجوات":gap_counts.values,
                            "أطول فجوة (د)":[round(gaps.max().get(n,0),1) for n in gap_counts.index]})
 
@@ -9252,21 +9259,24 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
             return pd.DataFrame({label:values.index,"عدد المكالمات":values.values,
                                  "%":[round(100*v/max(1,total),1) for v in values.values]})
         d8 = counts_with_percent(state_col,"الحالة")
-        fig8 = horizontal(d8["الحالة"].tolist(),d8["عدد المكالمات"].tolist(),colors[0])
+        custom8 = '<div class="snb-v-horizontal-list snb-v-status-list">' + "".join(
+            f'<div class="snb-v-hrow"><span>{html_escape(str(row["الحالة"]))}</span>'
+            f'<div class="snb-v-hbar"><i style="background:{colors[i%len(colors)]};'
+            f'width:{100*int(row["عدد المكالمات"])/max(1,int(d8["عدد المكالمات"].max())):.1f}%"></i></div>'
+            f'<b>{row["%"]:.1f}% · {int(row["عدد المكالمات"])}</b></div>'
+            for i,(_,row) in enumerate(d8.iterrows())
+        ) + '</div>'
         d9 = counts_with_percent(cls_col,"التصنيف")
-        fig9 = fig_base()
-        for idx, row in d9.iterrows():
-            count = int(row["عدد المكالمات"])
-            fig9.add_shape(type="line", x0=0, x1=count, y0=idx, y1=idx,
-                           line=dict(color=colors[idx % len(colors)], width=2))
-        fig9.add_trace(go.Scatter(
-            x=d9["عدد المكالمات"],y=list(range(len(d9))),mode="markers+text",
-            text=[f"{v} · {p}%" for v,p in zip(d9["عدد المكالمات"],d9["%"])],
-            textposition="middle left",marker=dict(color=[colors[i % len(colors)] for i in range(len(d9))],size=13)
-        ))
-        fig9.update_yaxes(tickmode="array",tickvals=list(range(len(d9))),
-                          ticktext=d9["التصنيف"].tolist(),autorange="reversed")
-        fig9.update_layout(margin=dict(l=6,r=70,t=8,b=8))
+        custom9 = '<div class="snb-v-lollipop">' + "".join(
+            f'<div class="snb-v-lrow"><span>{html_escape(str(row["التصنيف"]))}</span>'
+            f'<div class="snb-v-ltrack"><i style="width:{100*int(row["عدد المكالمات"])/max(1,int(d9["عدد المكالمات"].max())):.1f}%;'
+            f'background:{colors[i%len(colors)]}"></i>'
+            f'<em style="left:{100*int(row["عدد المكالمات"])/max(1,int(d9["عدد المكالمات"].max())):.1f}%;'
+            f'background:{colors[i%len(colors)]};transform:translate(-50%,-50%);'
+            f'width:{9+int(row["%"])/9:.1f}px;height:{9+int(row["%"])/9:.1f}px"></em></div>'
+            f'<b>{row["%"]:.0f}% · {int(row["عدد المكالمات"])}</b></div>'
+            for i,(_,row) in enumerate(d9.iterrows())
+        ) + '</div>'
 
         if product_col and product_col in frame:
             products = frame[product_col].fillna("").astype(str).str.upper().str.strip()
@@ -9348,15 +9358,15 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
         ) + '</div>'
 
         cards = [
-            ("المكالمات لكل محصل (أعلى 10)",fig1,d1,None),
+            ("المكالمات لكل محصل" + (" (أعلى 10)" if len(calls)>10 else ""),fig1,d1,None),
             ("ناجحة / غير ناجحة لكل محصل",None,d2,custom2),
-            ("أكتر المحصلين مكالمات غير ناجحة (أعلى 8)",None,d3,custom3),
-            ("أكتر المحصلين وقت مهدر (أعلى 8)",None,d4,custom4),
+            ("أكتر المحصلين مكالمات غير ناجحة" + (" (أعلى 8)" if len(calls)>8 else ""),None,d3,custom3),
+            ("أكتر المحصلين وقت مهدر" + (" (أعلى 8)" if len(calls)>8 else ""),None,d4,custom4),
             ("مين بدأ الأول ومين بدأ الآخر",None,d5,custom5),
             ("المكالمات بالساعة",fig6,d6,None),
-            ("فجوات طويلة (أكتر من 30 دقيقة)",fig7,d7,None),
-            (f"حالات المكالمات ({total})",fig8,d8,None),
-            ("نتيجة المكالمات (التصنيف)",fig9,d9,None),
+            ("فجوات طويلة (أكتر من 30 دقيقة)",None,d7,custom7),
+            (f"حالات المكالمات ({total})",None,d8,custom8),
+            ("نتيجة المكالمات (التصنيف)",None,d9,custom9),
             ("المكالمات حسب المنتج",None,d10,custom10),
             (f"عملاء اتكلمنا معاهم أكتر من مرة ({len(repeat)})",None,d11,custom11)
         ]
