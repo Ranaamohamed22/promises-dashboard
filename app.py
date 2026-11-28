@@ -2846,7 +2846,7 @@ if _snb_promises_page or _snb_activity_page:
         )
         if _snb_activity_page:
             files = st.session_state.get("activity_page_uploads", {}).get("SNB", {}).get("activity")
-            latest = None
+            latest = st.session_state.get("snb_activity_upload_time") if files else None
         else:
             files = st.session_state.get("page_files", {}).get("SNB", {}).get("Promises")
             latest = st.session_state.get("snb_promises_upload_time") if files else None
@@ -7270,6 +7270,8 @@ def save_activity_page_upload(bank, kind, widget_key):
     if kind == "activity":
         st.session_state.pop(f"activity_model_pending_{bank}", None)
     if bank == 'SNB' and kind == "activity":
+        st.session_state["snb_activity_upload_time"] = (datetime.now(ZoneInfo("Africa/Cairo"))
+            if st.session_state.activity_page_uploads[bank][kind] is not None else None)
         # A different upload should not silently keep its predecessor's shift.
         st.session_state.pop("snb_activity_daily_shift", None)
         st.session_state.pop("snb_activity_exclude_after_shift", None)
@@ -7302,6 +7304,8 @@ def clear_activity_page_upload(bank, kind):
     if kind == "activity":
         st.session_state.pop(f"activity_model_pending_{bank}", None)
     if bank == "SNB":
+        if kind == "activity":
+            st.session_state.pop("snb_activity_upload_time", None)
         st.session_state.snb_activity_screen = "upload"
 
 def _snb_header_key(value):
@@ -8900,6 +8904,13 @@ border-radius:16px;padding:22px;font-family:Tahoma,Arial,sans-serif;text-align:r
 
 
 
+def _snb_activity_short_name(name):
+    """Activity-only display label; original name survives in all data and exports."""
+    original = str(name).strip()
+    return (re.sub(r"^(?:SNB\s*II\s*NPL\s*II|Tawuniya\s*IR\s*II)\s*[-|:]*\s*",
+                   "", original, flags=re.IGNORECASE).strip() or original)
+
+
 def _snb_activity_glass_kpis(covered, successful, unsuccessful, unresolved, period=""):
     """SNB activity KPI presentation only; calculations remain in existing helpers."""
     from html import escape as _esc
@@ -8976,7 +8987,7 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
         '.st-key-snb_visual_board [data-testid="stPlotlyChart"]{width:100%}'
         '.st-key-snb_visual_board .stMarkdown h4{font-size:15px;text-align:right;direction:rtl}'
         '[class*="st-key-snb_activity_card_"] [data-testid="stVerticalBlockBorderWrapper"]'
-        '{min-height:360px;height:360px;overflow:hidden;position:relative;}'
+        '{min-height:0;height:100%;max-height:100%;overflow:hidden;position:relative;}'
         '[class*="st-key-snb_activity_card_"] [data-testid="stButton"]'
         '{opacity:0;transition:opacity .18s;}'
         '[class*="st-key-snb_activity_card_"]:hover [data-testid="stButton"],'
@@ -8999,6 +9010,7 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
         'text-align:center;display:flex;flex-direction:column;gap:2px;}'
         '.snb-v-heat small{font-size:10px;color:#d2edec;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
         '.snb-v-heat strong{font-size:23px;line-height:1.15;}'
+        '.snb-v-heat{height:92px;box-sizing:border-box;overflow:hidden;}'
         '.snb-v-track{background:rgba(255,255,255,.13);height:4px;border-radius:4px;overflow:hidden;}'
         '.snb-v-track i{display:block;height:4px;border-radius:4px;}'
         '.snb-v-donut{text-align:center;direction:rtl;}'
@@ -9014,11 +9026,11 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
 .st-key-snb_visual_board {direction:rtl}
 .st-key-snb_visual_board [class*="st-key-snb_activity_card_"]{
  border:1px solid rgba(127,214,224,.28)!important;
- border-radius:15px!important;padding:12px!important;min-height:360px!important;height:360px!important;
+ border-radius:15px!important;padding:12px!important;min-height:0!important;height:360px!important;max-height:360px!important;
  overflow:hidden!important;box-sizing:border-box!important;
  background:linear-gradient(115deg,rgba(29,63,84,.85),rgba(22,101,78,.6))!important}
 .st-key-snb_visual_board [class*="st-key-snb_activity_card_"]:hover{
- border-color:#5be39a!important;box-shadow:0 0 16px rgba(91,227,154,.26)!important}
+ border-color:#5be39a!important;box-shadow:0 0 16px rgba(91,227,154,.26)!important;transform:translateY(-4px) rotate(-.5deg)}
 .st-key-snb_visual_board [class*="st-key-snb_activity_card_"] [data-testid="stPlotlyChart"]{
  background:transparent!important;border:none!important;padding:0!important}
 .snb-v-split-list,.snb-v-horizontal-list,.snb-v-lollipop,.snb-v-timeline{
@@ -9073,9 +9085,9 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
  background:rgba(255,255,255,.95)!important;border:1px solid rgba(127,214,224,.75)!important;
  border-radius:9px!important;color:#0e2a47!important;min-height:42px}
 .st-key-snb_visual_board [data-testid="stMultiSelect"] [data-baseweb="tag"]{
- background:#b9f2d8!important;color:#0e2a47!important;border-radius:99px!important}
+ background:rgba(91,227,154,.18)!important;color:#fff!important;border:1px solid #5be39a!important;border-radius:99px!important}
 .st-key-snb_visual_board [data-testid="stMultiSelect"] [data-baseweb="tag"] *{
- color:#0e2a47!important}
+ color:#fff!important}
 .st-key-snb_visual_board [class*="st-key-snb_visual_clear_filter"] button{
  background:transparent!important;color:#7fd6e0!important;border:1px solid #7fd6e0!important;
  border-radius:99px!important}
@@ -9104,7 +9116,8 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
             selected_names = st.multiselect(
                 "🔍 ابحثي عن محصل…", options,
                 placeholder="اختاري محصل أو أكثر · بدون اختيار = الكل",
-                label_visibility="collapsed", key=filter_key
+                label_visibility="collapsed", key=filter_key,
+                format_func=_snb_activity_short_name
             )
             if selected_names:
                 def _clear_snb_visual_filter():
@@ -9222,12 +9235,7 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
                 if not preview:
                     st.markdown(_activity_details_html(title, detail, key), unsafe_allow_html=True)
 
-        def short_name(name):
-            value = str(name).strip()
-            for prefix in ("SNB II NPL II", "Tawuniya IR II"):
-                if value.casefold().startswith(prefix.casefold()):
-                    value = value[len(prefix):].strip(" -|:")
-            return value or str(name)
+        short_name = _snb_activity_short_name
 
         top = calls.head(10)
         fig1 = fig_base()
@@ -9524,8 +9532,8 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
             cols = [
                 short_name(entry["المحصل"]) if not is_total else "الإجمالي",
                 number_format(entry["المكالمات"]),
-                f'{entry["نسبة الناجحة"]}%',
-                f'{entry["الوقت المهدر"]} د',
+                f'{float(entry["نسبة الناجحة"]):.0f}%',
+                f'{float(entry["الوقت المهدر"]):.0f} د',
                 str(entry["أول مكالمة"]),str(entry["آخر مكالمة"])
             ]
             rows_html += '<tr class="snb-v-srow'+style_class+'">' + "".join(
@@ -11309,7 +11317,7 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                     review_choices = st.multiselect(
                         "فلتر المحصل (اختيار أكثر من محصل)",
                         options=review_options, key="snb_activity_visual_collectors",
-                        placeholder="ابحث عن محصل..."
+                        placeholder="ابحث عن محصل...", format_func=_snb_activity_short_name
                     )
                     review_selected = (
                         selected.loc[review_names.isin(review_choices)]
@@ -13873,6 +13881,31 @@ elif page_uploaded is None:
                         args=(selected_bank,),
                     )
 
+        # SNB: show genuine blank placeholders until an activity file is supplied.
+        if selected_bank == "SNB" and st.session_state.activity_page_uploads["SNB"]["activity"] is None:
+            _ejada_activity_kpis("SNB", None, None, None, None)
+            st.markdown('<p style="text-align:center;direction:rtl;color:var(--muted);font-family:Cairo,sans-serif">ارفعي الملف علشان تظهر الأرقام</p>', unsafe_allow_html=True)
+
+
+        # Activity page only: keep the select controls light in every browser theme.
+        if selected_bank == "SNB":
+            st.markdown("""<style>
+            .st-key-snb_activity_header_row [data-baseweb="select"]>div,
+            .st-key-snb_activity_daily_options [data-baseweb="select"]>div,
+            .st-key-snb_activity_header_row [data-baseweb="select"] input,
+            .st-key-snb_activity_daily_options [data-baseweb="select"] input{
+              background:#f1f3f8!important;color:#222!important;-webkit-text-fill-color:#222!important}
+            .st-key-snb_activity_header_row [data-baseweb="select"] span,
+            .st-key-snb_activity_daily_options [data-baseweb="select"] span{
+              color:#222!important;-webkit-text-fill-color:#222!important}
+            body:has(.st-key-snb_activity_header_row):has(.st-key-snb_pr_header)
+              [data-baseweb="popover"] [data-baseweb="menu"]{
+              background:#f1f3f8!important;color:#222!important}
+            .st-key-snb_activity_header_row .st-key-upload_box_activity_file{
+              border-radius:16px!important;background:var(--card)!important;
+              border:1px solid var(--border)!important}
+            </style>""",unsafe_allow_html=True)
+
         # STC has its OWN model, review and encrypted file — never SNB.
         if selected_bank == "STC":
             _stc_uploaded = st.session_state.activity_page_uploads["STC"]
@@ -13889,7 +13922,7 @@ elif page_uploaded is None:
             # No baseline model available yet: count coverage, but never guess.
             _waiting = st.session_state.activity_page_uploads["SNB"]["activity"]
             if _waiting is None:
-                _ejada_activity_kpis("SNB", 0, 0, 0)
+                pass  # Empty KPI placeholders were rendered above.
             else:
                 try:
                     _waiting_data, _ = _prepare_snb_activity_file(_waiting, activity_kind)
