@@ -8366,12 +8366,8 @@ def _filter_snb_activity_period(frame, activity_kind, daily_period,
         start = day_start + pd.Timedelta(hours=start_hour)
         end = day_start + pd.Timedelta(hours=end_hour)
         hour = pd.Timedelta(hours=1)
-        within_shift = (timestamps >= start) & (timestamps < end)
-        extra = (timestamps >= end) & (timestamps < end + hour)
-        if exclude_after_shift:
-            overtime_excluded = int(extra.sum())
-        else:
-            within_shift |= extra
+        within_shift = ((timestamps >= start) if daily_period == "first" else (timestamps > start)) & (timestamps <= end)
+        overtime_excluded = int(((timestamps > end) & timestamps.dt.normalize().eq(day_start)).sum())
         valid = valid.loc[within_shift].copy()
     elif activity_kind == "أسبوعي":
         valid = valid.loc[
@@ -8837,7 +8833,7 @@ def _snb_add_call_duration(frame, collector):
 
 def _ejada_activity_dashboard_is_open(bank):
     """Track whether the Activity KPI and chart dashboard is open per bank."""
-    return bool(st.session_state.get(f"ejada_activity_dashboard_open_{bank}", False))
+    return bank == "SNB" or bool(st.session_state.get(f"ejada_activity_dashboard_open_{bank}", False))
 
 
 def _ejada_toggle_activity_dashboard(bank):
@@ -8979,7 +8975,7 @@ def _style_snb_activity_workbook(workbook):
         last_row, last_col = sheet.max_row, sheet.max_column
         if not last_row or not last_col:
             continue
-        sheet.sheet_view.showGridLines = False
+        sheet.sheet_view.showGridLines = True
         if sheet.title in (
             "Efficiency_Call_Quality", "Collector_Stage_Product",
             "Weekly_Dropoff", "Weekly_Collector_Activity",
@@ -10528,32 +10524,12 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                 period = shift_selector.selectbox("فترة التقرير", list(names), index=list(names).index(suggestion),
                                       format_func=names.get, key="snb_activity_daily_shift")
                 remove_extra = True
-                if period == "second":
-                    stamps = prepared["__ejada_parsed_created"]
-                    report_day = stamps.dt.normalize().max()
-                    overtime_start = report_day + pd.Timedelta(hours=16)
-                    overtime_end = report_day + pd.Timedelta(hours=17)
-                    if ((stamps >= overtime_start) & (stamps < overtime_end)).any():
-                        remove_extra = st.checkbox(
-                            "استبعاد الساعة الزيادة بعد نهاية الفترة (4–5 عصرًا)",
-                            value=True, key="snb_activity_exclude_after_shift")
             # Warn about late notes in the uploaded daily file, without blocking
             # processing or changing the shift boundaries.
             if period in ("first", "second"):
                 stamps = prepared["__ejada_parsed_created"].dropna()
                 if not stamps.empty:
                     report_day = stamps.max().normalize()
-                    cutoff_hour = 12 if period == "first" else 14
-                    cutoff = report_day + pd.Timedelta(hours=cutoff_hour)
-                    late_count = int(((stamps.dt.normalize() == report_day) &
-                                      (stamps >= cutoff)).sum())
-                    if late_count:
-                        cutoff_label = "12 ظهرًا" if period == "first" else "2 ظهرًا"
-                        st.warning(
-                            f"تنبيه: يوجد {late_count:,} إفادة في الملف عند أو بعد "
-                            f"الساعة {cutoff_label} في {names[period]}. "
-                            "التقرير سيستمر بشكل طبيعي، ولن يتم حذف الساعة الأخيرة."
-                        )
             selected, excluded_after_shift = _filter_snb_activity_period(
                 prepared, activity_kind, period, remove_extra)
         else:
@@ -10665,12 +10641,6 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                 "لم أتعرف على عمود Claim/نوع المتنج-التمويل؛ "
                 "يرجى مراجعة أسماء أعمدة ملف النشاط."
             )
-        else:
-            st.caption(
-                f'عمود المنتج المعتمد: {stats["product"]} | '
-                f'عدد القيم التي تم تحويلها إلى CC+PF (من CC أو PF): '
-                f'{stats["combined_products"]:,} (قبل إزالة التكرارات).'
-            )
         if conflicted_notes:
             st.warning(
                 f'موديل النشاط يحتوي على {conflicted_notes} إفادة لها '
@@ -10688,11 +10658,6 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
         st.session_state["ejada_snb_model_coverage"] = {
             "matched": model_matched, "total": len(selected),
         }
-        st.caption(
-            "Notes = الإفادة. 0 = غير ناجحة، 1 = ناجحة. "
-            "مده المكالمه محسوبة بالدقائق بين مكالمتين متتاليتين "
-            "لنفس المحصل؛ أول مكالمة = صفر."
-        )
         final = result.drop(
             columns=["__ejada_parsed_created"], errors="ignore"
         )
@@ -10863,32 +10828,12 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                         writer, sheet_name="Weekly_Collector_Activity", index=False
                     )
                 _style_snb_activity_workbook(writer.book)
-            activity_only = io.BytesIO()
-            with pd.ExcelWriter(activity_only, engine="openpyxl") as writer:
-                export_final.to_excel(writer, sheet_name="Activity", index=False)
-                _style_snb_activity_workbook(writer.book)
-            collectors_workbook = _build_snb_collector_details_xlsx(
-                result, stats["collector"]
-            )
-            st.download_button(
-                "📥 تحميل شيت Activity منفصل", data=activity_only.getvalue(),
-                file_name=f"SNB_Activity_{activity_kind}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="download_snb_activity_only", on_click="ignore"
-            )
             st.download_button(
                 "📥 تحميل نشاط SNB بعد المعالجة",
                 data=output.getvalue(),
                 file_name=f"SNB_Activity_{activity_kind}_Processed.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="download_snb_activity_processed", on_click="ignore"
-            )
-            st.download_button(
-                "📥 تحميل تقرير مفصل لكل محصل (شيت مستقل)",
-                data=collectors_workbook,
-                file_name=f"SNB_Collectors_Details_{activity_kind}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="download_snb_activity_per_collector", on_click="ignore"
             )
 
 
@@ -13141,17 +13086,18 @@ elif page_uploaded is None:
                     duplicate_slot = st.empty()
             with period_col:
                 shift_selector = st.empty()
-            with dashboard_col, st.container(horizontal=True, horizontal_alignment="left", key="activity_toggle_align"):
-                is_open = _ejada_activity_dashboard_is_open(selected_bank)
-                st.button(
-                    "📊 إخفاء الداشبورد" if is_open else "📊 عرض الداشبورد",
-                    key=f"activity_dashboard_toggle_{selected_bank}",
-                    help="فتح وإغلاق لوحة مؤشرات النشاط والشارتات القادمة",
-                    width="content",
-                    type="primary" if is_open else "secondary",
-                    on_click=_ejada_toggle_activity_dashboard,
-                    args=(selected_bank,),
-                )
+            if is_stc:
+                with dashboard_col, st.container(horizontal=True, horizontal_alignment="left", key="activity_toggle_align"):
+                    is_open = _ejada_activity_dashboard_is_open(selected_bank)
+                    st.button(
+                        "📊 إخفاء الداشبورد" if is_open else "📊 عرض الداشبورد",
+                        key=f"activity_dashboard_toggle_{selected_bank}",
+                        help="فتح وإغلاق لوحة مؤشرات النشاط والشارتات القادمة",
+                        width="content",
+                        type="primary" if is_open else "secondary",
+                        on_click=_ejada_toggle_activity_dashboard,
+                        args=(selected_bank,),
+                    )
 
         # STC has its OWN model, review and encrypted file — never SNB.
         if selected_bank == "STC":
