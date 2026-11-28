@@ -11684,6 +11684,21 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
             manual_decisions.copy(), slash_row_decisions.copy(),
         )
         st.caption("✅ التقرير جاهز للتحميل بالتقييمات المعتمدة.")
+        # Keep the weekly download visible after Streamlit reruns. Invalidate
+        # cached bytes if the input file, chosen week, or approved ratings change.
+        weekly_export_signature = None
+        if activity_kind == "أسبوعي":
+            weekly_export_signature = hashlib.sha256(
+                activity_upload.getvalue()
+                + repr((
+                    tuple(map(str, selected.index)),
+                    tuple(result["تقييم المكالمات"].astype(str)),
+                    activity_kind,
+                )).encode("utf-8")
+            ).hexdigest()
+            prior = st.session_state.get("snb_weekly_excel_download")
+            if prior and prior.get("signature") != weekly_export_signature:
+                st.session_state.pop("snb_weekly_excel_download", None)
         if st.button(
             "📦 تجهيز ملفات Excel للنشاط",
             key="snb_activity_prepare_excel",
@@ -11790,16 +11805,43 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                 ].width = 32
                 for row_idx in range(2, percentage_sheet.max_row + 1):
                     percentage_sheet.cell(row=row_idx, column=percentage_col).number_format = "0.0%"
-            # Keep the original after-review gating; render only the approved
-            # workbook in the existing top-row placeholder.
-            with _snb_activity_download_slot.container():
+            # Preserve the existing day/month behavior; for weekly reports
+            # retain the Excel bytes so the download survives widget reruns.
+            if activity_kind == "أسبوعي":
+                st.session_state["snb_weekly_excel_download"] = {
+                    "signature": weekly_export_signature,
+                    "data": output.getvalue(),
+                    "file_name": f"SNB_Activity_{activity_kind}_Processed.xlsx",
+                }
+            else:
+                with _snb_activity_download_slot.container():
+                    st.download_button(
+                        "تحميل نشاط SNB",
+                        data=output.getvalue(),
+                        file_name=f"SNB_Activity_{activity_kind}_Processed.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="download_snb_activity_processed", on_click="ignore"
+                    )
+        # Weekly: show the actual download in the report itself AND in the
+        # top-row download position, even after a rerun.
+        if activity_kind == "أسبوعي":
+            ready_excel = st.session_state.get("snb_weekly_excel_download")
+            if ready_excel and ready_excel.get("signature") == weekly_export_signature:
                 st.download_button(
                     "تحميل نشاط SNB",
-                    data=output.getvalue(),
-                    file_name=f"SNB_Activity_{activity_kind}_Processed.xlsx",
+                    data=ready_excel["data"],
+                    file_name=ready_excel["file_name"],
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="download_snb_activity_processed", on_click="ignore"
+                    key="download_snb_activity_weekly_visible", on_click="ignore"
                 )
+                with _snb_activity_download_slot.container():
+                    st.download_button(
+                        "تحميل نشاط SNB",
+                        data=ready_excel["data"],
+                        file_name=ready_excel["file_name"],
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="download_snb_activity_processed", on_click="ignore"
+                    )
 
 
 selected_bank = st.session_state.selected_bank
