@@ -8923,23 +8923,24 @@ def _snb_activity_glass_kpis(covered, successful, unsuccessful, unresolved, peri
         )
     return (
         '<style>'
-        '.snb-act-kpi-panel{direction:rtl;border:1px solid rgba(127,214,224,.28);'
-        'border-radius:16px;padding:16px 14px 20px;background:linear-gradient(115deg,'
-        'rgba(28,59,83,.8),rgba(24,108,81,.38));font-family:Cairo,sans-serif}'
+        '.snb-act-kpi-panel{direction:rtl;border:0;padding:0;background:transparent;font-family:Cairo,sans-serif}'
         '.snb-act-kpi-title{font-weight:800;text-align:right;color:var(--text,#fff);'
         'font-size:16px;margin:0 0 16px}'
         '.snb-act-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}'
-        '.snb-act-kpi{min-height:96px;display:flex;flex-direction:column;align-items:center;'
-        'justify-content:center;gap:8px;text-decoration:none!important;border:1px solid '
-        'rgba(255,255,255,.17);border-radius:12px;background:rgba(255,255,255,.07);'
-        'color:var(--text,#fff)!important}'
+        '.snb-act-kpi{min-height:152px;display:flex;flex-direction:column;align-items:center;'
+        'justify-content:center;gap:12px;text-decoration:none!important;border:1px solid '
+        'rgba(127,214,224,.30);border-radius:18px;background:var(--card,rgba(20,55,75,.78));'
+        'box-shadow:var(--shadow,0 9px 24px #061d3022);color:var(--text,#fff)!important;'
+        'transition:transform .18s,box-shadow .18s,border-color .18s}'
+        '.snb-act-kpi:hover,.snb-act-kpi:focus-visible{transform:translateY(-7px) scale(1.02);'
+        'border-color:#5be39a;box-shadow:0 0 24px rgba(91,227,154,.45)}'
         '.snb-act-kpi span{font-size:11px;color:rgba(255,255,255,.7)}'
-        '.snb-act-kpi strong{font-size:26px;color:#fff;line-height:1.1}'
-        '.snb-act-kpi i{height:2px;width:20px;background:#5be39a;border-radius:5px}'
+        '.snb-act-kpi strong{font-size:48px;color:var(--text,#fff);line-height:1.1}'
+        '.snb-act-kpi i{height:3px;width:32px;background:#5be39a;border-radius:5px}'
+        '.snb-act-kpi:nth-child(1) i,.snb-act-kpi:nth-child(4) i{background:#fff}'
+        '.snb-act-kpi:nth-child(3) i{background:#7fd6e0}'
         '@media(max-width:650px){.snb-act-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}'
-        '</style><section class="snb-act-kpi-panel"><h3 class="snb-act-kpi-title">'
-        'لوحة مؤشرات النشاط | SNB · '+_esc(period)
-        +'</h3><div class="snb-act-kpi-grid">'+''.join(blocks)+'</div></section>'
+        '</style><section class="snb-act-kpi-panel"><div class="snb-act-kpi-grid">'+''.join(blocks)+'</div></section>'
     )
 
 
@@ -8975,7 +8976,7 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
         '.st-key-snb_visual_board [data-testid="stPlotlyChart"]{width:100%}'
         '.st-key-snb_visual_board .stMarkdown h4{font-size:15px;text-align:right;direction:rtl}'
         '[class*="st-key-snb_activity_card_"] [data-testid="stVerticalBlockBorderWrapper"]'
-        '{min-height:320px;position:relative;}'
+        '{min-height:360px;height:360px;overflow:hidden;position:relative;}'
         '[class*="st-key-snb_activity_card_"] [data-testid="stButton"]'
         '{opacity:0;transition:opacity .18s;}'
         '[class*="st-key-snb_activity_card_"]:hover [data-testid="stButton"],'
@@ -8993,7 +8994,7 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
         'background:conic-gradient(#5be39a var(--part),rgba(127,214,224,.28) 0);'
         'mask:radial-gradient(farthest-side,transparent 55%,#000 60%);}'
         '.snb-v-rank-row small{min-width:35px;color:#a9c5ce;text-align:left;}'
-        '.snb-v-heat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;direction:rtl;}'
+        '.snb-v-heat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;direction:rtl;align-content:start;}'
         '.snb-v-heat{background:rgba(255,255,255,.065);border-radius:9px;padding:9px 7px;'
         'text-align:center;display:flex;flex-direction:column;gap:2px;}'
         '.snb-v-heat small{font-size:10px;color:#d2edec;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
@@ -9013,8 +9014,8 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
 .st-key-snb_visual_board {direction:rtl}
 .st-key-snb_visual_board [class*="st-key-snb_activity_card_"]{
  border:1px solid rgba(127,214,224,.28)!important;
- border-radius:15px!important;padding:12px!important;min-height:320px!important;
- box-sizing:border-box!important;
+ border-radius:15px!important;padding:12px!important;min-height:360px!important;height:360px!important;
+ overflow:hidden!important;box-sizing:border-box!important;
  background:linear-gradient(115deg,rgba(29,63,84,.85),rgba(22,101,78,.6))!important}
 .st-key-snb_visual_board [class*="st-key-snb_activity_card_"]:hover{
  border-color:#5be39a!important;box-shadow:0 0 16px rgba(91,227,154,.26)!important}
@@ -9029,6 +9030,8 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
 .snb-v-split-legend{margin-top:auto;display:flex;justify-content:center;gap:16px;font-size:10px}
 .snb-v-split-legend span:first-child{color:#5be39a}
 .snb-v-split-legend span:last-child{color:#7fd6e0}
+.snb-v-split-row{color:#fff;text-shadow:0 1px 3px #102939}
+.snb-v-split-row span,.snb-v-split-row b{position:relative;z-index:1}
 .snb-v-timeline{display:flex;flex-direction:column;justify-content:center;gap:13px;font-size:11px}
 .snb-v-times,.snb-v-time-captions{display:flex;justify-content:space-between;direction:ltr}
 .snb-v-times{font-size:22px;color:#7fd6e0}
@@ -9221,9 +9224,9 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
 
         def short_name(name):
             value = str(name).strip()
-            prefix = "SNB II NPL II"
-            if value.upper().startswith(prefix):
-                value = value[len(prefix):].strip(" -|:")
+            for prefix in ("SNB II NPL II", "Tawuniya IR II"):
+                if value.casefold().startswith(prefix.casefold()):
+                    value = value[len(prefix):].strip(" -|:")
             return value or str(name)
 
         top = calls.head(10)
@@ -9238,10 +9241,14 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
 
         top2 = calls.head(len(selected_names) if selected_names else 4)
         custom2 = '<div class="snb-v-split-list">' + "".join(
-            f'<div class="snb-v-split-row" style="width:{max(45,100*count/max(1,int(top2.max()))):.1f}%">'
-            f'<span>{html_escape(short_name(name))}</span><b>'
-            f'{"— / —" if preview else str(int(unsuccessful.get(name,0))) + " / " + str(int(success.get(name,0)))}'
-            '</b></div>'
+            f'<div class="snb-v-split-row" style="width:{max(45,100*count/max(1,int(top2.max()))):.1f}%;'
+            + (f'background:linear-gradient(to left,rgba(91,227,154,.8) 0%,'
+               f'rgba(91,227,154,.8) {100*int(success.get(name,0))/max(1,int(count)):.2f}%,'
+               f'rgba(127,214,224,.8) {100*int(success.get(name,0))/max(1,int(count)):.2f}%,'
+               f'rgba(127,214,224,.8) 100%);' if not preview else '')
+            + f'"><span>{html_escape(short_name(name))}</span><b>'
+            + ('— / —' if preview else f'{int(success.get(name,0))} / {int(unsuccessful.get(name,0))}')
+            + '</b></div>'
             for name,count in top2.items()
         ) + ('<div class="snb-v-split-legend"><span>● ناجحة (من الموديل)</span>'
              '<span>● غير ناجحة (من الموديل)</span></div></div>')
