@@ -2846,7 +2846,7 @@ if _snb_promises_page or _snb_activity_page:
         )
         if _snb_activity_page:
             files = st.session_state.get("activity_page_uploads", {}).get("SNB", {}).get("activity")
-            latest = None
+            latest = st.session_state.get("snb_activity_upload_time") if files else None
         else:
             files = st.session_state.get("page_files", {}).get("SNB", {}).get("Promises")
             latest = st.session_state.get("snb_promises_upload_time") if files else None
@@ -7270,6 +7270,8 @@ def save_activity_page_upload(bank, kind, widget_key):
     if kind == "activity":
         st.session_state.pop(f"activity_model_pending_{bank}", None)
     if bank == 'SNB' and kind == "activity":
+        st.session_state["snb_activity_upload_time"] = (datetime.now(ZoneInfo("Africa/Cairo"))
+            if st.session_state.activity_page_uploads[bank][kind] is not None else None)
         # A different upload should not silently keep its predecessor's shift.
         st.session_state.pop("snb_activity_daily_shift", None)
         st.session_state.pop("snb_activity_exclude_after_shift", None)
@@ -7302,6 +7304,8 @@ def clear_activity_page_upload(bank, kind):
     if kind == "activity":
         st.session_state.pop(f"activity_model_pending_{bank}", None)
     if bank == "SNB":
+        if kind == "activity":
+            st.session_state.pop("snb_activity_upload_time", None)
         st.session_state.snb_activity_screen = "upload"
 
 def _snb_header_key(value):
@@ -8900,7 +8904,15 @@ border-radius:16px;padding:22px;font-family:Tahoma,Arial,sans-serif;text-align:r
 
 
 
-def _snb_activity_glass_kpis(covered, successful, unsuccessful, unresolved, period=""):
+def _snb_activity_short_name(name):
+    """Activity-only display label; original name survives in all data and exports."""
+    original = str(name).strip()
+    return (re.sub(r"^(?:SNB\s*II\s*NPL\s*II|Tawuniya\s*IR\s*II)\s*[-|:]*\s*",
+                   "", original, flags=re.IGNORECASE).strip() or original)
+
+
+def _snb_activity_glass_kpis(covered, successful, unsuccessful, unresolved, period="",
+                             detail_frame=None, collector_col=None, notes_col=None):
     """SNB activity KPI presentation only; calculations remain in existing helpers."""
     from html import escape as _esc
     period = period.replace("الفترة الأولى", "الفترة الأولى (02:00 – 12:00)").replace(
@@ -8915,31 +8927,98 @@ def _snb_activity_glass_kpis(covered, successful, unsuccessful, unresolved, peri
     blocks = []
     for label, number in values:
         shown = "—" if number is None else f"{int(number):,}"
-        tag = 'a href="#snb-activity-review"' if label == "محتاجة مراجعة" else 'div'
-        close_tag = "a" if label == "محتاجة مراجعة" else "div"
-        blocks.append(
-            f'<{tag} class="snb-act-kpi"><span>{_esc(label)}</span>'
-            f'<strong>{shown}</strong><i></i></{close_tag}>'
-        )
+        body = (f'<span>{_esc(label)}</span><strong>{shown}</strong><i></i>'
+                '<span class="snb-pr-detail-btn snb-pr-btn-open">👁 عرض التفاصيل</span>')
+        if label == "محتاجة مراجعة":
+            blocks.append(f'<a href="#snb-activity-review" class="snb-act-kpi">{body}</a>')
+        elif detail_frame is not None and collector_col and notes_col:
+            key, rating = {
+                "إجمالي المكالمات": ("91", None),
+                "ناجحة": ("92", "ناجحة"),
+                "غير ناجحة": ("93", "غير ناجحة"),
+            }[label]
+            # Status tabs share all collector-filtered calls; each shows its own first 50.
+            display_rows = pd.concat([
+                detail_frame.loc[detail_frame["تقييم المكالمات"].astype(str).str.strip().eq("ناجحة")].head(50),
+                detail_frame.loc[detail_frame["تقييم المكالمات"].astype(str).str.strip().eq("غير ناجحة")].head(50),
+            ]).sort_index(kind="mergesort")
+            rows = (detail_frame if rating is None else
+                    detail_frame.loc[detail_frame["تقييم المكالمات"].astype(str).str.strip().eq(rating)])
+            header = '<tr><th>#</th><th>المحصل</th><th>الإفادة</th><th>وقت المكالمة</th><th>الحالة</th></tr>'
+            lines = []
+            for i, (_, record) in enumerate(display_rows.iterrows(), 1):
+                state = str(record.get("تقييم المكالمات", "")).strip()
+                row_class = "st-ok" if state == "ناجحة" else ("st-bad" if state == "غير ناجحة" else "")
+                chip = ("ok" if row_class == "st-ok" else "bad")
+                stamp = record.get("__ejada_parsed_created")
+                when = pd.to_datetime(stamp, errors="coerce")
+                time_text = when.strftime("%Y-%m-%d %H:%M") if pd.notna(when) else "—"
+                lines.append(
+                    f'<tr class="{row_class}"><td>{i}</td>'
+                    f'<td>{_esc(_snb_activity_short_name(record.get(collector_col,"—")))}</td>'
+                    f'<td>{_esc(str(record.get(notes_col,"—")))}</td>'
+                    f'<td class="snb-m-date">{_esc(time_text)}</td>'
+                    f'<td><span class="snb-m-chip {chip}">{_esc(state or "—")}</span></td></tr>'
+                )
+            checked = "all" if rating is None else ("ok" if rating == "ناجحة" else "bad")
+            radios = "".join(
+                f'<input class="f-{v}" type="radio" name="snb-kpi-filter-{key}" '
+                f'id="snb-kpi-{key}-{v}" {"checked" if v == checked else ""}>'
+                for v in ("all", "ok", "bad")
+            )
+            seg = (
+                f'<div class="snb-m-seg">'
+                f'<label class="la" for="snb-kpi-{key}-all">الكل</label>'
+                f'<label class="lo" for="snb-kpi-{key}-ok">ناجحة</label>'
+                f'<label class="lb" for="snb-kpi-{key}-bad">غير ناجحة</label></div>'
+            )
+            note = (f'<p class="snb-pr-note">أول 50 صف لكل حالة — باقي الصفوف في ملف Excel</p>'
+                    if len(detail_frame) > len(display_rows) else "")
+            modal = (
+                '<div class="snb-m-panel"><div class="snb-m-box">' + radios
+                + '<div class="snb-m-head"><span class="snb-m-ic">📞</span><div class="snb-m-t">'
+                + f'<h4>{_esc(label)}</h4>'
+                + '<span>تفاصيل الصفوف من الملف المحمّل · قراءة فقط</span></div>'
+                + f'<span class="snb-m-count">{len(rows):,} مكالمة</span>'
+                + f'<a class="snb-m-dl" href="#" role="button" data-snb-activity-download="{key}">⬇ تحميل Excel</a>'
+                + '</div>' + seg + '<div class="snb-m-tblwrap">'
+                + '<table class="snb-m-tbl"><thead>' + header + '</thead><tbody>'
+                + "".join(lines) + '</tbody></table>' + note
+                + '</div></div></div>'
+            )
+            blocks.append(
+                '<details class="snb-pr-details snb-act-kpi-cell"><summary>'
+                f'<article class="snb-act-kpi">{body}</article>'
+                '<span class="snb-m-backdrop"></span><span class="snb-m-close">✕</span>'
+                '</summary>' + modal + '</details>'
+            )
+        else:
+            blocks.append(f'<div class="snb-act-kpi">{body}</div>')
     return (
         '<style>'
-        '.snb-act-kpi-panel{direction:rtl;border:1px solid rgba(127,214,224,.28);'
-        'border-radius:16px;padding:16px 14px 20px;background:linear-gradient(115deg,'
-        'rgba(28,59,83,.8),rgba(24,108,81,.38));font-family:Cairo,sans-serif}'
+        '.snb-act-kpi-panel{direction:rtl;border:0;padding:0;background:transparent;font-family:Cairo,sans-serif}'
+        '.snb-act-kpi-grid>details{min-width:0}.snb-act-kpi-grid>details>summary{height:100%}'
+        '.snb-act-kpi-grid .snb-act-kpi{height:152px;box-sizing:border-box;position:relative}'
+        '.snb-act-kpi-grid .snb-pr-detail-btn{margin:0;position:absolute;bottom:9px;left:50%;transform:translateX(-50%)}'
+        '.snb-act-kpi-grid .snb-act-kpi:hover .snb-pr-btn-open,.snb-act-kpi-grid .snb-pr-details:focus-within .snb-pr-btn-open{opacity:1;visibility:visible}'
+        '.snb-act-kpi-grid .snb-pr-details[open] .snb-pr-btn-open{display:none}'
         '.snb-act-kpi-title{font-weight:800;text-align:right;color:var(--text,#fff);'
         'font-size:16px;margin:0 0 16px}'
         '.snb-act-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}'
-        '.snb-act-kpi{min-height:96px;display:flex;flex-direction:column;align-items:center;'
-        'justify-content:center;gap:8px;text-decoration:none!important;border:1px solid '
-        'rgba(255,255,255,.17);border-radius:12px;background:rgba(255,255,255,.07);'
-        'color:var(--text,#fff)!important}'
+        '.snb-act-kpi{min-height:152px;display:flex;flex-direction:column;align-items:center;'
+        'justify-content:center;gap:12px;text-decoration:none!important;border:1px solid '
+        'rgba(127,214,224,.30);border-radius:18px;background:var(--card,rgba(20,55,75,.78));'
+        'box-shadow:var(--shadow,0 9px 24px #061d3022);color:var(--text,#fff)!important;'
+        'transition:transform .18s,box-shadow .18s,border-color .18s}'
+        '.snb-act-kpi:hover,.snb-act-kpi:focus-visible{transform:translateY(-7px) scale(1.02);'
+        'border-color:#5be39a;box-shadow:0 0 24px rgba(91,227,154,.45)}'
         '.snb-act-kpi span{font-size:11px;color:rgba(255,255,255,.7)}'
-        '.snb-act-kpi strong{font-size:26px;color:#fff;line-height:1.1}'
-        '.snb-act-kpi i{height:2px;width:20px;background:#5be39a;border-radius:5px}'
+        '.snb-act-kpi strong{font-size:48px;color:var(--text,#fff);line-height:1.1}'
+        '.snb-act-kpi i{height:3px;width:32px;background:#5be39a;border-radius:5px}'
+        '.snb-act-kpi:nth-child(1) i,.snb-act-kpi:nth-child(4) i{background:#fff}'
+        '.snb-act-kpi:nth-child(3) i{background:#7fd6e0}'
         '@media(max-width:650px){.snb-act-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}'
-        '</style><section class="snb-act-kpi-panel"><h3 class="snb-act-kpi-title">'
-        'لوحة مؤشرات النشاط | SNB · '+_esc(period)
-        +'</h3><div class="snb-act-kpi-grid">'+''.join(blocks)+'</div></section>'
+        '</style><section class="snb-act-kpi-panel"><div class="snb-act-kpi-grid">'+''.join(blocks)+'</div></section>'
     )
 
 
@@ -8975,7 +9054,7 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
         '.st-key-snb_visual_board [data-testid="stPlotlyChart"]{width:100%}'
         '.st-key-snb_visual_board .stMarkdown h4{font-size:15px;text-align:right;direction:rtl}'
         '[class*="st-key-snb_activity_card_"] [data-testid="stVerticalBlockBorderWrapper"]'
-        '{min-height:320px;position:relative;}'
+        '{min-height:0;height:100%;max-height:100%;overflow:hidden;position:relative;}'
         '[class*="st-key-snb_activity_card_"] [data-testid="stButton"]'
         '{opacity:0;transition:opacity .18s;}'
         '[class*="st-key-snb_activity_card_"]:hover [data-testid="stButton"],'
@@ -8993,11 +9072,12 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
         'background:conic-gradient(#5be39a var(--part),rgba(127,214,224,.28) 0);'
         'mask:radial-gradient(farthest-side,transparent 55%,#000 60%);}'
         '.snb-v-rank-row small{min-width:35px;color:#a9c5ce;text-align:left;}'
-        '.snb-v-heat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;direction:rtl;}'
+        '.snb-v-heat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;direction:rtl;align-content:start;}'
         '.snb-v-heat{background:rgba(255,255,255,.065);border-radius:9px;padding:9px 7px;'
         'text-align:center;display:flex;flex-direction:column;gap:2px;}'
         '.snb-v-heat small{font-size:10px;color:#d2edec;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
         '.snb-v-heat strong{font-size:23px;line-height:1.15;}'
+        '.snb-v-heat{height:92px;box-sizing:border-box;overflow:hidden;}'
         '.snb-v-track{background:rgba(255,255,255,.13);height:4px;border-radius:4px;overflow:hidden;}'
         '.snb-v-track i{display:block;height:4px;border-radius:4px;}'
         '.snb-v-donut{text-align:center;direction:rtl;}'
@@ -9013,11 +9093,11 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
 .st-key-snb_visual_board {direction:rtl}
 .st-key-snb_visual_board [class*="st-key-snb_activity_card_"]{
  border:1px solid rgba(127,214,224,.28)!important;
- border-radius:15px!important;padding:12px!important;min-height:320px!important;
- box-sizing:border-box!important;
+ border-radius:15px!important;padding:12px!important;min-height:0!important;height:360px!important;max-height:360px!important;
+ overflow:hidden!important;box-sizing:border-box!important;
  background:linear-gradient(115deg,rgba(29,63,84,.85),rgba(22,101,78,.6))!important}
 .st-key-snb_visual_board [class*="st-key-snb_activity_card_"]:hover{
- border-color:#5be39a!important;box-shadow:0 0 16px rgba(91,227,154,.26)!important}
+ border-color:#5be39a!important;box-shadow:0 0 16px rgba(91,227,154,.26)!important;transform:translateY(-4px) rotate(-.5deg)}
 .st-key-snb_visual_board [class*="st-key-snb_activity_card_"] [data-testid="stPlotlyChart"]{
  background:transparent!important;border:none!important;padding:0!important}
 .snb-v-split-list,.snb-v-horizontal-list,.snb-v-lollipop,.snb-v-timeline{
@@ -9029,6 +9109,8 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
 .snb-v-split-legend{margin-top:auto;display:flex;justify-content:center;gap:16px;font-size:10px}
 .snb-v-split-legend span:first-child{color:#5be39a}
 .snb-v-split-legend span:last-child{color:#7fd6e0}
+.snb-v-split-row{color:#fff;text-shadow:0 1px 3px #102939}
+.snb-v-split-row span,.snb-v-split-row b{position:relative;z-index:1}
 .snb-v-timeline{display:flex;flex-direction:column;justify-content:center;gap:13px;font-size:11px}
 .snb-v-times,.snb-v-time-captions{display:flex;justify-content:space-between;direction:ltr}
 .snb-v-times{font-size:22px;color:#7fd6e0}
@@ -9070,9 +9152,9 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
  background:rgba(255,255,255,.95)!important;border:1px solid rgba(127,214,224,.75)!important;
  border-radius:9px!important;color:#0e2a47!important;min-height:42px}
 .st-key-snb_visual_board [data-testid="stMultiSelect"] [data-baseweb="tag"]{
- background:#b9f2d8!important;color:#0e2a47!important;border-radius:99px!important}
+ background:rgba(91,227,154,.18)!important;color:#fff!important;border:1px solid #5be39a!important;border-radius:99px!important}
 .st-key-snb_visual_board [data-testid="stMultiSelect"] [data-baseweb="tag"] *{
- color:#0e2a47!important}
+ color:#fff!important}
 .st-key-snb_visual_board [class*="st-key-snb_visual_clear_filter"] button{
  background:transparent!important;color:#7fd6e0!important;border:1px solid #7fd6e0!important;
  border-radius:99px!important}
@@ -9090,6 +9172,7 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
 </style>
 """,unsafe_allow_html=True)
 
+    _activity_downloads = {}
     with st.container(key="snb_visual_board"):
         if preview:
             selected_names = [
@@ -9101,7 +9184,8 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
             selected_names = st.multiselect(
                 "🔍 ابحثي عن محصل…", options,
                 placeholder="اختاري محصل أو أكثر · بدون اختيار = الكل",
-                label_visibility="collapsed", key=filter_key
+                label_visibility="collapsed", key=filter_key,
+                format_func=_snb_activity_short_name
             )
             if selected_names:
                 def _clear_snb_visual_filter():
@@ -9123,8 +9207,29 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
             with kpi_slot:
                 st.markdown(_snb_activity_glass_kpis(
                     total, int((rated == "ناجحة").sum()),
-                    int((rated == "غير ناجحة").sum()), pending, period_label
+                    int((rated == "غير ناجحة").sum()), pending, period_label,
+                    detail_frame=frame, collector_col=collector_col, notes_col=notes_col
                 ), unsafe_allow_html=True)
+            # Existing delegated native Excel downloads, scoped to the filtered calls.
+            # Only after all reviews are approved (preview=False).
+            for _card in ("91", "92", "93"):
+                for _suffix, _rating in (("1", None), ("2", "ناجحة"), ("3", "غير ناجحة")):
+                    _key = _card + _suffix
+                    _subset = frame if _rating is None else frame.loc[rated.eq(_rating)]
+                    _records = []
+                    for _num, (_, _rec) in enumerate(_subset.iterrows(), 1):
+                        _dt = pd.to_datetime(_rec.get(stamp), errors="coerce")
+                        _records.append({
+                            "#": _num, "المحصل": str(_rec.get(collector_col,"—")),
+                            "الإفادة": str(_rec.get(notes_col,"—")),
+                            "وقت المكالمة": _dt.strftime("%Y-%m-%d %H:%M") if pd.notna(_dt) else "—",
+                            "الحالة": str(_rec.get("تقييم المكالمات","—")),
+                        })
+                    _data = pd.DataFrame(_records, columns=["#","المحصل","الإفادة","وقت المكالمة","الحالة"])
+                    _bytes = io.BytesIO()
+                    with pd.ExcelWriter(_bytes, engine="openpyxl") as _writer:
+                        _data.to_excel(_writer, sheet_name="التفاصيل", index=False)
+                    _activity_downloads[_key] = _bytes.getvalue()
 
         waste_detail, waste_summary = _snb_wasted_time_reports(
             frame, collector_col, notes_col, activity_kind=kind
@@ -9158,7 +9263,7 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
 
         # Reuse the promise page's HTML details/summary/modal class structure.
         # Each card gets the same snb-pr-details / snb-m-backdrop / snb-m-close.
-        _activity_downloads = {}
+        # KPI export entries are already registered in the same download transport.
 
         def _activity_modal_html(title, detail, key):
             detail = table(detail).reset_index(drop=True)
@@ -9219,12 +9324,7 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
                 if not preview:
                     st.markdown(_activity_details_html(title, detail, key), unsafe_allow_html=True)
 
-        def short_name(name):
-            value = str(name).strip()
-            prefix = "SNB II NPL II"
-            if value.upper().startswith(prefix):
-                value = value[len(prefix):].strip(" -|:")
-            return value or str(name)
+        short_name = _snb_activity_short_name
 
         top = calls.head(10)
         fig1 = fig_base()
@@ -9238,10 +9338,14 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
 
         top2 = calls.head(len(selected_names) if selected_names else 4)
         custom2 = '<div class="snb-v-split-list">' + "".join(
-            f'<div class="snb-v-split-row" style="width:{max(45,100*count/max(1,int(top2.max()))):.1f}%">'
-            f'<span>{html_escape(short_name(name))}</span><b>'
-            f'{"— / —" if preview else str(int(unsuccessful.get(name,0))) + " / " + str(int(success.get(name,0)))}'
-            '</b></div>'
+            f'<div class="snb-v-split-row" style="width:{max(45,100*count/max(1,int(top2.max()))):.1f}%;'
+            + (f'background:linear-gradient(to left,rgba(91,227,154,.8) 0%,'
+               f'rgba(91,227,154,.8) {100*int(success.get(name,0))/max(1,int(count)):.2f}%,'
+               f'rgba(127,214,224,.8) {100*int(success.get(name,0))/max(1,int(count)):.2f}%,'
+               f'rgba(127,214,224,.8) 100%);' if not preview else '')
+            + f'"><span>{html_escape(short_name(name))}</span><b>'
+            + ('— / —' if preview else f'{int(success.get(name,0))} / {int(unsuccessful.get(name,0))}')
+            + '</b></div>'
             for name,count in top2.items()
         ) + ('<div class="snb-v-split-legend"><span>● ناجحة (من الموديل)</span>'
              '<span>● غير ناجحة (من الموديل)</span></div></div>')
@@ -9517,8 +9621,8 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
             cols = [
                 short_name(entry["المحصل"]) if not is_total else "الإجمالي",
                 number_format(entry["المكالمات"]),
-                f'{entry["نسبة الناجحة"]}%',
-                f'{entry["الوقت المهدر"]} د',
+                f'{float(entry["نسبة الناجحة"]):.0f}%',
+                f'{float(entry["الوقت المهدر"]):.0f} د',
                 str(entry["أول مكالمة"]),str(entry["آخر مكالمة"])
             ]
             rows_html += '<tr class="snb-v-srow'+style_class+'">' + "".join(
@@ -9576,7 +9680,13 @@ overflow:hidden!important;opacity:0!important;pointer-events:none!important}
     const link = event.target.closest('a[data-snb-activity-download]');
     if (!link) return;
     event.preventDefault();
-    const mid = link.getAttribute('data-snb-activity-download');
+    let mid = link.getAttribute('data-snb-activity-download');
+    if (/^9[123]$/.test(mid)) {
+      const selected = link.closest('.snb-m-box')?.querySelector('input[type="radio"]:checked');
+      const suffix = selected?.classList.contains('f-ok') ? '2' :
+                     selected?.classList.contains('f-bad') ? '3' : '1';
+      mid = mid + suffix;
+    }
     if (!/^(?:\d+|collectors)$/.test(mid)) return;
     const host = document.querySelector('.st-key-snb_activity_dl_' + mid);
     const button = host && host.querySelector('button');
@@ -11302,7 +11412,7 @@ def render_snb_activity_report(model_upload, activity_upload, activity_kind, err
                     review_choices = st.multiselect(
                         "فلتر المحصل (اختيار أكثر من محصل)",
                         options=review_options, key="snb_activity_visual_collectors",
-                        placeholder="ابحث عن محصل..."
+                        placeholder="ابحث عن محصل...", format_func=_snb_activity_short_name
                     )
                     review_selected = (
                         selected.loc[review_names.isin(review_choices)]
@@ -13866,6 +13976,31 @@ elif page_uploaded is None:
                         args=(selected_bank,),
                     )
 
+        # SNB: show genuine blank placeholders until an activity file is supplied.
+        if selected_bank == "SNB" and st.session_state.activity_page_uploads["SNB"]["activity"] is None:
+            _ejada_activity_kpis("SNB", None, None, None, None)
+            st.markdown('<p style="text-align:center;direction:rtl;color:var(--muted);font-family:Cairo,sans-serif">ارفعي الملف علشان تظهر الأرقام</p>', unsafe_allow_html=True)
+
+
+        # Activity page only: keep the select controls light in every browser theme.
+        if selected_bank == "SNB":
+            st.markdown("""<style>
+            .st-key-snb_activity_header_row [data-baseweb="select"]>div,
+            .st-key-snb_activity_daily_options [data-baseweb="select"]>div,
+            .st-key-snb_activity_header_row [data-baseweb="select"] input,
+            .st-key-snb_activity_daily_options [data-baseweb="select"] input{
+              background:#f1f3f8!important;color:#222!important;-webkit-text-fill-color:#222!important}
+            .st-key-snb_activity_header_row [data-baseweb="select"] span,
+            .st-key-snb_activity_daily_options [data-baseweb="select"] span{
+              color:#222!important;-webkit-text-fill-color:#222!important}
+            body:has(.st-key-snb_activity_header_row):has(.st-key-snb_pr_header)
+              [data-baseweb="popover"] [data-baseweb="menu"]{
+              background:#f1f3f8!important;color:#222!important}
+            .st-key-snb_activity_header_row .st-key-upload_box_activity_file{
+              border-radius:16px!important;background:var(--card)!important;
+              border:1px solid var(--border)!important}
+            </style>""",unsafe_allow_html=True)
+
         # STC has its OWN model, review and encrypted file — never SNB.
         if selected_bank == "STC":
             _stc_uploaded = st.session_state.activity_page_uploads["STC"]
@@ -13882,7 +14017,7 @@ elif page_uploaded is None:
             # No baseline model available yet: count coverage, but never guess.
             _waiting = st.session_state.activity_page_uploads["SNB"]["activity"]
             if _waiting is None:
-                _ejada_activity_kpis("SNB", 0, 0, 0)
+                pass  # Empty KPI placeholders were rendered above.
             else:
                 try:
                     _waiting_data, _ = _prepare_snb_activity_file(_waiting, activity_kind)
