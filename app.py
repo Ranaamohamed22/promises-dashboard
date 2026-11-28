@@ -8937,12 +8937,16 @@ def _snb_activity_glass_kpis(covered, successful, unsuccessful, unresolved, peri
                 "ناجحة": ("92", "ناجحة"),
                 "غير ناجحة": ("93", "غير ناجحة"),
             }[label]
-            rows = detail_frame
-            if rating:
-                rows = rows.loc[rows["تقييم المكالمات"].astype(str).str.strip().eq(rating)]
+            # Status tabs share all collector-filtered calls; each shows its own first 50.
+            display_rows = pd.concat([
+                detail_frame.loc[detail_frame["تقييم المكالمات"].astype(str).str.strip().eq("ناجحة")].head(50),
+                detail_frame.loc[detail_frame["تقييم المكالمات"].astype(str).str.strip().eq("غير ناجحة")].head(50),
+            ]).sort_index(kind="mergesort")
+            rows = (detail_frame if rating is None else
+                    detail_frame.loc[detail_frame["تقييم المكالمات"].astype(str).str.strip().eq(rating)])
             header = '<tr><th>#</th><th>المحصل</th><th>الإفادة</th><th>وقت المكالمة</th><th>الحالة</th></tr>'
             lines = []
-            for i, (_, record) in enumerate(rows.head(50).iterrows(), 1):
+            for i, (_, record) in enumerate(display_rows.iterrows(), 1):
                 state = str(record.get("تقييم المكالمات", "")).strip()
                 row_class = "st-ok" if state == "ناجحة" else ("st-bad" if state == "غير ناجحة" else "")
                 chip = ("ok" if row_class == "st-ok" else "bad")
@@ -8968,8 +8972,8 @@ def _snb_activity_glass_kpis(covered, successful, unsuccessful, unresolved, peri
                 f'<label class="lo" for="snb-kpi-{key}-ok">ناجحة</label>'
                 f'<label class="lb" for="snb-kpi-{key}-bad">غير ناجحة</label></div>'
             )
-            note = (f'<p class="snb-pr-note">أول 50 صف من {len(rows):,} — الباقي في ملف Excel</p>'
-                    if len(rows) > 50 else "")
+            note = (f'<p class="snb-pr-note">أول 50 صف لكل حالة — باقي الصفوف في ملف Excel</p>'
+                    if len(detail_frame) > len(display_rows) else "")
             modal = (
                 '<div class="snb-m-panel"><div class="snb-m-box">' + radios
                 + '<div class="snb-m-head"><span class="snb-m-ic">📞</span><div class="snb-m-t">'
@@ -9208,22 +9212,24 @@ body:has(.st-key-snb_visual_board) [data-baseweb="popover"] [data-baseweb="menu"
                 ), unsafe_allow_html=True)
             # Existing delegated native Excel downloads, scoped to the filtered calls.
             # Only after all reviews are approved (preview=False).
-            for _key, _rating in (("91", None), ("92", "ناجحة"), ("93", "غير ناجحة")):
-                _subset = frame if _rating is None else frame.loc[rated.eq(_rating)]
-                _records = []
-                for _num, (_, _rec) in enumerate(_subset.iterrows(), 1):
-                    _dt = pd.to_datetime(_rec.get(stamp), errors="coerce")
-                    _records.append({
-                        "#": _num, "المحصل": str(_rec.get(collector_col,"—")),
-                        "الإفادة": str(_rec.get(notes_col,"—")),
-                        "وقت المكالمة": _dt.strftime("%Y-%m-%d %H:%M") if pd.notna(_dt) else "—",
-                        "الحالة": str(_rec.get("تقييم المكالمات","—")),
-                    })
-                _data = pd.DataFrame(_records, columns=["#","المحصل","الإفادة","وقت المكالمة","الحالة"])
-                _bytes = io.BytesIO()
-                with pd.ExcelWriter(_bytes, engine="openpyxl") as _writer:
-                    _data.to_excel(_writer, sheet_name="التفاصيل", index=False)
-                _activity_downloads[_key] = _bytes.getvalue()
+            for _card in ("91", "92", "93"):
+                for _suffix, _rating in (("1", None), ("2", "ناجحة"), ("3", "غير ناجحة")):
+                    _key = _card + _suffix
+                    _subset = frame if _rating is None else frame.loc[rated.eq(_rating)]
+                    _records = []
+                    for _num, (_, _rec) in enumerate(_subset.iterrows(), 1):
+                        _dt = pd.to_datetime(_rec.get(stamp), errors="coerce")
+                        _records.append({
+                            "#": _num, "المحصل": str(_rec.get(collector_col,"—")),
+                            "الإفادة": str(_rec.get(notes_col,"—")),
+                            "وقت المكالمة": _dt.strftime("%Y-%m-%d %H:%M") if pd.notna(_dt) else "—",
+                            "الحالة": str(_rec.get("تقييم المكالمات","—")),
+                        })
+                    _data = pd.DataFrame(_records, columns=["#","المحصل","الإفادة","وقت المكالمة","الحالة"])
+                    _bytes = io.BytesIO()
+                    with pd.ExcelWriter(_bytes, engine="openpyxl") as _writer:
+                        _data.to_excel(_writer, sheet_name="التفاصيل", index=False)
+                    _activity_downloads[_key] = _bytes.getvalue()
 
         waste_detail, waste_summary = _snb_wasted_time_reports(
             frame, collector_col, notes_col, activity_kind=kind
@@ -9674,7 +9680,13 @@ overflow:hidden!important;opacity:0!important;pointer-events:none!important}
     const link = event.target.closest('a[data-snb-activity-download]');
     if (!link) return;
     event.preventDefault();
-    const mid = link.getAttribute('data-snb-activity-download');
+    let mid = link.getAttribute('data-snb-activity-download');
+    if (/^9[123]$/.test(mid)) {
+      const selected = link.closest('.snb-m-box')?.querySelector('input[type="radio"]:checked');
+      const suffix = selected?.classList.contains('f-ok') ? '2' :
+                     selected?.classList.contains('f-bad') ? '3' : '1';
+      mid = mid + suffix;
+    }
     if (!/^(?:\d+|collectors)$/.test(mid)) return;
     const host = document.querySelector('.st-key-snb_activity_dl_' + mid);
     const button = host && host.querySelector('button');
