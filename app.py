@@ -8896,6 +8896,7 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
     from html import escape as html_escape
+    import math
 
     stamp = "__ejada_parsed_created"
     colors = ["#5be39a", "#7fd6e0", "#2fb3a6", "#b9f2d8"]
@@ -8919,6 +8920,15 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
         'background:linear-gradient(120deg,rgba(26,61,83,.72),rgba(17,111,80,.3));}'
         '.st-key-snb_visual_board [data-testid="stPlotlyChart"]{width:100%}'
         '.st-key-snb_visual_board .stMarkdown h4{font-size:15px;text-align:right;direction:rtl}'
+        '[class*="st-key-snb_activity_card_"] [data-testid="stVerticalBlockBorderWrapper"]'
+        '{min-height:320px;position:relative;}'
+        '[class*="st-key-snb_activity_card_"] [data-testid="stButton"]'
+        '{opacity:0;transition:opacity .18s;}'
+        '[class*="st-key-snb_activity_card_"]:hover [data-testid="stButton"],'
+        '[class*="st-key-snb_activity_card_"]:focus-within [data-testid="stButton"]'
+        '{opacity:1;}'
+        '[class*="st-key-snb_activity_card_"]:hover [data-testid="stVerticalBlockBorderWrapper"]'
+        '{border-color:#5be39a!important;box-shadow:0 0 12px rgba(91,227,154,.28);}'
         '</style>', unsafe_allow_html=True
     )
 
@@ -8991,30 +9001,37 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
             fig.update_layout(margin=dict(l=6,r=35,t=8,b=8))
             return fig
 
+        @st.dialog("تفاصيل مؤشرات النشاط", width="large")
+        def _snb_card_modal(title, detail, key):
+            detail = table(detail).reset_index(drop=True)
+            st.markdown(f"### {title}")
+            st.caption("Excel بتحمّل صفوف الكارت ده بس · قراءة فقط")
+            st.caption(f"{len(detail):,} صف")
+            workbook = io.BytesIO()
+            with pd.ExcelWriter(workbook, engine="openpyxl") as writer:
+                detail.to_excel(writer, sheet_name="Details", index=False)
+                writer.book.active.sheet_view.showGridLines = True
+            st.download_button(
+                "⬇ تحميل Excel", data=workbook.getvalue(),
+                file_name=f"SNB_Activity_Card_{key}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key=f"snb_visual_export_{key}"
+            )
+            st.dataframe(detail, hide_index=True, use_container_width=True)
+
         def open_card(number, title, figure, detail, key, custom=None):
-            with st.container(border=True):
+            with st.container(border=True, key=f"snb_activity_card_{key}"):
                 st.markdown(f"**{number}. {title}**")
                 if figure is not None:
-                    st.plotly_chart(figure, use_container_width=True, config={"displayModeBar":False},
+                    st.plotly_chart(figure, use_container_width=True,
+                                    config={"displayModeBar":False},
                                     key=f"snb_visual_chart_{key}")
                 elif custom is not None:
                     st.html(custom)
                 else:
                     st.info("—")
-                with st.popover("◉ عرض التفاصيل", use_container_width=False):
-                    st.caption("Excel بتحمّل صفوف الكارت ده بس · قراءة فقط")
-                    detail = table(detail).reset_index(drop=True)
-                    st.dataframe(detail, hide_index=True, use_container_width=True)
-                    workbook = io.BytesIO()
-                    with pd.ExcelWriter(workbook, engine="openpyxl") as writer:
-                        detail.to_excel(writer, sheet_name="Details", index=False)
-                        writer.book.active.sheet_view.showGridLines = True
-                    st.download_button(
-                        "⬇ تحميل Excel", data=workbook.getvalue(),
-                        file_name=f"SNB_Activity_Card_{key}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key=f"snb_visual_export_{key}"
-                    )
+                if st.button("◉ عرض التفاصيل", key=f"snb_activity_details_{key}"):
+                    _snb_card_modal(title, detail, key)
 
         top = calls.head(10)
         fig1 = fig_base()
@@ -9040,16 +9057,31 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
         })
 
         rank3 = unsuccessful.sort_values(ascending=False)
-        fig3 = horizontal(rank3.head(8).index,rank3.head(8).values,colors[1])
+        all_rated = result["تقييم المكالمات"].fillna("").astype(str).str.strip()
+        full_unsuccessful_total = int((all_rated == "غير ناجحة").sum())
         d3 = pd.DataFrame({
             "المحصل":rank3.index,"غير ناجحة":rank3.values,
             "% من إجمالي غير الناجحة":[
-                round(100*x/max(1,int(unsuccessful.sum())),1) for x in rank3.values
+                round(100*x/max(1,full_unsuccessful_total),1) for x in rank3.values
             ]
         })
+        custom3 = '<div class="snb-v-rank-list">' + "".join(
+            f'<div class="snb-v-rank-row"><span class="snb-v-rank">{i+1}</span>'
+            f'<span class="snb-v-rank-name">{html_escape(str(name))}</span>'
+            f'<b>{int(value)} مكالمة</b>'
+            f'<span class="snb-v-ring" style="--part:{100*value/max(1,full_unsuccessful_total):.3f}%"></span>'
+            f'<small>{100*value/max(1,full_unsuccessful_total):.1f}%</small></div>'
+            for i,(name,value) in enumerate(rank3.head(8).items())
+        ) + '</div>'
         rank4 = waste.sort_values(ascending=False)
-        fig4 = horizontal(rank4.head(8).index,rank4.head(8).round(1).values,colors[1])
         d4 = pd.DataFrame({"المحصل":rank4.index,"الوقت المهدر (د)":rank4.round(2).values})
+        custom4 = '<div class="snb-v-heat-grid">' + "".join(
+            f'<div class="snb-v-heat"><small>#{i+1} · {html_escape(str(name))}</small>'
+            f'<strong style="color:{colors[0] if i<3 else colors[1]}">{value:.0f} <small>د</small></strong>'
+            f'<div class="snb-v-track"><i style="background:{colors[0] if i<3 else colors[1]};'
+            f'width:{100*value/max(1,float(rank4.max())):.2f}%"></i></div></div>'
+            for i,(name,value) in enumerate(rank4.head(8).items())
+        ) + '</div>'
 
         firsts = (pd.DataFrame({"المحصل":names,"الوقت":timestamps})
                   .dropna(subset=["الوقت"]).groupby("المحصل")["الوقت"].min().sort_values())
@@ -9111,11 +9143,17 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
         fig8 = horizontal(d8["الحالة"].tolist(),d8["عدد المكالمات"].tolist(),colors[0])
         d9 = counts_with_percent(cls_col,"التصنيف")
         fig9 = fig_base()
+        for idx, row in d9.iterrows():
+            count = int(row["عدد المكالمات"])
+            fig9.add_shape(type="line", x0=0, x1=count, y0=idx, y1=idx,
+                           line=dict(color=colors[idx % len(colors)], width=2))
         fig9.add_trace(go.Scatter(
-            x=d9["عدد المكالمات"],y=d9["التصنيف"],mode="markers+text",
+            x=d9["عدد المكالمات"],y=list(range(len(d9))),mode="markers+text",
             text=[f"{v} · {p}%" for v,p in zip(d9["عدد المكالمات"],d9["%"])],
-            textposition="middle right",marker=dict(color=colors[2],size=13)
+            textposition="middle left",marker=dict(color=[colors[i % len(colors)] for i in range(len(d9))],size=13)
         ))
+        fig9.update_yaxes(tickmode="array",tickvals=list(range(len(d9))),
+                          ticktext=d9["التصنيف"].tolist(),autorange="reversed")
         fig9.update_layout(margin=dict(l=6,r=70,t=8,b=8))
 
         if product_col and product_col in frame:
@@ -9127,13 +9165,46 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
             pv = pd.Series(dtype=int)
         d10 = pd.DataFrame({"المنتج":pv.index,"عدد المكالمات":pv.values,
                             "%":[round(100*v/max(1,total),1) for v in pv.values]})
-        fig10 = fig_base()
-        if not pv.empty:
-            fig10.add_trace(go.Pie(labels=pv.index,values=pv.values,hole=.68,
-                                   marker=dict(colors=colors[:len(pv)]),
-                                   textinfo="percent",sort=False))
-            fig10.update_layout(annotations=[dict(text=f"<b>{total}</b><br>مكالمة",
-                                                  x=.5,y=.5,showarrow=False,font=dict(size=18))])
+        # Rounded SVG arcs and leader labels match the promises-tab ring family.
+        ring_parts = []
+        leaders = []
+        pills = []
+        previous = -90.0
+        for i, (product, value) in enumerate(pv.items()):
+            ratio = float(value) / max(1, int(pv.sum()))
+            portion = ratio * 360
+            start_angle = previous + 2
+            end_angle = previous + portion - 2
+            if end_angle > start_angle:
+                start_rad, end_rad = [math.radians(v) for v in (start_angle,end_angle)]
+                x1,y1 = 130+57*math.cos(start_rad),130+57*math.sin(start_rad)
+                x2,y2 = 130+57*math.cos(end_rad),130+57*math.sin(end_rad)
+                ring_parts.append(
+                    f'<path d="M{x1:.2f} {y1:.2f} A57 57 0 {1 if end_angle-start_angle>180 else 0} 1 '
+                    f'{x2:.2f} {y2:.2f}" stroke="{colors[i%len(colors)]}" stroke-width="24" '
+                    f'stroke-linecap="round" fill="none"/>'
+                )
+                angle = math.radians(previous + portion/2)
+                a,b = 130+78*math.cos(angle),130+78*math.sin(angle)
+                c,d = 130+94*math.cos(angle),130+94*math.sin(angle)
+                right = math.cos(angle)>=0
+                endx = c+(12 if right else -12)
+                tx = endx+(8 if right else -8)
+                leaders.append(
+                    f'<path d="M{a:.1f} {b:.1f} L{c:.1f} {d:.1f} L{endx:.1f} {d:.1f}" '
+                    f'fill="none" stroke="{colors[i%len(colors)]}" stroke-width="1.5"/>'
+                    f'<text x="{tx:.1f}" y="{d+5:.1f}" text-anchor="{"start" if right else "end"}" '
+                    f'font-size="12" font-weight="bold" fill="{colors[i%len(colors)]}">'
+                    f'{ratio*100:.1f}%</text>'
+                )
+            previous += portion
+            pills.append(f'<span>{html_escape(str(product))} · {int(value)}</span>')
+        custom10 = ('<div class="snb-v-donut">'
+                    '<svg viewBox="0 0 300 270" style="width:100%;max-height:230px;overflow:visible">'
+                    + "".join(ring_parts+leaders)
+                    + f'<text x="130" y="126" text-anchor="middle" font-size="23" font-weight="800" fill="#fff">{total}</text>'
+                    + '<text x="130" y="147" text-anchor="middle" font-size="13" fill="#eafbf7">مكالمة</text>'
+                    + '</svg><div class="snb-v-pills">' + "".join(pills) + '</div></div>')
 
         debtor_col = _snb_find_column(frame,"Debitor","Debtor","رقم العميل","رقم الهوية")
         repeat = (frame[debtor_col].fillna("").astype(str).value_counts()
@@ -9153,14 +9224,14 @@ def _snb_activity_visual_dashboard(result, collector_col, notes_col, kind, perio
         cards = [
             ("المكالمات لكل محصل (أعلى 10)",fig1,d1,None),
             ("ناجحة / غير ناجحة لكل محصل",fig2,d2,None),
-            ("أكتر المحصلين مكالمات غير ناجحة (أعلى 8)",fig3,d3,None),
-            ("أكتر المحصلين وقت مهدر (أعلى 8)",fig4,d4,None),
+            ("أكتر المحصلين مكالمات غير ناجحة (أعلى 8)",None,d3,custom3),
+            ("أكتر المحصلين وقت مهدر (أعلى 8)",None,d4,custom4),
             ("مين بدأ الأول ومين بدأ الآخر",fig5,d5,None),
             ("المكالمات بالساعة",fig6,d6,None),
             ("فجوات طويلة (أكتر من 30 دقيقة)",fig7,d7,None),
             (f"حالات المكالمات ({total})",fig8,d8,None),
             ("نتيجة المكالمات (التصنيف)",fig9,d9,None),
-            ("المكالمات حسب المنتج",fig10,d10,None),
+            ("المكالمات حسب المنتج",None,d10,custom10),
             (f"عملاء اتكلمنا معاهم أكتر من مرة ({len(repeat)})",None,d11,custom11)
         ]
         for start in range(0,len(cards),3):
