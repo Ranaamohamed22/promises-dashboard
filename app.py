@@ -1972,22 +1972,22 @@ st.markdown(f"""
     .stApp .st-key-snb_pr_titlebar {{
         justify-content:space-between !important;gap:12px !important;margin:4px 0 24px;
     }}
-    .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page {{
+    .stApp :is(.st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page,.st-key-snb_activity_header_row .st-key-snb_activity_upload_card) {{
         min-height:60px;padding:6px 14px;border-radius:16px;background:var(--card);
         border-color:#ffffff33;backdrop-filter:var(--blur);
     }}
     .stApp .st-key-snb_ov_upload_promises_page p {{font-size:16px;font-weight:600;white-space:nowrap;}}
     .stApp .st-key-snb_pr_titlebar [data-testid="stFileUploader"] {{width:114px !important;min-width:114px !important;}}
     /* ===== مربع رفع المحفظة (صفحة الوعود): صف واحد بنفس الحجم قبل وبعد الملف ===== */
-    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page {{
+    html body .stApp :is(.st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page,.st-key-snb_activity_header_row .st-key-snb_activity_upload_card) {{
         gap:14px !important;
     }}
-    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page [data-testid="stFileUploader"],
-    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page div[class*="st-key-uploaded_chip_"] {{
+    html body .stApp :is(.st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page,.st-key-snb_activity_header_row .st-key-snb_activity_upload_card) [data-testid="stFileUploader"],
+    html body .stApp :is(.st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page,.st-key-snb_activity_header_row .st-key-snb_activity_upload_card) div[class*="st-key-uploaded_chip_"] {{
         width:400px !important;min-width:400px !important;max-width:100% !important;
     }}
-    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page [data-testid="stFileUploaderDropzone"],
-    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page div[class*="st-key-uploaded_chip_"] {{
+    html body .stApp :is(.st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page,.st-key-snb_activity_header_row .st-key-snb_activity_upload_card) [data-testid="stFileUploaderDropzone"],
+    html body .stApp :is(.st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page,.st-key-snb_activity_header_row .st-key-snb_activity_upload_card) div[class*="st-key-uploaded_chip_"] {{
         direction:rtl !important;display:flex !important;flex-direction:row !important;flex-wrap:nowrap !important;
         align-items:center !important;justify-content:flex-start !important;gap:10px !important;
         height:46px !important;min-height:46px !important;max-height:46px !important;box-sizing:border-box !important;
@@ -1995,21 +1995,21 @@ st.markdown(f"""
         background:rgba(127,127,127,.12) !important;box-shadow:none !important;overflow:hidden !important;
     }}
     /* قبل الملف: دايرة سهم + "لسه مفيش ملف" + زرار Upload */
-    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page [data-testid="stFileUploaderDropzone"]::before {{
+    html body .stApp :is(.st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page,.st-key-snb_activity_header_row .st-key-snb_activity_upload_card) [data-testid="stFileUploaderDropzone"]::before {{
         content:"↑";order:0;flex:none;width:28px;height:28px;border-radius:50%;box-sizing:border-box;
         border:2px solid var(--muted);color:var(--muted);display:grid;place-items:center;
         font:800 15px/1 Cairo,sans-serif;direction:ltr;
     }}
-    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page [data-testid="stFileUploaderDropzone"]::after {{
+    html body .stApp :is(.st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page,.st-key-snb_activity_header_row .st-key-snb_activity_upload_card) [data-testid="stFileUploaderDropzone"]::after {{
         content:"لسه مفيش ملف";order:1;flex:1 1 auto;min-width:0;color:var(--muted);
         font:600 13px Cairo,sans-serif;white-space:nowrap;text-align:right;
     }}
-    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page [data-testid="stFileUploaderDropzone"] button {{
+    html body .stApp :is(.st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page,.st-key-snb_activity_header_row .st-key-snb_activity_upload_card) [data-testid="stFileUploaderDropzone"] button {{
         order:2;flex:none;width:100px !important;min-width:100px !important;height:30px !important;min-height:30px !important;
         padding:0 !important;border-radius:15px !important;background:var(--btn) !important;
         border:0 !important;color:var(--btn-text) !important;
     }}
-    html body .stApp .st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page [data-testid="stFileUploaderDropzone"] button::after {{
+    html body .stApp :is(.st-key-snb_pr_titlebar .st-key-snb_ov_upload_promises_page,.st-key-snb_activity_header_row .st-key-snb_activity_upload_card) [data-testid="stFileUploaderDropzone"] button::after {{
         color:var(--btn-text) !important;-webkit-text-fill-color:var(--btn-text) !important;
         font:800 13px Cairo,sans-serif !important;
     }}
@@ -13962,18 +13962,10 @@ elif page_uploaded is None:
                         )
                         saved = st.session_state.activity_page_uploads[selected_bank]["activity"]
                         if saved:
-                            with st.container(key="snb_activity_file_chip", horizontal=True,
-                                              vertical_alignment="center"):
-                                st.markdown(
-                                    f'<span class="snb-act-upload-name">✓ '
-                                    f'{_xml_escape(saved.name)}</span>',
-                                    unsafe_allow_html=True
-                                )
-                                st.button(
-                                    "تغيير", key="snb_activity_file_change",
-                                    on_click=clear_activity_page_upload,
-                                    args=(selected_bank, "activity"), width="content"
-                                )
+                            uploaded_chip(
+                                saved, "snb_activity_file",
+                                clear_activity_page_upload, (selected_bank, "activity")
+                            )
                         else:
                             st.file_uploader(
                                 "رفع ملف النشاط", type=["xlsx", "csv"],
